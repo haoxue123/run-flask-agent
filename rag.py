@@ -200,11 +200,165 @@ def _split_markdown(filepath):
 
 
 # ============================================================
+# 知识文档元数据解析（H1 注释块 → 结构化字段）
+# ============================================================
+#
+# 知识文档在 H1 之后用 HTML 注释块写入元数据，例如：
+#   <!--
+#   meta:
+#     category: 公开指南
+#     author: WHO
+#     year: 2020
+#     authority_level: 高
+#     source_type: guideline
+#     lang: zh
+#   -->
+# 解析后写入 ChromaDB metadata，使检索可按 category 过滤、按
+# authority_level 加权（冲突时高权威优先）。
+
+_DEFAULT_META = {
+    "category": "自编",
+    "author": "团队自编",
+    "year": "未知",
+    "authority_level": "中",
+    "source_type": "note",
+    "lang": "zh",
+}
+
+# 权威度 → 加权系数（用于检索重排，冲突仲裁依据）
+_AUTH_WEIGHT = {"高": 1.0, "中": 0.65, "低": 0.35}
+
+
+def _parse_meta(filepath):
+    """
+    从 Markdown 文件解析 H1 后的 <!-- meta: ... --> 注释块。
+
+    返回 dict；若文件中无 meta 块，返回空 dict（调用方用 _DEFAULT_META 兜底）。
+    """
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return {}
+
+    m = re.search(r"<!--\s*meta:(.*?)-->", text, re.S)
+    if not m:
+        return {}
+
+    meta = {}
+    for line in m.group(1).splitlines():
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        key = key.strip()
+        value = value.strip()
+        if key and value:
+            meta[key] = value
+    return meta
+
+
+def rerank_with_authority(results, boost=0.2, summary_boost=0.04):
+    """
+    按「相似度 + 权威度 + 摘要」融合重排检索结果（冲突仲裁核心）。
+
+    - results: retrieve_knowledge 的原始输出列表（每条含 score / authority_level / is_summary）
+    - boost: 权威度融合权重（0=只看相似度，1=只看权威度）；默认 0.2
+    - summary_boost: 中文摘要块额外加成（0=不加成）；默认 0.04，用于提升中文召回
+    - 返回：重排后的新列表，每条额外带 fused_score 字段
+
+    规则：高权威源在相似度接近时胜出；相似度差距大时仍以相似度为主；
+          is_summary=true 的摘要块给予小幅加成，优先呈现文档要点。
+    """
+    if not results:
+        return results
+
+    out = []
+    for r in results:
+        lvl = r.get("authority_level", "中")
+        aw = _AUTH_WEIGHT.get(lvl, 0.65)
+        base = r.get("score", 0.0)
+        sb = summary_boost if str(r.get("is_summary", "false")).lower() in ("true", "1") else 0.0
+        fused = (1.0 - boost) * base + boost * aw + sb
+        item = dict(r)
+        item["authority_level"] = lvl
+        item["is_summary"] = str(r.get("is_summary", "false")).lower() in ("true", "1")
+        item["fused_score"] = round(min(1.0, fused), 4)
+        out.append(item)
+
+    out.sort(key=lambda x: x["fused_score"], reverse=True)
+    return out
+
+
+# ============================================================
+# 治理文件识别 + 文档标题/摘要解析
+# ============================================================
+
+# 治理/运营类文档：不入库为「知识」，避免被当作权威知识引用
+_GOVERNANCE_FILES = {"OPERATIONS.md"}
+
+
+def _is_governance(filename):
+    """文件名以 _ 开头（如 _licenses.md）或为已知运营文档 → 视为治理文件，跳过入库。"""
+    return filename.startswith("_") or filename in _GOVERNANCE_FILES
+
+
+def _doc_title(filepath):
+    """提取一级标题作为文档标题；缺省回退为文件名。"""
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read()
+    except OSError:
+        return os.path.basename(filepath)
+    m = re.match(r"^#\s+(.+)$", content, re.MULTILINE)
+    return m.group(1).strip() if m else os.path.basename(filepath)
+
+
+def _extract_summary(filepath):
+    """
+    提取文档的「概述与中文要点摘要」节正文，用于构建中文摘要层。
+    无该节时返回空串（不新增摘要块）。
+    """
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return ""
+    m = re.search(r"##\s*概述与中文要点摘要\s*\n(.*?)(?=\n##\s|\Z)", text, re.S)
+    return m.group(1).strip() if m else ""
+
+
+# ============================================================
 # 索引构建与加载
 # ============================================================
 
 _collection = None
 _build_lock = threading.Lock()
+
+# ============================================================
+# 检索结果缓存（自失效 LRU）
+# ------------------------------------------------------------
+# 热路径 retrieve_knowledge() 每次都会对 query 重新嵌入 + 向量检索 +
+# 重排。教练对话中，同一用户消息的重试 / 完全相同的追问会重复触发，
+# 缓存可避免重复的嵌入与检索开销。
+#
+# 失效策略：缓存与索引版本号 _retrieve_cache_version 绑定。任何会
+# 改变索引内容的操作（reset_index / build_index）都会使版本号自增并
+# 清空缓存，从而保证缓存结果永远与当前索引一致，无需调用方感知。
+# ============================================================
+
+_retrieve_cache = {}            # (query, top_k, category, authority_boost) -> (version, results)
+_retrieve_cache_order = []     # LRU 访问顺序（队首最旧）
+_retrieve_cache_max = 128       # 最大缓存条目数
+_retrieve_cache_version = 0     # 索引版本号：重建时自增
+_retrieve_cache_lock = threading.Lock()
+
+
+def _invalidate_retrieve_cache():
+    """使检索缓存整体失效（索引重建时调用）。"""
+    global _retrieve_cache_version
+    _retrieve_cache_version += 1
+    _retrieve_cache.clear()
+    _retrieve_cache_order.clear()
 
 
 def _is_index_valid(db_dir):
@@ -294,6 +448,9 @@ def build_index(knowledge_dir=None, db_dir=None):
     if db_dir is None:
         db_dir = _DEFAULT_DB_DIR
 
+    # 索引内容即将被重建：使检索缓存整体失效
+    _invalidate_retrieve_cache()
+
     import chromadb
 
     # 扫描知识文档
@@ -320,15 +477,45 @@ def build_index(knowledge_dir=None, db_dir=None):
 
     for filepath in md_files:
         filename = os.path.basename(filepath)
+        # 治理/运营文档不入库为「知识」
+        if _is_governance(filename):
+            print(f"[RAG] 跳过治理文件（不入库）：{filename}")
+            continue
         chunks = _split_markdown(filepath)
+        # 解析文档级元数据（无 meta 块则用默认兜底）
+        doc_meta = _parse_meta(filepath) or dict(_DEFAULT_META)
+        doc_title = _doc_title(filepath)
         for i, chunk in enumerate(chunks):
             chunk_id = f"{filename}_{i}"
             all_chunks.append(chunk)
             all_metadatas.append({
                 "source": filename,
                 "chunk_index": i,
+                "category": doc_meta.get("category", "自编"),
+                "author": doc_meta.get("author", "团队自编"),
+                "year": doc_meta.get("year", "未知"),
+                "authority_level": doc_meta.get("authority_level", "中"),
+                "source_type": doc_meta.get("source_type", "note"),
+                "lang": doc_meta.get("lang", "zh"),
+                "is_summary": "false",
             })
             all_ids.append(chunk_id)
+        # 中文摘要层：为每篇文档增加一份「概述」摘要块，提升中文问句召回
+        summ = _extract_summary(filepath)
+        if summ:
+            all_chunks.append(f"【{doc_title}】中文摘要\n{summ}")
+            all_metadatas.append({
+                "source": filename,
+                "chunk_index": -1,
+                "category": doc_meta.get("category", "自编"),
+                "author": doc_meta.get("author", "团队自编"),
+                "year": doc_meta.get("year", "未知"),
+                "authority_level": doc_meta.get("authority_level", "中"),
+                "source_type": doc_meta.get("source_type", "note"),
+                "lang": doc_meta.get("lang", "zh"),
+                "is_summary": "true",
+            })
+            all_ids.append(f"{filename}_summary")
 
     print(f"[RAG] 分块完成：{len(all_chunks)} 个文本块")
 
@@ -368,36 +555,54 @@ def build_index(knowledge_dir=None, db_dir=None):
 # 公共检索接口
 # ============================================================
 
-def retrieve_knowledge(query, top_k=3):
+def retrieve_knowledge(query, top_k=3, category=None, authority_boost=0.2):
     """
     检索与查询最相关的运动科学知识片段。
 
     参数：
-        query:  查询文本（中文）
-        top_k:  返回最多几条结果（默认 3）
+        query:            查询文本（中文）
+        top_k:            返回最多几条结果（默认 3）
+        category:         按类别过滤（如 "公开指南"/"生理基础"），None=不过滤
+        authority_boost:  权威度融合权重 0–1，默认 0.2（冲突时高权威优先）
 
     返回：
         list[dict]，每条包含：
         {
             "content": "知识片段文本（已截断至 800 字）",
             "source":  "文件名.md",
-            "score":   0.85,  # 相似度分数（0-1），越高越相关
+            "score":   0.85,           # 原始相似度（0-1）
+            "authority_level": "高",  # 文档权威度
+            "is_summary": False,       # 是否中文摘要块
+            "fused_score": 0.88,      # 融合重排分数
         }
 
     特殊场景：
         - 空查询 / 仅空白字符 → 返回 []
+        - category 过滤后无结果 → 返回 []
         - 数据库未初始化 → 自动建库后检索
     """
     if not query or not query.strip():
         return []
 
+    qkey = query.strip()
+    version = _retrieve_cache_version
+    with _retrieve_cache_lock:
+        hit = _retrieve_cache.get((qkey, top_k, category, authority_boost))
+        if hit is not None and hit[0] == version:
+            return hit[1]
+        cache_key = (qkey, top_k, category, authority_boost)
+
     col = _get_collection()
 
+    query_args = {
+        "query_texts": [query.strip()],
+        "n_results": top_k,
+    }
+    if category:
+        query_args["where"] = {"category": category}
+
     try:
-        results = col.query(
-            query_texts=[query.strip()],
-            n_results=top_k,
-        )
+        results = col.query(**query_args)
     except Exception as e:
         print(f"[RAG] 检索失败：{e}")
         return []
@@ -427,9 +632,25 @@ def retrieve_knowledge(query, top_k=3):
             "content": content,
             "source": metadata.get("source", "unknown.md"),
             "score": score,
+            "authority_level": metadata.get("authority_level", "中"),
+            "is_summary": str(metadata.get("is_summary", "false")),
         })
 
-    return output
+    # 按相似度 + 权威度融合重排（冲突仲裁）
+    result = rerank_with_authority(output, boost=authority_boost)
+
+    # 写入缓存（仅当索引版本未变，避免重建竞态写入陈旧结果）；并执行 LRU 淘汰
+    with _retrieve_cache_lock:
+        if _retrieve_cache_version == version:
+            _retrieve_cache[cache_key] = (version, result)
+            if cache_key in _retrieve_cache_order:
+                _retrieve_cache_order.remove(cache_key)
+            _retrieve_cache_order.append(cache_key)
+            while len(_retrieve_cache_order) > _retrieve_cache_max:
+                oldest = _retrieve_cache_order.pop(0)
+                _retrieve_cache.pop(oldest, None)
+
+    return result
 
 
 def format_knowledge_context(results):
@@ -447,8 +668,10 @@ def format_knowledge_context(results):
 
     lines = ["【运动科学知识库检索结果】"]
     for i, r in enumerate(results, 1):
+        auth = r.get("authority_level", "")
+        auth_tag = f"，权威度：{auth}" if auth else ""
         lines.append(
-            f"\n--- 参考资料 {i}（来源：{r['source']}，相关度：{r['score']}）---"
+            f"\n--- 参考资料 {i}（来源：{r['source']}，相关度：{r['score']}{auth_tag}）---"
         )
         lines.append(r["content"])
 
@@ -461,6 +684,8 @@ def reset_index():
     """清除内存中的集合引用，下次检索时重新加载。"""
     global _collection
     _collection = None
+    # 索引引用已失效，缓存必须同步失效
+    _invalidate_retrieve_cache()
 
 
 # ============================================================

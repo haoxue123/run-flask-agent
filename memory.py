@@ -17,8 +17,10 @@
 """
 
 import os
+import re
 import json
 import tempfile
+import copy
 from datetime import datetime
 
 
@@ -50,6 +52,19 @@ _DEFAULT_PROFILE = {
         "prs": {},
         "training_background": "",
     },
+    "identity": {
+        "coach_name": "",
+        "user_nickname": "",
+    },
+    "onboarding": {
+        "level": "",
+        "intent": "",
+        "goal": "",
+        "target_time": "",
+        "available_days": [],
+        "plan_duration": 0,
+        "completed": False,
+    },
     "updated_at": "",
 }
 
@@ -72,17 +87,17 @@ def load_long_term_memory(path=None):
         path = _DEFAULT_MEMORY_PATH
 
     if not os.path.isfile(path):
-        return dict(_DEFAULT_PROFILE)  # 深拷贝默认结构
+        return copy.deepcopy(_DEFAULT_PROFILE)  # 深拷贝默认结构
 
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError):
-        return dict(_DEFAULT_PROFILE)
+        return copy.deepcopy(_DEFAULT_PROFILE)
 
     # 合并默认结构，补全缺失的字段
-    merged = dict(_DEFAULT_PROFILE)
-    for section in ("goals", "preferences", "history"):
+    merged = copy.deepcopy(_DEFAULT_PROFILE)
+    for section in ("goals", "preferences", "history", "identity", "onboarding"):
         if section in data and isinstance(data[section], dict):
             merged[section].update(data[section])
     if "updated_at" in data:
@@ -243,11 +258,41 @@ def update_long_term_memory(message, reply, path=None):
     从对话中提取信息并更新长期记忆。
     合并已有记忆，只更新被提取到的字段。
 
+    第一性原理：记忆写入前先经过「否定意图层」。
+      - REVoke_ALL：清空全部记忆。
+      - REVoke_LAST：不存储本轮（"别管这个 / 忘掉刚才说的"）。
+      - NEGATE_FACT：主动移除被否定的事实字段（"我膝盖不疼"不再记为伤病史）。
+      - 否则：走原有正向提取；若消息含否定词则整体抑制，避免矛盾写入。
+
     参数：
         message: 用户消息
         reply:   AI 回答
         path:    文件路径，默认 data/user_profile.json
     """
+    intent = detect_negation_intent(message)
+    if intent["type"] == "REVoke_ALL":
+        revoke_memory("all", path)
+        return
+    if intent["type"] == "REVoke_LAST":
+        return  # 不存储本轮
+    if intent["type"] == "NEGATE_FACT":
+        profile = load_long_term_memory(path)
+        fld = intent.get("field")
+        if fld == "history":
+            # 外科手术式：仅移除被否定词修饰的标签，同句断言的其他标签保留
+            _negate_field_labels(profile, "history", "injuries", message,
+                                 _INJURY_KW, _INJURY_LABELS)
+        elif fld == "goals":
+            profile["goals"] = dict(_DEFAULT_PROFILE["goals"])
+        elif fld == "preferences":
+            profile["preferences"] = dict(_DEFAULT_PROFILE["preferences"])
+        save_long_term_memory(profile, path)
+        return
+
+    # 含否定词时抑制正向提取，避免"我膝盖不疼"被误记为伤病史
+    if any(tok in (message + " " + (reply or "")) for tok in _NEG_TOKENS):
+        return
+
     updates = extract_memory_updates(message, reply)
     if not updates:
         return
@@ -268,6 +313,215 @@ def update_long_term_memory(message, reply, path=None):
                     profile[section][key] = value
 
     save_long_term_memory(profile, path)
+
+
+# ============================================================
+# 否定意图识别层（记忆撤销 / 不存储）
+# 第一性原理：写入记忆前必须先判断"用户是否在撤回/否定"，而非无条件关键词存储。
+# ============================================================
+
+# 显式撤销指令：用户要求"忘掉 / 别记 / 不存"等
+_REVOKE_TOKENS = ["忘掉", "忘了", "忘记", "忘", "别记", "别存", "别保", "别管",
+                  "不要记", "不要存", "不要保", "不用记", "不用存", "忽略",
+                  "删掉", "删除", "清除", "清空", "撤销", "抹掉"]
+# 否定词：出现在事实词附近表示"不是 / 没有该事实"
+_NEG_TOKENS = ["不", "没", "没有", "不再", "不想", "不是", "未", "勿", "别"]
+# 事实关键词族（与 extract_memory_updates 对应）
+_GOAL_KW = ["全马", "马拉松", "半马", "半程", "10公里", "10k", "10K"]
+_INJURY_KW = ["受伤", "膝", "膝盖", "踝", "脚踝", "足底", "筋膜炎", "胫骨",
+             "ITBS", "髂胫束", "跟腱", "腰", "髋"]
+_PREF_DAY_KW = ["周一", "周二", "星期二", "周三", "周四", "星期四", "周五",
+               "周六", "星期六", "周日", "星期天"]
+
+# 伤病史关键词 → 可读标签（与 extract_memory_updates 内 injury_labels 对齐）
+_INJURY_LABELS = {
+    "受伤": "有伤病史", "膝": "膝盖", "膝盖": "膝盖", "踝": "脚踝", "脚踝": "脚踝",
+    "足底": "足底筋膜炎", "筋膜炎": "足底筋膜炎", "胫骨": "胫骨",
+    "ITBS": "髂胫束综合征", "髂胫束": "髂胫束综合征", "跟腱": "跟腱",
+    "腰": "腰部", "髋": "髋部",
+}
+
+
+def detect_negation_intent(message):
+    """识别否定 / 撤销意图，返回分类结果。
+
+    返回：
+        {"type": "REVoke_ALL" | "REVoke_LAST" | "NEGATE_FACT" | "NONE",
+         "field": 可选，被否定的事实字段}
+
+    判定层级（先识别"是否要撤回"，再识别"撤回 / 否定哪个事实"）：
+        1) 含显式撤销词 -> 撤销。带"全部/所有/一切/记忆"或纯"忘掉"为 REVoke_ALL；
+           带"刚才/之前/这个/它"或"别管这个"为 REVoke_LAST（不存储本轮）。
+        2) 含事实关键词 且 同句含否定词 -> NEGATE_FACT（撤销该事实，并从记忆移除）。
+        3) 否则 NONE。
+    """
+    msg = (message or "").strip()
+    if not msg:
+        return {"type": "NONE"}
+
+    if any(tok in msg for tok in _REVOKE_TOKENS):
+        if any(w in msg for w in ["全部", "所有", "一切", "记忆", "我的记忆", "记录"]):
+            return {"type": "REVoke_ALL"}
+        # 默认按"刚才说的 / 这句"处理：不存储本轮（LAST）
+        return {"type": "REVoke_LAST"}
+
+    neg = any(tok in msg for tok in _NEG_TOKENS)
+    if neg:
+        if any(k in msg for k in _GOAL_KW):
+            return {"type": "NEGATE_FACT", "field": "goals"}
+        if any(k in msg for k in _INJURY_KW):
+            return {"type": "NEGATE_FACT", "field": "history"}
+        if any(k in msg for k in _PREF_DAY_KW):
+            return {"type": "NEGATE_FACT", "field": "preferences"}
+    return {"type": "NONE"}
+
+
+def revoke_memory(scope="all", path=None):
+    """撤销记忆：scope='all' 清空为默认结构；'last' 由调用方决定（此处等同不存储）。"""
+    if path is None:
+        path = _DEFAULT_MEMORY_PATH
+    if scope == "all":
+        save_long_term_memory(dict(_DEFAULT_PROFILE), path)
+    return True
+
+
+def _negate_field_labels(profile, section, key, message, keywords, label_map):
+    """在被否定事实的字段中做外科手术式更新：
+    仅移除"被否定词修饰"的关键词标签；同句里未被否定的关键词仍视为有效
+    断言并保留/补入。避免 '我膝盖不疼了，但我脚踝受伤了' 把合法断言一起抹掉。
+    """
+    cur = (profile.setdefault(section, {}).get(key) or [])
+    clauses = re.split(r"[，。、；！？,.;!?]", message)
+    negated, asserted = set(), set()
+    for kw in keywords:
+        if kw not in message:
+            continue
+        label = label_map.get(kw, kw)
+        in_neg_clause = any(
+            kw in c and any(t in c for t in _NEG_TOKENS)
+            for c in clauses
+        )
+        (negated if in_neg_clause else asserted).add(label)
+    new = [x for x in cur if x not in negated]
+    for a in asserted:
+        if a not in new:
+            new.append(a)
+    profile[section][key] = new
+
+
+# ============================================================
+# 用户画像结构化摘要（标签 + 置信度 + 来源片段，支持增量更新）
+# ============================================================
+_DEFAULT_SUMMARY_PATH = os.path.join(_PROJECT_DIR, "data", "profile_summary.json")
+
+# 摘要候选提取：目标 / 伤病史 / 偏好 / 立场
+_SUM_GOAL = [("全马", "目标·全马完赛"), ("马拉松", "目标·全马完赛"),
+             ("半马", "目标·半马完赛"), ("半程", "目标·半马完赛"),
+             ("10公里", "目标·10K完赛"), ("10k", "目标·10K完赛"), ("10K", "目标·10K完赛")]
+_SUM_INJURY = {"膝": "伤病史·膝盖", "膝盖": "伤病史·膝盖", "踝": "伤病史·脚踝",
+               "脚踝": "伤病史·脚踝", "足底": "伤病史·足底筋膜炎", "筋膜炎": "伤病史·足底筋膜炎",
+               "胫骨": "伤病史·胫骨", "跟腱": "伤病史·跟腱", "腰": "伤病史·腰部", "髋": "伤病史·髋部"}
+_SUM_STANCE_RE = re.compile(r"(我(觉得|认为|更喜欢|倾向于|想|希望|打算|决定)|我个人|我的看法)")
+
+
+def _extract_summary_candidates(messages):
+    """从消息列表提取摘要候选：(标签, 来源片段)。"""
+    cands = []
+    for m in messages:
+        text = (m.get("content") or "") if isinstance(m, dict) else str(m)
+        if not text:
+            continue
+        low = text.lower()
+        for kw, tag in _SUM_GOAL:
+            if kw.lower() in low:
+                cands.append((tag, text[:40]))
+                break
+        for kw, tag in _SUM_INJURY.items():
+            if kw in text:
+                cands.append((tag, text[:40]))
+                break
+        for day in ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]:
+            if day in text:
+                cands.append(("偏好·训练日·" + day, text[:40]))
+                break
+        if _SUM_STANCE_RE.search(text):
+            cands.append(("立场·明确表达", text[:40]))
+    return cands
+
+
+def generate_profile_summary(history):
+    """基于完整对话历史生成结构化摘要（标签 + 置信度 + 计数 + 来源片段）。"""
+    cands = _extract_summary_candidates(history)
+    agg = {}
+    for tag, src in cands:
+        a = agg.setdefault(tag, {"count": 0, "sources": []})
+        a["count"] += 1
+        if len(a["sources"]) < 3 and src not in a["sources"]:
+            a["sources"].append(src)
+    tags = []
+    for tag, info in agg.items():
+        conf = round(min(1.0, 0.5 + 0.1 * info["count"]), 2)
+        tags.append({"tag": tag, "confidence": conf, "count": info["count"], "sources": info["sources"]})
+    tags.sort(key=lambda x: (-x["count"], x["tag"]))
+    return {"updated_at": datetime.now().isoformat(), "tags": tags}
+
+
+def load_profile_summary(path=None):
+    if path is None:
+        path = _DEFAULT_SUMMARY_PATH
+    if not os.path.isfile(path):
+        return {"updated_at": "", "tags": []}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {"updated_at": "", "tags": []}
+
+
+def save_profile_summary(summary, path=None):
+    if path is None:
+        path = _DEFAULT_SUMMARY_PATH
+    data_dir = os.path.dirname(path)
+    os.makedirs(data_dir, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(suffix=".json", dir=data_dir)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(summary, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, path)
+    except Exception:
+        if os.path.isfile(tmp):
+            os.unlink(tmp)
+        raise
+
+
+def update_profile_summary_from_history(history, path=None):
+    """随新对话增量更新：基于（已截断的）完整历史重新生成并落盘。
+
+    说明：历史本身随对话增长（coach.py 截断为最近 N 轮），摘要随之演进，
+    即实现"随新对话增量更新"。如需纯 delta 合并可调用 merge_profile_summary。
+    """
+    summary = generate_profile_summary(history)
+    save_profile_summary(summary, path)
+    return summary
+
+
+def merge_profile_summary(prev, new):
+    """纯增量合并：将 new 的标签并入 prev（按 tag 累加计数、合并来源）。"""
+    merged = {t["tag"]: dict(t) for t in prev.get("tags", [])}
+    for t in new.get("tags", []):
+        if t["tag"] in merged:
+            m = merged[t["tag"]]
+            m["count"] = m.get("count", 0) + t.get("count", 0)
+            src = set(m.get("sources", []))
+            for s in t.get("sources", []):
+                if len(src) < 3:
+                    src.add(s)
+            m["sources"] = list(src)
+            m["confidence"] = round(min(1.0, 0.5 + 0.1 * m["count"]), 2)
+        else:
+            merged[t["tag"]] = dict(t)
+    tags = sorted(merged.values(), key=lambda x: (-x["count"], x["tag"]))
+    return {"updated_at": new.get("updated_at", ""), "tags": tags}
 
 
 # ============================================================

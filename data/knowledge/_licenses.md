@@ -40,6 +40,16 @@ meta:
 | beginner_guide.md | 自编 | OWNED | 直接 | 既有文档 |
 | race_preparation.md | 自编 | OWNED | 直接 | 既有文档 |
 | method_japan_china.md | 文献综述+采访 | OPEN（公开报道/官方指南/开放综述/教练公开著作节选） | 二次整理+标注来源+署名 | 2026-07-21 新增；补日本体系+中国精英案例空白，未整本复制书籍 |
+| ref_data_augmentation.md | 文献综述(方法索引) | OPEN（公开论文索引/可引用） | 改写概述+文献索引 | 2026-07-21 新增；数据增强与质量过滤理论，附权威文献 |
+| book_physiology.md | 生理基础 | OWNED（购买副本，限研究 RAG） | 萃取要点+改写概述+标注出处 | 2026-07-21 新增；Kenney/Wilmore/Costill 等《Physiology of Sport and Exercise》2019；不整本照搬 |
+| book_training_theory.md | 训练理论 | OWNED（购买副本，限研究 RAG） | 萃取要点+改写概述+标注出处 | 2026-07-21 新增；Daniels《Daniels' Running Formula》/ Pfitzinger《Advanced Marathoning》2013；不整本照搬 |
+| book_running_technique.md | 跑步技术 | OWNED（购买副本，限研究 RAG） | 萃取要点+改写概述+标注出处 | 2026-07-21 新增；Dicharry《Anatomy for Runners》/ Starrett《Becoming a Supple Leopard》2019；不整本照搬 |
+| book_nutrition.md | 营养补给 | OWNED（购买副本，限研究 RAG） | 萃取要点+改写概述+标注出处 | 2026-07-21 新增；Jeukendrup 运动营养研究 2020；不整本照搬 |
+| book_recovery_injury.md | 恢复伤痛 | OWNED（购买副本，限研究 RAG） | 萃取要点+改写概述+标注出处 | 2026-07-21 新增；Starrett / Magness《The Runner's Guide to Healthy Feet & Ankles》2015；不整本照搬 |
+| book_data_power.md | 数据化 | OWNED（购买副本，限研究 RAG） | 萃取要点+改写概述+标注出处 | 2026-07-21 新增；Vance《Run with Power》2016；不整本照搬 |
+| book_special_populations.md | 特殊人群 | OWNED（购买副本，限研究 RAG） | 萃取要点+改写概述+标注出处 | 2026-07-21 新增；Sims《ROAR》/ Webb《Older, Faster, Stronger》2016；不整本照搬 |
+| ref_numeric_tables.md | 数据化 | OWNED（标准参考萃取） | 数值要点萃取+改写概述+标注出处 | 2026-07-21 新增（Path A / G7 数值查表缺口）；VDOT→配速、心率五区间、ACWR 阈值、功率区间；不整本照搬 |
+| book_sport_psychology.md | 运动心理 | OWNED（标准参考萃取） | 萃取要点+改写概述+标注出处 | 2026-07-21 新增（Path A / G1 运动心理缺口）；Weinberg&Gould《运动心理学基础》/ Buman&Marcus 行为改变；不整本照搬 |
 
 ## 合规红线
 

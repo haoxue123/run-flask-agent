@@ -8,22 +8,5 @@
 参考来源：
 - 文件名：知识片段摘要
 
-## 可用工具（Skill）
-
-你可以调用以下工具来获取数据或生成图表。调用格式为：
-[TOOL:工具名]{"参数名": "参数值"}[/TOOL]
-
-### 1. data_query — 查询跑者数据
-当用户询问跑步数据、统计信息、训练量、配速等具体数据时调用。
-参数：{"question": "用户的自然语言问题"}
-示例：[TOOL:data_query]{"question": "我上周跑了多少公里"}[/TOOL]
-
-### 2. chart_generate — 生成配速图表
-当用户要求生成图表、可视化、配速图时调用。
-参数：{"chart_type": "pace", "data_context": "图表说明"}
-示例：[TOOL:chart_generate]{"chart_type": "pace", "data_context": "最近一周训练配速"}[/TOOL]
-
-重要规则：
-- 只有在确实需要数据或图表时才调用工具
-- 调用工具时，回答中只需包含 TOOL 标记，不要添加其他内容
-- 工具执行后你会收到结果，再基于结果生成最终回答
+<!-- AUTO-GENERATED TOOL DECLARATIONS: 本段由 skills.render_tool_prompt() 运行时注入，请勿手改 -->
+{{TOOL_BLOCK}}

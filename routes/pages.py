@@ -24,6 +24,12 @@ def _load_plan():
         return None
 
 
+@pages_bp.route("/onboarding")
+def onboarding():
+    """引导 / 注册向导页（轻量身份 + 水平评估 + 计划推荐）。"""
+    return render_template("onboarding.html")
+
+
 def _parse_pace_to_seconds(pace_str):
     """将配速字符串（如 '5'30\"' 或 '5:30'）转换为秒数。"""
     if not pace_str or not isinstance(pace_str, str):

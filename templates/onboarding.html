@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}引导设置 · 跑步教练{% endblock %}
+
+{% block content %}
+<div class="onboarding-wrap">
+  <div class="ob-card">
+    <header class="ob-head">
+      <div>
+        <h1>欢迎来到你的跑步教练</h1>
+        <p class="ob-sub">三步完成个性化设置，我们会基于<b>科学、自主、批判</b>的原则为你推荐训练计划。</p>
+      </div>
+      <span class="ob-step-pill" id="stepPill">第 1 / 4 步</span>
+    </header>
+
+    <!-- 步骤指示 -->
+    <div class="ob-steps">
+      <div class="ob-step is-active" data-step="1"><span>1</span>身份</div>
+      <div class="ob-step" data-step="2"><span>2</span>水平</div>
+      <div class="ob-step" data-step="3"><span>3</span>目标</div>
+      <div class="ob-step" data-step="4"><span>4</span>日程</div>
+    </div>
+
+    <!-- 步骤1：身份 -->
+    <section class="ob-pane is-active" data-pane="1">
+      <h2>① 给教练起个名，也告诉我们怎么称呼你</h2>
+      <p class="ob-hint">这是「注册」的全部内容——轻量、无密码、不收集隐私。数据只存在你本机。</p>
+      <label class="ob-field">
+        <span>教练名称</span>
+        <input id="coach_name" type="text" maxlength="20" placeholder="例如：配速哥 / Coach Lee" />
+      </label>
+      <label class="ob-field">
+        <span>我的称呼</span>
+        <input id="user_nickname" type="text" maxlength="20" placeholder="例如：小明 / Runner" />
+      </label>
+    </section>
+
+    <!-- 步骤2：水平 -->
+    <section class="ob-pane" data-pane="2">
+      <h2>② 你目前处于什么水平？</h2>
+      <p class="ob-hint">我们会据此推荐计划周期与训练重心。</p>
+      <div class="ob-options" id="levelOptions"></div>
+    </section>
+
+    <!-- 步骤3：目标 -->
+    <section class="ob-pane" data-pane="3">
+      <h2>③ 你的目标是什么？</h2>
+      <p class="ob-hint">不同目标对应不同的计划侧重（科学内核会据此调整强度结构）。</p>
+      <label class="ob-field">
+        <span>目标距离</span>
+        <div class="ob-options" id="goalOptions"></div>
+      </label>
+      <label class="ob-field">
+        <span>训练意图</span>
+        <div class="ob-options" id="intentOptions"></div>
+      </label>
+      <label class="ob-field">
+        <span>目标完赛时间（选填）</span>
+        <input id="target_time" type="text" maxlength="20" placeholder="例如：sub-4 / 2:30:00" />
+      </label>
+    </section>
+
+    <!-- 步骤4：日程 -->
+    <section class="ob-pane" data-pane="4">
+      <h2>④ 每周哪些天可以训练？</h2>
+      <p class="ob-hint">勾选后教练会围绕你的可用日编排计划。</p>
+      <div class="ob-days" id="dayOptions"></div>
+    </section>
+
+    <!-- 结果 -->
+    <section class="ob-pane" data-pane="result">
+      <h2>🎉 引导完成</h2>
+      <div id="resultBox" class="ob-result"></div>
+      <div class="ob-actions">
+        <a class="btn btn-primary" href="/coach">进入 AI 教练 →</a>
+        <a class="btn btn-ghost" href="/training">查看训练计划</a>
+      </div>
+    </section>
+
+    <!-- 导航按钮 -->
+    <footer class="ob-foot" id="obFoot">
+      <a class="ob-skip" href="/coach">跳过，直接进教练</a>
+      <div class="ob-foot-right">
+        <button class="btn btn-ghost" id="prevBtn" style="display:none">上一步</button>
+        <button class="btn btn-primary" id="nextBtn">下一步</button>
+        <button class="btn btn-primary" id="submitBtn" style="display:none">生成我的计划</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<style>
+  .onboarding-wrap{max-width:760px;margin:32px auto;padding:0 16px}
+  .ob-card{background:var(--rc-surface,#161b18);border:1px solid var(--rc-border,#222);border-radius:18px;padding:28px 28px 20px;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+  .ob-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+  .ob-head h1{font-size:22px;margin:0 0 6px}
+  .ob-sub{color:var(--rc-text-secondary,#9aa);margin:0;font-size:14px}
+  .ob-step-pill{font-size:12px;color:var(--rc-chart-1,#2BD493);border:1px solid var(--rc-chart-1,#2BD493);border-radius:999px;padding:4px 10px;white-space:nowrap}
+  .ob-steps{display:flex;gap:8px;margin:20px 0}
+  .ob-step{flex:1;text-align:center;font-size:12px;color:var(--rc-text-secondary,#9aa);padding:8px 4px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid transparent}
+  .ob-step span{display:inline-block;width:20px;height:20px;line-height:20px;border-radius:50%;background:rgba(255,255,255,.08);margin-right:6px;font-size:11px}
+  .ob-step.is-active{color:#fff;border-color:var(--rc-chart-1,#2BD493)}
+  .ob-step.is-active span{background:var(--rc-chart-1,#2BD493);color:#06281d}
+  .ob-pane{display:none;margin:8px 0 4px}
+  .ob-pane.is-active{display:block}
+  .ob-pane h2{font-size:17px;margin:6px 0 4px}
+  .ob-hint{color:var(--rc-text-secondary,#9aa);font-size:13px;margin:0 0 16px}
+  .ob-field{display:block;margin-bottom:16px}
+  .ob-field>span{display:block;font-size:13px;margin-bottom:6px;color:var(--rc-text-secondary,#9aa)}
+  .ob-field input{width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--rc-border,#2a2f2c);background:rgba(255,255,255,.04);color:#fff;font-size:14px}
+  .ob-options{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .ob-opt{padding:13px 14px;border-radius:12px;border:1px solid var(--rc-border,#2a2f2c);background:rgba(255,255,255,.03);cursor:pointer;transition:.15s;font-size:13px}
+  .ob-opt small{display:block;color:var(--rc-text-secondary,#9aa);margin-top:4px;font-size:12px}
+  .ob-opt.is-selected{border-color:var(--rc-chart-1,#2BD493);background:rgba(43,212,147,.10)}
+  .ob-days{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+  .ob-day{padding:12px 0;text-align:center;border-radius:10px;border:1px solid var(--rc-border,#2a2f2c);background:rgba(255,255,255,.03);cursor:pointer;font-size:13px}
+  .ob-day.is-selected{border-color:var(--rc-chart-1,#2BD493);background:rgba(43,212,147,.12);color:#fff}
+  .ob-foot{display:flex;justify-content:space-between;align-items:center;margin-top:22px;padding-top:16px;border-top:1px solid var(--rc-border,#222)}
+  .ob-foot-right{display:flex;gap:10px}
+  .ob-skip{color:var(--rc-text-secondary,#9aa);font-size:13px;text-decoration:none}
+  .btn{padding:10px 18px;border-radius:10px;border:none;font-size:14px;cursor:pointer;text-decoration:none;display:inline-block}
+  .btn-primary{background:var(--rc-chart-1,#2BD493);color:#06281d;font-weight:600}
+  .btn-ghost{background:rgba(255,255,255,.06);color:#fff}
+  .ob-result{background:rgba(255,255,255,.03);border:1px solid var(--rc-border,#2a2f2c);border-radius:12px;padding:16px;font-size:14px;line-height:1.7;white-space:pre-wrap}
+  .ob-actions{display:flex;gap:12px;margin-top:18px}
+  .ob-err{color:#FF6A60;font-size:13px;margin-top:10px}
+</style>
+
+<script>
+(function(){
+  var state = { level:"", goal:"", intent:"", days:[], coach_name:"", user_nickname:"", target_time:"" };
+  var step = 1;
+  var presets = { levels:{}, intents:{}, goals:{} };
+
+  var $ = function(s){ return document.querySelector(s); };
+  var $$ = function(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); };
+
+  function showStep(n){
+    step = n;
+    $$(".ob-pane").forEach(function(p){ p.classList.toggle("is-active", p.getAttribute("data-pane")==String(n) || (n>4 && p.getAttribute("data-pane")=="result")); });
+    $$(".ob-step").forEach(function(s){ var sn=+s.getAttribute("data-step"); s.classList.toggle("is-active", sn===n); });
+    $("#stepPill").textContent = n>4 ? "完成" : ("第 "+n+" / 4 步");
+    $("#prevBtn").style.display = n>1 && n<=4 ? "" : "none";
+    $("#nextBtn").style.display = n<4 ? "" : "none";
+    $("#submitBtn").style.display = n===4 ? "" : "none";
+    $("#obFoot").style.display = n>4 ? "none" : "";
+  }
+
+  function renderOptions(){
+    // 水平
+    var lo = $("#levelOptions"); lo.innerHTML="";
+    Object.keys(presets.levels).forEach(function(k){
+      var p = presets.levels[k];
+      var d = document.createElement("div");
+      d.className="ob-opt"+(state.level===k?" is-selected":"");
+      d.innerHTML = "<b>"+p.label+"</b><small>周期 "+p.plan_duration+"天 · 周里程≈"+p.weekly_volume_km+"km · "+p.focus+"</small>";
+      d.onclick=function(){ state.level=k; renderOptions(); };
+      lo.appendChild(d);
+    });
+    // 目标
+    var go = $("#goalOptions"); go.innerHTML="";
+    Object.keys(presets.goals).forEach(function(k){
+      var d=document.createElement("div");
+      d.className="ob-opt"+(state.goal===k?" is-selected":"");
+      d.textContent=presets.goals[k];
+      d.onclick=function(){ state.goal=k; renderOptions(); };
+      go.appendChild(d);
+    });
+    // 意图
+    var io = $("#intentOptions"); io.innerHTML="";
+    Object.keys(presets.intents).forEach(function(k){
+      var p=presets.intents[k];
+      var d=document.createElement("div");
+      d.className="ob-opt"+(state.intent===k?" is-selected":"");
+      d.innerHTML="<b>"+p.label+"</b><small>"+p.emphasis+"</small>";
+      d.onclick=function(){ state.intent=k; renderOptions(); };
+      io.appendChild(d);
+    });
+    // 训练日
+    var days=["周一","周二","周三","周四","周五","周六","周日"];
+    var dopt=$("#dayOptions"); dopt.innerHTML="";
+    days.forEach(function(day){
+      var d=document.createElement("div");
+      d.className="ob-day"+(state.days.indexOf(day)>=0?" is-selected":"");
+      d.textContent=day;
+      d.onclick=function(){
+        var i=state.days.indexOf(day);
+        if(i>=0) state.days.splice(i,1); else state.days.push(day);
+        renderOptions();
+      };
+      dopt.appendChild(d);
+    });
+  }
+
+  function validateStep(){
+    if(step===1){ if(!$("#coach_name").value.trim() || !$("#user_nickname").value.trim()){ return "请填写教练名称与你的称呼"; } }
+    if(step===2){ if(!state.level){ return "请选择当前水平"; } }
+    if(step===3){ if(!state.goal || !state.intent){ return "请选择目标距离与训练意图"; } }
+    if(step===4){ if(state.days.length===0){ return "请至少选择一天可训练"; } }
+    return null;
+  }
+
+  function next(){
+    var err=validateStep();
+    if(err){ flash(err); return; }
+    if(step<4){ showStep(step+1); }
+  }
+  function prev(){ if(step>1) showStep(step-1); }
+
+  function flash(msg){
+    var b=$("#resultBox");
+    // 仅在表单步骤用临时提示
+    var old=document.querySelector(".ob-err");
+    if(old) old.remove();
+    var e=document.createElement("div"); e.className="ob-err"; e.textContent=msg;
+    $("#obFoot").insertBefore(e, $("#obFoot").firstChild);
+    setTimeout(function(){ if(e.parentNode) e.remove(); }, 2500);
+  }
+
+  function submit(){
+    var err=validateStep(); if(err){ flash(err); return; }
+    state.coach_name=$("#coach_name").value.trim();
+    state.user_nickname=$("#user_nickname").value.trim();
+    state.target_time=$("#target_time").value.trim();
+    var payload={ coach_name:state.coach_name, user_nickname:state.user_nickname,
+      level:state.level, goal:state.goal, intent:state.intent,
+      target_time:state.target_time, available_days:state.days };
+    fetch("/api/onboarding/complete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        showStep(5);
+        var html="<b>身份</b>："+ (res.identity&&res.identity.coach_name||"教练") +" 教练 ↔ "+(res.identity&&res.identity.user_nickname||"你")+"\n";
+        html+="<b>水平</b>："+(presets.levels[state.level]?presets.levels[state.level].label:state.level)+"\n";
+        html+="<b>目标</b>："+(presets.goals[state.goal]||state.goal)+" · "+(presets.intents[state.intent]?presets.intents[state.intent].label:state.intent)+"\n";
+        html+="<b>计划周期</b>："+(res.plan_duration||(presets.levels[state.level]?presets.levels[state.level].plan_duration:30))+" 天\n";
+        if(res.plan_error){ html+="\n⚠️ 计划自动生成未成功（"+res.plan_error+"），可在「训练计划」页手动上传数据后生成。"; }
+        else { html+="\n✅ 已为你生成推荐计划，点击「进入 AI 教练」即可开始。"+(res.plan?("\n\n"+String(res.plan).slice(0,400)+"…"):""); }
+        $("#resultBox").textContent=html;
+        try{ localStorage.setItem("onboarding_done","1"); }catch(e){}
+      })
+      .catch(function(e){ flash("提交失败："+e); });
+  }
+
+  // 预拉取预设与已有状态
+  fetch("/api/onboarding").then(function(r){return r.json();}).then(function(d){
+    presets.levels=d.levels||{}; presets.intents=d.intents||{}; presets.goals=d.goals||{};
+    var id=d.identity||{}, ob=d.onboarding||{};
+    if(id.coach_name) $("#coach_name").value=id.coach_name;
+    if(id.user_nickname) $("#user_nickname").value=id.user_nickname;
+    if(ob.level) state.level=ob.level;
+    if(ob.goal) state.goal=ob.goal;
+    if(ob.intent) state.intent=ob.intent;
+    if(ob.target_time) state.target_time=ob.target_time;
+    if(Array.isArray(ob.available_days)) state.days=ob.available_days;
+    if(ob.completed && !$("#coach_name").value){ /* 已引导过，保留导航即可 */ }
+    renderOptions();
+  }).catch(function(){ renderOptions(); });
+
+  $("#nextBtn").onclick=next;
+  $("#prevBtn").onclick=prev;
+  $("#submitBtn").onclick=submit;
+  showStep(1);
+})();
+</script>
+{% endblock %}

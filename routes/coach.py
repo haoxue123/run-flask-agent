@@ -47,6 +47,51 @@ _QUICK_INTENT_MAP = {
     "进度": "track", "完成": "track", "打卡": "track",
 }
 
+# 轻量回复分类：纯问候 / 寒暄 / 致谢，可走模板短路（跳过 RAG + LLM + profile 重算）
+_GREET_TOKENS = ["你好", "您好", "hi", "hello", "hey", "在吗", "在么", "在不在",
+                "嗨", "哈喽", "早安", "晚安", "早上好", "下午好", "晚上好",
+                "好久不见", "好呀", "在的在的", "谢谢", "感谢", "多谢",
+                "好的", "好嘞", "收到", "不客气", "辛苦了"]
+# 领域 / 问题词：出现即视为真实问题，绝不当作纯问候
+_GREET_DOMAIN_KW = ["配速", "心率", "距离", "训练", "计划", "伤", "痛", "比赛",
+                   "建议", "分析", "数据", "跑", "公里", "km", "步频", "恢复",
+                   "负荷", "目标", "饮食", "睡眠", "体重", "怎么", "为什么",
+                   "多少", "如何", "能否", "可以", "帮我", "查询", "查一下"]
+
+
+def _classify_lightweight(message):
+    """判定是否为纯问候 / 寒暄 / 致谢（可走轻量模板）。
+
+    边界规则（避免误判短问题）：
+      1) 必须包含问候词；
+      2) 不得包含任何领域 / 问题词（如"配速""帮我分析"）——否则视为真实问题；
+      3) 长度上限 12 字，超长视为带内容的句子。
+    返回模板字符串，或 None（非轻量，走正常链路）。
+    """
+    s = (message or "").strip()
+    if not s:
+        return None
+    low = s.lower()
+    if not any(g.lower() in low for g in _GREET_TOKENS):
+        return None
+    if any(k in s for k in _GREET_DOMAIN_KW):
+        return None
+    if len(s) > 12:
+        return None
+    if any(w in s for w in ["谢谢", "感谢", "多谢", "辛苦", "不客气", "好的", "收到", "好嘞"]):
+        pool = [
+            "不客气，随时找我聊训练就好 💪",
+            "应该的～有任何跑步问题尽管说。",
+            "收到！需要分析配速、计划或伤病时，直接把问题发我就行。",
+        ]
+    else:
+        pool = [
+            "你好，{nickname}！我是你的 AI 跑步教练 👟 想看训练计划、分析配速，还是聊聊最近的跑步数据？",
+            "嗨，{nickname}！随时可以问我训练、配速、伤病或计划相关的问题。",
+            "在的～今天想先定个小目标，还是回顾下最近的训练？",
+        ]
+    return pool[abs(hash(s)) % len(pool)]
+
 
 def _get_cached_profile():
     """获取缓存的跑者画像，30 秒内复用。"""
@@ -167,6 +212,25 @@ def api_coach_chat():
 
     data_dir = current_app.config["DATA_DIR"]
 
+    # ---- 轻量问候短路：纯问候/寒暄/致谢直接模板回复，跳过 RAG + LLM + profile 重算 ----
+    light = _classify_lightweight(message)
+    if light is not None:
+        # 用用户昵称个性化问候（轻量；失败不影响短路）
+        try:
+            _id = memory.load_long_term_memory().get("identity", {})
+            _nick = _id.get("user_nickname") or "跑者"
+            light = light.replace("{nickname}", _nick)
+        except Exception:
+            light = light.replace("{nickname}", "跑者")
+        def _gen_light():
+            yield f"data: {json.dumps({'chunk': light})}\n\n"
+            yield "data: [DONE]\n\n"
+        return Response(
+            stream_with_context(_gen_light()),
+            mimetype="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
     # 加载对话历史
     history = _load_chat_history(data_dir)
     history_summary = _build_history_summary(history)
@@ -212,13 +276,24 @@ def api_coach_chat():
         sleep_hours=float(sleep_hours) if sleep_hours else None,
     ) if recent_runs else {}
 
-    system_prompt = load_prompt("coach_chat_system")
+    system_prompt = load_prompt("coach_chat_system", TOOL_BLOCK=skills.render_tool_prompt())
     state_prompt = workflow.get_state_prompt(next_state)
 
     # 动态组装 system prompt
     system_prompt = system_prompt + "\n\n" + state_prompt
     if memory_context:
         system_prompt = system_prompt + "\n\n" + memory_context
+
+    # 身份个性化（教练名 + 用户昵称）：从既有记忆画像读取，缺失则用默认
+    _id = (user_profile or {}).get("identity", {}) if isinstance(user_profile, dict) else {}
+    _coach = _id.get("coach_name") or "你的 AI 跑步教练"
+    _nick = _id.get("user_nickname") or "跑者"
+    system_prompt = (
+        system_prompt
+        + f"\n\n【身份设定】你的名字是「{_coach}」，用户称呼自己为「{_nick}」。"
+        f"对话中用「{_nick}」称呼用户，必要时以「{_coach}」自称。"
+        f"坚持科学、自主、批判的教练风格：用数据说话、鼓励用户独立思考、对模糊诉求先追问澄清。"
+    )
 
     ts_context = ""
     if ts_summary:
@@ -369,14 +444,8 @@ def api_coach_chat():
                 skill_name = tool_match.group(1)
                 skill_args_str = tool_match.group(2).strip()
 
-                # 解析 args（JSON 格式）
-                try:
-                    skill_args = json.loads(skill_args_str)
-                except json.JSONDecodeError:
-                    skill_args = {"question": skill_args_str} if skill_name == "data_query" else {"chart_type": "pace", "data_context": skill_args_str}
-
-                # 执行 Skill
-                skill_result = skills.tool_call(skill_name, skill_args)
+                # 解析并执行 Skill（解析逻辑内聚到各 skill，router 不感知具体参数）
+                skill_result = skills.parse_and_call(skill_name, skill_args_str)
                 skill_result_str = json.dumps(skill_result, ensure_ascii=False)
 
                 # 将 Skill 结果追加到对话上下文
@@ -410,6 +479,12 @@ def api_coach_chat():
         except Exception:
             pass  # 保存失败不阻塞响应
 
+        # 增量更新用户画像结构化摘要（随对话演进）
+        try:
+            memory.update_profile_summary_from_history(history)
+        except Exception:
+            pass  # 摘要更新失败不阻塞响应
+
         # 更新长期记忆
         try:
             memory.update_long_term_memory(message, reply_text)
@@ -428,3 +503,31 @@ def api_coach_chat():
             "X-Accel-Buffering": "no",
         }
     )
+
+
+@coach_bp.route("/api/coach/history", methods=["GET"])
+def api_coach_history():
+    """返回已持久化的对话历史，供前端在加载/刷新/切换标签后重水合。"""
+    data_dir = current_app.config["DATA_DIR"]
+    history = _load_chat_history(data_dir)
+    return jsonify({"ok": True, "history": history})
+
+
+@coach_bp.route("/api/coach/history/clear", methods=["POST"])
+def api_coach_history_clear():
+    """清空对话历史（开始新对话）。"""
+    data_dir = current_app.config["DATA_DIR"]
+    try:
+        _save_chat_history(data_dir, [])
+    except Exception:
+        return jsonify({"ok": False, "error": "清空失败"}), 500
+    return jsonify({"ok": True})
+
+
+@coach_bp.route("/api/coach/profile-summary", methods=["GET"])
+def api_coach_profile_summary():
+    """返回结构化用户画像摘要（标签 + 置信度 + 来源片段），供"查看我的记忆"等场景。"""
+    data_dir = current_app.config["DATA_DIR"]
+    # memory 模块按固定路径读写 data/profile_summary.json
+    summary = memory.load_profile_summary()
+    return jsonify({"ok": True, "summary": summary})

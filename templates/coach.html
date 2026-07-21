@@ -354,7 +354,10 @@
         <h1 class="page-title">AI 教练</h1>
         <p class="page-subtitle">与 AI 教练一对一对话，基于你的真实数据获取个性化建议</p>
     </div>
-    <span class="coach-orb coach-orb--header" id="chat-header-orb" aria-hidden="true"></span>
+    <div style="display:flex;align-items:center;gap:var(--rc-space-3);">
+        <button class="btn btn-secondary" id="newChatBtn" onclick="newChat()" title="清空当前对话">新对话</button>
+        <span class="coach-orb coach-orb--header" id="chat-header-orb" aria-hidden="true"></span>
+    </div>
 </div>
 
 <!-- 教练记忆指示器（静态占位，预留 DOM 钩子供未来扩展） -->
@@ -526,8 +529,9 @@
         return safe;
     }
 
-    // 添加消息气泡
-    function addMessage(role, content) {
+    // 添加消息气泡（timeIso 可选：用于重水合历史消息时显示真实时间）
+    function addMessage(role, content, timeIso) {
+        var t = timeIso ? relativeTime(new Date(timeIso)) : relativeTime(new Date());
         var div = document.createElement('div');
         div.className = 'chat-message ' + role;
 
@@ -537,14 +541,14 @@
                 '<div class="coach-orb coach-orb--chat" aria-hidden="true"></div>' +
                 '<div>' +
                 '<div class="chat-bubble-coach">' + renderMarkdown(content) + '</div>' +
-                '<div class="chat-time chat-time-left">' + relativeTime(new Date()) + '</div>' +
+                '<div class="chat-time chat-time-left">' + t + '</div>' +
                 '</div>' +
                 '</div>';
         } else {
             div.innerHTML =
                 '<div class="chat-user-row">' +
                 '<div class="chat-bubble-user">' + renderMarkdown(content) + '</div>' +
-                '<div class="chat-time chat-time-right">' + relativeTime(new Date()) + '</div>' +
+                '<div class="chat-time chat-time-right">' + t + '</div>' +
                 '</div>';
         }
 
@@ -553,6 +557,46 @@
         lucide.createIcons();
         return div;
     }
+
+    // ---- 聊天持久化：服务端历史重水合 + localStorage 镜像兜底 ----
+    // 根因：可见对话此前只存在于 DOM 内存，刷新/浏览器丢弃后台标签页后重载即丢失。
+    // 后端已把对话存到 data/chat_history.json，但前端从不加载它。
+    // 修复：加载时优先从服务端重水合；服务端不可用时用本地镜像兜底；
+    //       每次完成一轮对话即写入本地镜像，保证「进行中」也不丢失。
+    var LS_KEY = 'coach-chat-mirror-v1';
+    function loadMirror() {
+        try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch (e) { return []; }
+    }
+    function saveMirror(arr) {
+        try { localStorage.setItem(LS_KEY, JSON.stringify(arr.slice(-50))); } catch (e) {}
+    }
+    function pushMirror(role, content) {
+        var arr = loadMirror();
+        arr.push({ role: role, content: content, time: new Date().toISOString() });
+        saveMirror(arr);
+    }
+    function loadChatHistory() {
+        fetch('/api/coach/history')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                var hist = (data && data.history) ? data.history : null;
+                if (!hist || !hist.length) hist = loadMirror();
+                if (hist && hist.length) {
+                    hist.forEach(function (e) { addMessage(e.role, e.content || '', e.time); });
+                    if (data && data.history) saveMirror(data.history);
+                }
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            })
+            .catch(function () {
+                loadMirror().forEach(function (e) { addMessage(e.role, e.content || '', e.time); });
+            });
+    }
+    window.newChat = function () {
+        try { localStorage.removeItem(LS_KEY); } catch (e) {}
+        fetch('/api/coach/history/clear', { method: 'POST' })
+            .catch(function () {})
+            .finally(function () { location.reload(); });
+    };
 
     // 显示 typing 动画
     function addTyping() {
@@ -595,6 +639,7 @@
         isSending = true;
         setOrbState('is-thinking');
         addMessage('user', msg);
+        pushMirror('user', msg);
         chatInput.value = '';
         chatInput.style.height = '';
         sendBtn.disabled = true;
@@ -652,6 +697,7 @@
                         isSending = false;
                         sendBtn.disabled = !chatInput.value.trim();
                         setOrbState(null);
+                        if (fullText.trim()) pushMirror('assistant', fullText);
                         return;
                     }
 
@@ -687,9 +733,10 @@
                                 hasStartedSpeaking = true;
                                 setOrbState('is-speaking');
                             }
-                            // RAF 批量更新：每帧最多渲染一次
+                            // 批量更新：用 setTimeout 而非 requestAnimationFrame，
+                            // 否则后台标签页会暂停 rAF，导致切回才刷新、且被丢弃重载时流式中途丢失
                             if (!rafId) {
-                                rafId = requestAnimationFrame(flushStreamText);
+                                rafId = setTimeout(flushStreamText, 0);
                             }
                         } else if (data.error) {
                             addMessage('coach', '教练暂时无法回复：' + data.error);
@@ -720,6 +767,9 @@
         sendBtn.disabled = false;
         sendMessage();
     }
+
+    // 页面加载即重水合持久化对话（修复切换标签/刷新后记录消失）
+    loadChatHistory();
 
     // 导出到全局
     window.sendMessage = sendMessage;

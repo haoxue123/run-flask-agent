@@ -5,7 +5,7 @@ sys.path.insert(0, _BASE_DIR)
 import visualize
 
 
-def generate_chart(chart_type: str, data_context: str) -> dict:
+def generate_chart(data_context: str) -> dict:
     try:
         plan_path = os.path.join(_BASE_DIR, "data", "plan.json")
 
