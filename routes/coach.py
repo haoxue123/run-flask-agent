@@ -86,8 +86,8 @@ def _classify_lightweight(message):
         ]
     else:
         pool = [
-            "你好，{nickname}！我是你的 AI 跑步教练 👟 想看训练计划、分析配速，还是聊聊最近的跑步数据？",
-            "嗨，{nickname}！随时可以问我训练、配速、伤病或计划相关的问题。",
+            "你好，跑者！我是你的 AI 跑步教练 👟 想看训练计划、分析配速，还是聊聊最近的跑步数据？",
+            "嗨，跑者！随时可以问我训练、配速、伤病或计划相关的问题。",
             "在的～今天想先定个小目标，还是回顾下最近的训练？",
         ]
     return pool[abs(hash(s)) % len(pool)]
@@ -215,13 +215,6 @@ def api_coach_chat():
     # ---- 轻量问候短路：纯问候/寒暄/致谢直接模板回复，跳过 RAG + LLM + profile 重算 ----
     light = _classify_lightweight(message)
     if light is not None:
-        # 用用户昵称个性化问候（轻量；失败不影响短路）
-        try:
-            _id = memory.load_long_term_memory().get("identity", {})
-            _nick = _id.get("user_nickname") or "跑者"
-            light = light.replace("{nickname}", _nick)
-        except Exception:
-            light = light.replace("{nickname}", "跑者")
         def _gen_light():
             yield f"data: {json.dumps({'chunk': light})}\n\n"
             yield "data: [DONE]\n\n"
@@ -283,17 +276,6 @@ def api_coach_chat():
     system_prompt = system_prompt + "\n\n" + state_prompt
     if memory_context:
         system_prompt = system_prompt + "\n\n" + memory_context
-
-    # 身份个性化（教练名 + 用户昵称）：从既有记忆画像读取，缺失则用默认
-    _id = (user_profile or {}).get("identity", {}) if isinstance(user_profile, dict) else {}
-    _coach = _id.get("coach_name") or "你的 AI 跑步教练"
-    _nick = _id.get("user_nickname") or "跑者"
-    system_prompt = (
-        system_prompt
-        + f"\n\n【身份设定】你的名字是「{_coach}」，用户称呼自己为「{_nick}」。"
-        f"对话中用「{_nick}」称呼用户，必要时以「{_coach}」自称。"
-        f"坚持科学、自主、批判的教练风格：用数据说话、鼓励用户独立思考、对模糊诉求先追问澄清。"
-    )
 
     ts_context = ""
     if ts_summary:

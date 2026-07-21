@@ -52,19 +52,6 @@ _DEFAULT_PROFILE = {
         "prs": {},
         "training_background": "",
     },
-    "identity": {
-        "coach_name": "",
-        "user_nickname": "",
-    },
-    "onboarding": {
-        "level": "",
-        "intent": "",
-        "goal": "",
-        "target_time": "",
-        "available_days": [],
-        "plan_duration": 0,
-        "completed": False,
-    },
     "updated_at": "",
 }
 
@@ -97,7 +84,7 @@ def load_long_term_memory(path=None):
 
     # 合并默认结构，补全缺失的字段
     merged = copy.deepcopy(_DEFAULT_PROFILE)
-    for section in ("goals", "preferences", "history", "identity", "onboarding"):
+    for section in ("goals", "preferences", "history"):
         if section in data and isinstance(data[section], dict):
             merged[section].update(data[section])
     if "updated_at" in data:

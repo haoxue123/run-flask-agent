@@ -18,7 +18,7 @@
 ├── workflow.py            # 教练对话流程编排（被 routes/coach 调用）
 ├── visualize.py           # 图表生成（配速曲线等）
 ├── data_tool.py           # 数据接入（运动文件 / 手动输入双模式）
-├── routes/                # Web 路由：pages · data · plan · coach · eval · onboarding
+├── routes/                # Web 路由：pages · data · plan · coach · eval
 ├── skills/                # 工具执行器：data_query（双引擎）· chart_generate
 ├── parsers/               # GPX / TCX / FIT 解析
 ├── data/
