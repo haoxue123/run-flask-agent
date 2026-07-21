@@ -1,0 +1,211 @@
+/* ============================================================
+   Execution Panel — 训练日执行追踪 Modal
+   ============================================================ */
+.exec-panel-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    animation: exec-fade-in 200ms ease-out;
+}
+
+@keyframes exec-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.exec-panel-card {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    margin: 0 1rem;
+    background: var(--ds-card-bg, var(--rc-card));
+    border: 1px solid var(--ds-border, var(--rc-border));
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    animation: exec-slide-up 250ms ease-out;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+@keyframes exec-slide-up {
+    from { opacity: 0; transform: translateY(16px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.exec-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--ds-border, var(--rc-border));
+}
+
+.exec-panel-header h3 {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--ds-text, var(--rc-foreground));
+    margin: 0;
+}
+
+.exec-panel-close {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--ds-text-muted, var(--rc-muted-foreground));
+    transition: background-color 150ms;
+}
+
+.exec-panel-close:hover {
+    background: var(--ds-surface-muted, var(--rc-muted));
+}
+
+.exec-panel-body {
+    padding: 1rem 1.25rem;
+}
+
+.exec-panel-section {
+    margin-bottom: 1rem;
+}
+
+.exec-panel-section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ds-text-muted, var(--rc-muted-foreground));
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.exec-detail-list {
+    background: var(--ds-surface-muted, var(--rc-muted));
+    border-radius: 8px;
+    padding: 0.625rem 0.75rem;
+}
+
+.exec-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0;
+    font-size: 0.8125rem;
+}
+
+.exec-detail-row + .exec-detail-row {
+    border-top: 1px solid rgba(128, 128, 128, 0.12);
+    margin-top: 0.25rem;
+    padding-top: 0.375rem;
+}
+
+.exec-detail-label {
+    color: var(--ds-text-muted, var(--rc-muted-foreground));
+}
+
+.exec-detail-value {
+    color: var(--ds-text, var(--rc-foreground));
+    font-weight: 500;
+}
+
+.exec-form-group {
+    margin-bottom: 0.75rem;
+}
+
+.exec-form-group label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--ds-text-muted, var(--rc-muted-foreground));
+    margin-bottom: 0.25rem;
+}
+
+.exec-form-group input,
+.exec-form-group textarea {
+    width: 100%;
+    background: var(--ds-input-bg, var(--rc-input));
+    border: 1px solid var(--ds-border, var(--rc-border));
+    border-radius: 8px;
+    padding: 0.5rem 0.625rem;
+    font-size: 0.8125rem;
+    color: var(--ds-input-text, var(--rc-foreground));
+    outline: none;
+    transition: border-color 150ms;
+    box-sizing: border-box;
+}
+
+.exec-form-group input:focus,
+.exec-form-group textarea:focus {
+    border-color: var(--ds-border-focus, var(--rc-primary));
+    box-shadow: 0 0 0 2px rgba(122, 168, 0, 0.15);
+}
+
+.exec-form-group textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+.exec-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.exec-panel-footer {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid var(--ds-border, var(--rc-border));
+}
+
+.exec-btn {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: opacity 150ms;
+}
+
+.exec-btn:hover {
+    opacity: 0.9;
+}
+
+.exec-btn:active {
+    opacity: 0.8;
+}
+
+.exec-btn-primary {
+    background: var(--ds-button-primary-bg, var(--rc-primary));
+    color: var(--ds-button-primary-text, var(--rc-primary-foreground));
+}
+
+.exec-btn-secondary {
+    background: var(--ds-surface-muted, var(--rc-muted));
+    color: var(--ds-text-secondary, var(--rc-muted-foreground));
+}
+
+.exec-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 休息日特殊样式 */
+.exec-rest-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    background: var(--ds-surface-muted, var(--rc-muted));
+    color: var(--ds-text-muted, var(--rc-muted-foreground));
+}

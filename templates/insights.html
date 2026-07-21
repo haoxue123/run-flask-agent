@@ -1,0 +1,1231 @@
+{% extends "base.html" %}
+{% block title %}数据洞察 | COACH{% endblock %}
+{% block content %}
+
+<style>
+/* ============================================================
+   页面级布局样式
+   ============================================================ */
+/* Tab 切换栏 */
+.tab-bar {
+    display: flex;
+    gap: var(--rc-space-2);
+    margin-bottom: var(--rc-space-6);
+}
+.tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--rc-space-2);
+    padding: var(--rc-space-2) var(--rc-space-4);
+    border-radius: var(--rc-radius-md);
+    font-size: var(--rc-text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all var(--rc-transition);
+    text-decoration: none;
+    background: transparent;
+    color: var(--rc-primary);
+    font-family: var(--rc-font-body);
+}
+.tab-btn.btn-primary {
+    background: var(--rc-primary);
+    color: var(--rc-text-on-primary);
+}
+.tab-btn.btn-ghost {
+    background: transparent;
+    color: var(--rc-primary);
+}
+.tab-btn.btn-ghost:hover {
+    background: var(--rc-primary-bg);
+}
+
+/* 统计摘要卡片 grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--rc-space-3);
+    margin-bottom: var(--rc-space-6);
+}
+@media (min-width: 769px) {
+    .stats-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.stat-card-label {
+    font-size: var(--rc-text-xs);
+    color: var(--rc-text-muted);
+    margin-bottom: var(--rc-space-1);
+}
+.stat-card-value {
+    font-size: var(--rc-text-2xl);
+    font-weight: 700;
+    color: var(--rc-text);
+}
+.stat-card-sub {
+    font-size: var(--rc-text-xs);
+    color: var(--rc-text-muted);
+    margin-top: var(--rc-space-1);
+}
+
+/* 图表网格 */
+.chart-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--rc-space-4);
+    margin-bottom: var(--rc-space-4);
+}
+@media (min-width: 769px) {
+    .chart-grid-2col {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+.chart-grid-full {
+    grid-template-columns: 1fr;
+}
+
+.chart-box {
+    background: var(--rc-card);
+    border: 1px solid var(--rc-border);
+    border-radius: var(--rc-radius-lg);
+    padding: var(--rc-space-4);
+}
+.chart-box-title {
+    font-size: var(--rc-text-sm);
+    font-weight: 600;
+    margin-bottom: var(--rc-space-3);
+    color: var(--rc-text);
+}
+.chart-container {
+    position: relative;
+    height: 250px;
+}
+.chart-container-progress {
+    position: relative;
+    height: 280px;
+}
+.chart-container-donut {
+    position: relative;
+    height: 220px;
+    width: 220px;
+    flex-shrink: 0;
+}
+
+/* 配速分布区域 — 单列直方图 + 迷你图例 */
+.pace-dist-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--rc-space-3);
+}
+.pace-dist-mini-legend {
+    font-size: var(--rc-text-xs);
+    color: var(--rc-text-muted);
+    text-align: center;
+}
+
+/* 心率区间分布卡片 */
+.hr-zone-bar {
+    display: flex;
+    height: 36px;
+    border-radius: var(--rc-radius-sm);
+    overflow: hidden;
+    margin-bottom: var(--rc-space-3);
+}
+.hr-zone-seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--rc-text-xs);
+    color: var(--rc-text-muted);
+    font-weight: 500;
+}
+.hr-zone-legend-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--rc-space-2);
+    font-size: var(--rc-text-xs);
+}
+.hr-zone-legend-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.hr-zone-legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+}
+</style>
+
+<!-- 页面标题 -->
+<div style="margin-bottom: var(--rc-space-6);">
+    <h1 class="font-display" style="font-size: var(--rc-text-3xl); margin: 0 0 var(--rc-space-1) 0;">数据洞察</h1>
+    <p style="font-size: var(--rc-text-sm); color: var(--rc-text-muted); margin: 0;">基于历史数据的趋势分析</p>
+</div>
+
+{% if recent_runs and recent_runs|length >= 2 %}
+<!-- 统计摘要卡片 -->
+<div class="stats-grid">
+    <div class="card">
+        <p class="stat-card-label">总跑量</p>
+        <p class="stat-card-value" id="stat-total-km">--</p>
+        <p class="stat-card-sub"><span id="stat-run-count">--</span> 次训练</p>
+    </div>
+    <div class="card">
+        <p class="stat-card-label">平均配速</p>
+        <p class="stat-card-value" id="stat-avg-pace">--</p>
+        <p class="stat-card-sub">/km</p>
+    </div>
+    <div class="card">
+        <p class="stat-card-label">平均心率</p>
+        <p class="stat-card-value" id="stat-avg-hr">--</p>
+        <p class="stat-card-sub">bpm</p>
+    </div>
+    <div class="card">
+        <p class="stat-card-label">最佳配速</p>
+        <p class="stat-card-value" id="stat-best-pace">--</p>
+        <p class="stat-card-sub">/km</p>
+    </div>
+</div>
+
+<!-- Tab 切换 -->
+<div class="tab-bar">
+    <button class="tab-btn btn-primary" data-tab="analysis" onclick="switchTab('analysis')">单次分析</button>
+    <button class="tab-btn btn-ghost" data-tab="trends" onclick="switchTab('trends')">长期趋势</button>
+</div>
+
+<!-- 分析 Tab -->
+<div id="tab-analysis">
+    <div class="chart-grid chart-grid-2col">
+        <!-- 配速趋势图 -->
+        <div class="chart-box">
+            <h3 class="chart-box-title" id="pace-title">配速趋势</h3>
+            <div class="chart-container" id="pace-chart-container">
+                <canvas id="paceChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 心率趋势图 -->
+        <div class="chart-box">
+            <h3 class="chart-box-title" id="hr-title">心率趋势</h3>
+            <div class="chart-container" id="hr-chart-container">
+                <canvas id="hrChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 配速分布直方图 -->
+        <div class="chart-box chart-grid-full" style="grid-column: 1 / -1;">
+            <h3 class="chart-box-title" id="pace-dist-title">配速分布</h3>
+            <div class="pace-dist-layout">
+                <div class="chart-container" id="pace-dist-container">
+                    <canvas id="paceDistChart"></canvas>
+                </div>
+                <div class="pace-dist-mini-legend">颜色越深=强度越高</div>
+            </div>
+        </div>
+
+        <!-- 心率区间分布 -->
+        <div class="chart-box" style="grid-column: 1 / -1;">
+            <h3 class="chart-box-title" id="hr-zone-title">心率区间分布</h3>
+            <div class="hr-zone-bar" id="hr-zone-bar"></div>
+            <div class="hr-zone-legend-grid" id="hr-zone-legend"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 趋势 Tab -->
+<div id="tab-trends" style="display: none;">
+    <!-- 训练进展 -->
+    {% if plan_chart_data and plan_chart_data|length >= 2 %}
+    <div class="chart-box" style="margin-bottom: var(--rc-space-4);">
+        <h3 class="chart-box-title">训练进展</h3>
+        <div class="chart-container-progress" id="progress-chart-container">
+            <canvas id="progressChart"></canvas>
+        </div>
+    </div>
+    {% elif plan_chart_data and plan_chart_data|length == 1 %}
+    <div class="chart-box" style="margin-bottom: var(--rc-space-4);" id="progress-empty">
+        <h3 class="chart-box-title">训练进展</h3>
+    </div>
+    {% endif %}
+
+    <div class="chart-grid chart-grid-2col">
+        <!-- 训练负荷图 -->
+        <div class="chart-box">
+            <h3 class="chart-box-title" id="load-title">训练负荷</h3>
+            <div class="chart-container" id="load-chart-container">
+                <canvas id="loadChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 周跑量变化图 -->
+        <div class="chart-box">
+            <h3 class="chart-box-title" id="weekly-title">周跑量变化</h3>
+            <div class="chart-container" id="weekly-chart-container">
+                <canvas id="weeklyChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<!-- 数据不足 -->
+<div class="chart-grid chart-grid-2col">
+    {% if recent_runs and recent_runs|length == 1 %}
+    <!-- 只有 1 条记录：显示 EmptyState -->
+    <div class="chart-box" id="pace-empty">
+        <h3 class="chart-box-title">配速趋势</h3>
+    </div>
+    <div class="chart-box" id="hr-empty">
+        <h3 class="chart-box-title">心率趋势</h3>
+    </div>
+    <div class="chart-box" id="load-empty">
+        <h3 class="chart-box-title">训练负荷</h3>
+    </div>
+    <div class="chart-box" id="weekly-empty">
+        <h3 class="chart-box-title">周跑量变化</h3>
+    </div>
+    {% else %}
+    <!-- 完全无数据：显示 Skeleton -->
+    <div class="chart-box">
+        <h3 class="chart-box-title">配速趋势</h3>
+        <div id="pace-skeleton"></div>
+    </div>
+    <div class="chart-box">
+        <h3 class="chart-box-title">心率趋势</h3>
+        <div id="hr-skeleton"></div>
+    </div>
+    <div class="chart-box">
+        <h3 class="chart-box-title">训练负荷</h3>
+        <div id="load-skeleton"></div>
+    </div>
+    <div class="chart-box">
+        <h3 class="chart-box-title">周跑量变化</h3>
+        <div id="weekly-skeleton"></div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+var runsData = {{ recent_runs | tojson }};
+var planChartData = {{ plan_chart_data | tojson }};
+
+// ============================================================
+// 工具函数
+// ============================================================
+function formatPace(secondsPerKm) {
+    if (secondsPerKm == null || isNaN(secondsPerKm)) return '--';
+    var mins = Math.floor(secondsPerKm / 60);
+    var secs = Math.floor(secondsPerKm % 60);
+    return mins + "'" + (secs < 10 ? '0' : '') + secs + '"';
+}
+
+function getISOWeekStart(dateStr) {
+    var d = new Date(dateStr);
+    var day = d.getDay();
+    var diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    var monday = new Date(d.setDate(diff));
+    return monday.toISOString().slice(0, 10);
+}
+
+function formatWeekLabel(mondayStr) {
+    var d = new Date(mondayStr + 'T00:00:00');
+    var month = d.getMonth() + 1;
+    var day = d.getDate();
+    return month + '/' + day;
+}
+
+// ============================================================
+// Tab 切换
+// ============================================================
+function switchTab(tabName) {
+    // 更新按钮状态
+    document.querySelectorAll('.tab-btn').forEach(function(btn) {
+        if (btn.getAttribute('data-tab') === tabName) {
+            btn.classList.remove('btn-ghost');
+            btn.classList.add('btn-primary');
+        } else {
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-ghost');
+        }
+    });
+
+    // 切换面板
+    var analysisPanel = document.getElementById('tab-analysis');
+    var trendsPanel = document.getElementById('tab-trends');
+    if (analysisPanel) analysisPanel.style.display = tabName === 'analysis' ? '' : 'none';
+    if (trendsPanel) trendsPanel.style.display = tabName === 'trends' ? '' : 'none';
+
+    // 刷新图标
+    lucide.createIcons();
+}
+
+// ============================================================
+// 填充统计摘要
+// ============================================================
+function populateStats() {
+    if (!runsData || runsData.length < 2) return;
+
+    var sorted = runsData.slice().sort(function(a, b) {
+        return new Date(a['日期']) - new Date(b['日期']);
+    });
+
+    var distanceData = sorted.map(function(r) { return r['距离_km']; });
+    var paceData = sorted.map(function(r) { return r['平均配速_秒每公里']; });
+    var hrData = sorted.map(function(r) { return r['平均心率']; });
+
+    var totalKm = distanceData.reduce(function(a, b) { return (a || 0) + (b || 0); }, 0);
+    var runCount = sorted.length;
+    var validPaces = paceData.filter(function(v) { return v != null; });
+    var avgPace = validPaces.length > 0 ? validPaces.reduce(function(a, b) { return a + b; }, 0) / validPaces.length : null;
+    var validHrs = hrData.filter(function(v) { return v != null; });
+    var avgHr = validHrs.length > 0 ? Math.round(validHrs.reduce(function(a, b) { return a + b; }, 0) / validHrs.length) : null;
+    var bestPace = validPaces.length > 0 ? Math.min.apply(null, validPaces) : null;
+
+    document.getElementById('stat-total-km').textContent = Math.round(totalKm * 10) / 10;
+    document.getElementById('stat-run-count').textContent = runCount;
+    document.getElementById('stat-avg-pace').textContent = avgPace ? formatPace(avgPace) : '--';
+    document.getElementById('stat-avg-hr').textContent = avgHr || '--';
+    document.getElementById('stat-best-pace').textContent = bestPace ? formatPace(bestPace) : '--';
+}
+
+// ============================================================
+// 辅助函数：zone 色阶 / TRIMP / 负荷序列 / 心率区间卡
+// ============================================================
+
+// 读取 --rc-zone-1..5，返回 [zone1, zone2, zone3, zone4, zone5]
+function getZoneColors() {
+    var style = getComputedStyle(document.documentElement);
+    return [
+        style.getPropertyValue('--rc-zone-1').trim(),
+        style.getPropertyValue('--rc-zone-2').trim(),
+        style.getPropertyValue('--rc-zone-3').trim(),
+        style.getPropertyValue('--rc-zone-4').trim(),
+        style.getPropertyValue('--rc-zone-5').trim()
+    ];
+}
+
+// Banister TRIMP 公式，镜像 training_science.py 的 calc_trimp
+// ΔHR = (HR_avg - HR_rest) / (HR_max - HR_rest)
+// TRIMP = duration × ΔHR × 0.64 × e^(1.92 × ΔHR)
+function calcTrimpClient(duration, avgHr, restHr, maxHr) {
+    if (!duration || !avgHr) return null;
+    if (!restHr || restHr <= 0) restHr = 60;
+    if (!maxHr || maxHr <= 0) maxHr = 190;
+    if (maxHr <= restHr) return null;
+    var deltaHr = (avgHr - restHr) / (maxHr - restHr);
+    if (deltaHr <= 0) return duration * 0.5;
+    return duration * deltaHr * 0.64 * Math.exp(1.92 * deltaHr);
+}
+
+// 从 runsData 计算 ATL/CTL/TSB 序列（Coggan EWMA: ATL τ=7, CTL τ=42）
+// 填充连续日历日，按日聚合 TSS，递推 EWMA
+function computeLoadSeries(runsData) {
+    if (!runsData || runsData.length === 0) return { labels: [], atl: [], ctl: [], tsb: [] };
+
+    var sorted = runsData.slice().sort(function(a, b) {
+        return new Date(a['日期']) - new Date(b['日期']);
+    });
+
+    // 从第一条含 最大心率 的记录取 maxHr，fallback 190
+    var maxHr = 190;
+    for (var i = 0; i < sorted.length; i++) {
+        if (sorted[i]['最大心率'] != null && sorted[i]['最大心率'] > 0) {
+            maxHr = sorted[i]['最大心率'];
+            break;
+        }
+    }
+    var restHr = 60;
+
+    // 按日聚合 TSS
+    var tssByDay = {};
+    sorted.forEach(function(r) {
+        var rawDate = r['日期'];
+        if (!rawDate) return;
+        var dateStr = String(rawDate).split('T')[0]; // 归一化为 YYYY-MM-DD
+        var duration = r['时长_分钟'];
+        var avgHr = r['平均心率'];
+        if (duration && avgHr) {
+            var tss = calcTrimpClient(duration, avgHr, restHr, maxHr);
+            if (tss != null) {
+                tssByDay[dateStr] = (tssByDay[dateStr] || 0) + tss;
+            }
+        }
+    });
+
+    // 填充连续日历日（earliest → latest）
+    function parseDateLocal(s) {
+        var datePart = String(s).split('T')[0];
+        var parts = datePart.split('-');
+        if (parts.length === 3) return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        return new Date(s);
+    }
+    var earliest = parseDateLocal(sorted[0]['日期']);
+    var latest = parseDateLocal(sorted[sorted.length - 1]['日期']);
+    var dayMs = 24 * 60 * 60 * 1000;
+
+    var labels = [], atl = [], ctl = [], tsb = [];
+    var atlPrev = 0, ctlPrev = 0;
+    var cur = new Date(earliest.getTime());
+
+    while (cur <= latest) {
+        var dateStr = cur.getFullYear() + '-' + String(cur.getMonth() + 1).padStart(2, '0') + '-' + String(cur.getDate()).padStart(2, '0');
+        var tss = tssByDay[dateStr] || 0;
+        // Coggan EWMA: atl[t]=atl[t-1]+(tss[t]-atl[t-1])/7, ctl 同理 τ=42
+        atlPrev = atlPrev + (tss - atlPrev) / 7;
+        ctlPrev = ctlPrev + (tss - ctlPrev) / 42;
+        atl.push(Math.round(atlPrev * 10) / 10);
+        ctl.push(Math.round(ctlPrev * 10) / 10);
+        tsb.push(Math.round((ctlPrev - atlPrev) * 10) / 10);
+        labels.push((cur.getMonth() + 1) + '/' + cur.getDate());
+        cur = new Date(cur.getTime() + dayMs);
+    }
+
+    return { labels: labels, atl: atl, ctl: ctl, tsb: tsb };
+}
+
+// 心率区间分布卡片：Karvonen 5 区分桶，按时长加权
+// Z1 50-60%, Z2 60-70%, Z3 70-80%, Z4 80-90%, Z5 90-100% of HRmax
+function buildHrZoneCard(runsData) {
+    var barEl = document.getElementById('hr-zone-bar');
+    var legendEl = document.getElementById('hr-zone-legend');
+    var titleEl = document.getElementById('hr-zone-title');
+    if (!barEl || !legendEl) return;
+
+    if (!runsData || runsData.length === 0) {
+        barEl.innerHTML = DS.renderEmptyState('heart', '暂无心率数据', '需要至少 1 条包含心率与时长记录');
+        legendEl.innerHTML = '';
+        return;
+    }
+
+    // 从第一条含 最大心率 的记录取 maxHr，fallback 190
+    var maxHr = 190;
+    for (var i = 0; i < runsData.length; i++) {
+        if (runsData[i]['最大心率'] != null && runsData[i]['最大心率'] > 0) {
+            maxHr = runsData[i]['最大心率'];
+            break;
+        }
+    }
+
+    var zoneMinutes = [0, 0, 0, 0, 0];
+    var validCount = 0;
+    runsData.forEach(function(r) {
+        var avgHr = r['平均心率'];
+        var duration = r['时长_分钟'];
+        if (!avgHr || !duration) return;
+        validCount++;
+        var ratio = avgHr / maxHr;
+        var idx;
+        if (ratio < 0.60) idx = 0;
+        else if (ratio < 0.70) idx = 1;
+        else if (ratio < 0.80) idx = 2;
+        else if (ratio < 0.90) idx = 3;
+        else idx = 4;
+        zoneMinutes[idx] += parseFloat(duration) || 0;
+    });
+
+    var totalMinutes = zoneMinutes.reduce(function(a, b) { return a + b; }, 0);
+
+    if (validCount === 0 || totalMinutes === 0) {
+        barEl.innerHTML = DS.renderEmptyState('heart', '暂无心率数据', '需要至少 1 条包含心率与时长记录');
+        legendEl.innerHTML = '';
+        return;
+    }
+
+    var zoneColors = getZoneColors();
+    var zoneNames = ['Z1 热身', 'Z2 有氧', 'Z3 节奏', 'Z4 阈值', 'Z5 极限'];
+
+    // 渲染堆叠条
+    barEl.innerHTML = '';
+    zoneMinutes.forEach(function(min, i) {
+        var pct = totalMinutes > 0 ? Math.round(min / totalMinutes * 100) : 0;
+        var seg = document.createElement('div');
+        seg.className = 'hr-zone-seg';
+        seg.style.background = zoneColors[i];
+        seg.style.width = pct + '%';
+        seg.textContent = pct > 0 ? pct + '%' : '';
+        barEl.appendChild(seg);
+    });
+
+    // 渲染图例
+    legendEl.innerHTML = '';
+    zoneNames.forEach(function(name, i) {
+        var min = zoneMinutes[i];
+        var pct = totalMinutes > 0 ? Math.round(min / totalMinutes * 100) : 0;
+        var item = document.createElement('div');
+        item.className = 'hr-zone-legend-item';
+        var colorRow = document.createElement('div');
+        colorRow.style.cssText = 'display:flex;align-items:center;gap:6px;';
+        var colorBox = document.createElement('span');
+        colorBox.className = 'hr-zone-legend-color';
+        colorBox.style.background = zoneColors[i];
+        var nameSpan = document.createElement('span');
+        nameSpan.textContent = name;
+        colorRow.appendChild(colorBox);
+        colorRow.appendChild(nameSpan);
+        var detail = document.createElement('div');
+        detail.style.color = 'var(--rc-text-muted)';
+        detail.textContent = '累计 ' + Math.round(min) + ' 分钟 · ' + pct + '%';
+        item.appendChild(colorRow);
+        item.appendChild(detail);
+        legendEl.appendChild(item);
+    });
+
+    // claim 标题
+    var peakIdx = 0;
+    for (var i = 1; i < 5; i++) {
+        if (zoneMinutes[i] > zoneMinutes[peakIdx]) peakIdx = i;
+    }
+    var peakPct = totalMinutes > 0 ? Math.round(zoneMinutes[peakIdx] / totalMinutes * 100) : 0;
+    if (titleEl) {
+        titleEl.textContent = zoneNames[peakIdx] + ' 累计时长最长，占 ' + peakPct + '%';
+    }
+}
+
+// 配速直方图 bin 颜色映射：快端=zone-5（深 lime），慢端=zone-1（浅 lime）
+function paceBinColor(binIdx, totalBins, zoneColors) {
+    if (totalBins <= 1) return zoneColors[4];
+    var t = binIdx / (totalBins - 1); // 0=fast, 1=slow
+    var zoneIdx = 4 - Math.round(t * 4);
+    if (zoneIdx < 0) zoneIdx = 0;
+    if (zoneIdx > 4) zoneIdx = 4;
+    return zoneColors[zoneIdx];
+}
+
+// ============================================================
+// buildCharts — 所有图表初始化（由主题切换触发）
+// ============================================================
+function buildCharts() {
+    if (!runsData || runsData.length < 2) return;
+
+    var colors = getChartColors();
+    colors.cardBg = getComputedStyle(document.documentElement).getPropertyValue('--rc-card').trim() || '#14161A';
+    var tooltipBg = getComputedStyle(document.documentElement).getPropertyValue('--rc-card').trim() || '#1E2127';
+    var tooltipTitle = getComputedStyle(document.documentElement).getPropertyValue('--rc-text').trim() || '#F4F5F0';
+    var tooltipBody = getComputedStyle(document.documentElement).getPropertyValue('--rc-text-secondary').trim() || '#8A8F98';
+
+    // 数据提取与排序（按日期正序）
+    var sorted = runsData.slice().sort(function(a, b) {
+        return new Date(a['日期']) - new Date(b['日期']);
+    });
+
+    var labels = sorted.map(function(r) { return r['日期']; });
+    var paceData = sorted.map(function(r) { return r['平均配速_秒每公里']; });
+    var hrData = sorted.map(function(r) { return r['平均心率']; });
+    var distanceData = sorted.map(function(r) { return r['距离_km']; });
+
+    // 周跑量聚合
+    var weekMap = {};
+    sorted.forEach(function(r) {
+        var weekStart = getISOWeekStart(r['日期']);
+        if (!weekMap[weekStart]) {
+            weekMap[weekStart] = 0;
+        }
+        weekMap[weekStart] += parseFloat(r['距离_km']) || 0;
+    });
+
+    var weekKeys = Object.keys(weekMap).sort();
+    var weekLabels = weekKeys.map(function(w) { return formatWeekLabel(w); });
+    var weekData = weekKeys.map(function(w) { return Math.round(weekMap[w] * 10) / 10; });
+
+    // Chart.js 全局默认
+    Chart.defaults.color = colors.text;
+    Chart.defaults.borderColor = colors.grid;
+
+    function baseOptions(yLabel, yCallback) {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: tooltipBg,
+                    titleColor: tooltipTitle,
+                    bodyColor: tooltipBody,
+                    borderColor: 'rgba(255,255,255,0.08)',
+                    borderWidth: 1,
+                    padding: 10,
+                    cornerRadius: 8,
+                    callbacks: {
+                        label: function(ctx) {
+                            return yCallback ? yCallback(ctx) : (ctx.parsed.y + ' ' + (yLabel || ''));
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: colors.grid },
+                    ticks: { color: colors.text, maxTicksLimit: 8, font: { size: 11 } }
+                },
+                y: {
+                    grid: { color: colors.grid },
+                    ticks: {
+                        color: colors.text,
+                        font: { size: 11 },
+                        callback: yCallback ? function(val) { return yCallback({parsed: {y: val}}); } : undefined
+                    }
+                }
+            }
+        };
+    }
+
+    // ============================================================
+    // 1. 配速趋势图（分析 Tab）
+    // ============================================================
+    var paceCtx = document.getElementById('paceChart');
+    if (paceCtx) {
+        paceCtx = paceCtx.getContext('2d');
+        var paceOptions = baseOptions('', function(ctx) { return formatPace(ctx.parsed.y); });
+        paceOptions.scales.y.reverse = true;
+        paceOptions.scales.y.ticks.callback = function(val) { return formatPace(val); };
+        var paceChart = new Chart(paceCtx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: paceData,
+                    borderColor: colors.primary,
+                    backgroundColor: hexToRgba(colors.primary, 0.08),
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 3,
+                    pointBackgroundColor: colors.primary,
+                    pointBorderColor: colors.cardBg,
+                    pointBorderWidth: 2,
+                    pointHoverRadius: 5
+                }]
+            },
+            options: paceOptions
+        });
+        registerChart(paceChart);
+
+        // claim 标题：近 N 次配速均值 + 趋势方向
+        var paceTitleEl = document.getElementById('pace-title');
+        if (paceTitleEl) {
+            var validPaceVals = paceData.filter(function(v) { return v != null; });
+            if (validPaceVals.length > 0) {
+                var avgPace = validPaceVals.reduce(function(a, b) { return a + b; }, 0) / validPaceVals.length;
+                var firstPace = validPaceVals[0];
+                var lastPace = validPaceVals[validPaceVals.length - 1];
+                var trend = lastPace < firstPace ? '↓ 改善' : (lastPace > firstPace ? '↑ 变慢' : '→ 持平');
+                paceTitleEl.textContent = '近 ' + validPaceVals.length + ' 次配速均值 ' + formatPace(avgPace) + '，' + trend;
+            }
+        }
+    }
+
+    // ============================================================
+    // 2. 心率趋势图（分析 Tab）— primary 色
+    // ============================================================
+    var hrCtx = document.getElementById('hrChart');
+    if (hrCtx) {
+        hrCtx = hrCtx.getContext('2d');
+        var hrOptions = baseOptions('bpm');
+        var hrChart = new Chart(hrCtx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: hrData,
+                    borderColor: colors.primary,
+                    backgroundColor: hexToRgba(colors.primary, 0.08),
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 3,
+                    pointBackgroundColor: colors.primary,
+                    pointBorderColor: colors.cardBg,
+                    pointBorderWidth: 2,
+                    pointHoverRadius: 5
+                }]
+            },
+            options: hrOptions
+        });
+        registerChart(hrChart);
+
+        // claim 标题：近 N 次均心率 + 稳定/上漂
+        var hrTitleEl = document.getElementById('hr-title');
+        if (hrTitleEl) {
+            var validHrVals = hrData.filter(function(v) { return v != null; });
+            if (validHrVals.length > 0) {
+                var avgHr = Math.round(validHrVals.reduce(function(a, b) { return a + b; }, 0) / validHrVals.length);
+                var firstHr = validHrVals[0];
+                var lastHr = validHrVals[validHrVals.length - 1];
+                var hrStd = Math.sqrt(validHrVals.reduce(function(sum, v) { var d = v - avgHr; return sum + d * d; }, 0) / validHrVals.length);
+                var hrTrend = hrStd < 5 ? '稳定' : (lastHr > firstHr + 5 ? '上漂' : '稳定');
+                hrTitleEl.textContent = '近 ' + validHrVals.length + ' 次均心率 ' + avgHr + ' bpm，' + hrTrend;
+            }
+        }
+    }
+
+    // ============================================================
+    // 3. 训练负荷 ATL/CTL/TSB 三线图（趋势 Tab）
+    // ============================================================
+    var validHrRuns = runsData.filter(function(r) {
+        return r['平均心率'] != null && r['时长_分钟'] != null;
+    });
+    var loadCanvas = document.getElementById('loadChart');
+    var loadContainer = document.getElementById('load-chart-container');
+
+    if (validHrRuns.length < 3) {
+        // HR 记录不足 3 条，显示 EmptyState
+        if (loadContainer) {
+            loadContainer.innerHTML = DS.renderEmptyState('zap', '负荷估算需更多心率数据', '至少需要 3 条包含心率与时长的记录才能建模 ATL/CTL/TSB');
+        }
+    } else if (loadCanvas) {
+        var loadCtx = loadCanvas.getContext('2d');
+        var loadSeries = computeLoadSeries(runsData);
+        var atlLast = loadSeries.atl.length > 0 ? loadSeries.atl[loadSeries.atl.length - 1] : 0;
+        var ctlLast = loadSeries.ctl.length > 0 ? loadSeries.ctl[loadSeries.ctl.length - 1] : 0;
+        var tsbLast = loadSeries.tsb.length > 0 ? loadSeries.tsb[loadSeries.tsb.length - 1] : 0;
+
+        var tsbSuccess = getComputedStyle(document.documentElement).getPropertyValue('--state-success').trim() || '#3DD68C';
+        var tsbWarning = getComputedStyle(document.documentElement).getPropertyValue('--state-warning').trim() || '#FFB23D';
+
+        var loadChart = new Chart(loadCtx, {
+            type: 'line',
+            data: {
+                labels: loadSeries.labels,
+                datasets: [
+                    {
+                        label: 'ATL 短期负荷',
+                        data: loadSeries.atl,
+                        borderColor: colors.primary,
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        pointHoverBackgroundColor: colors.primary,
+                        tension: 0.35,
+                        fill: false,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'CTL 长期负荷',
+                        data: loadSeries.ctl,
+                        borderColor: colors.secondary,
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        pointHoverBackgroundColor: colors.secondary,
+                        tension: 0.35,
+                        fill: false,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'TSB 疲劳差值',
+                        data: loadSeries.tsb,
+                        borderColor: colors.quaternary,
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        pointHoverBackgroundColor: colors.quaternary,
+                        tension: 0.3,
+                        yAxisID: 'y1',
+                        fill: {
+                            target: 0,
+                            above: hexToRgba(tsbSuccess, 0.18),
+                            below: hexToRgba(tsbWarning, 0.18)
+                        }
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipTitle,
+                        bodyColor: tooltipBody,
+                        borderColor: 'rgba(255,255,255,0.08)',
+                        borderWidth: 1,
+                        padding: 10,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: function(ctx) {
+                                return ctx.dataset.label + ' ' + ctx.parsed.y;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: colors.grid },
+                        ticks: { color: colors.text, maxTicksLimit: 8, font: { size: 11 } }
+                    },
+                    y: {
+                        type: 'linear',
+                        position: 'left',
+                        grid: { color: colors.grid },
+                        ticks: { color: colors.text, font: { size: 11 } },
+                        title: { display: true, text: 'ATL / CTL', color: colors.text, font: { size: 11 } }
+                    },
+                    y1: {
+                        type: 'linear',
+                        position: 'right',
+                        grid: { drawOnChartArea: false },
+                        ticks: { color: colors.text, font: { size: 11 } },
+                        title: { display: true, text: 'TSB', color: colors.text, font: { size: 11 } }
+                    }
+                }
+            }
+        });
+        registerChart(loadChart);
+
+        // claim 标题
+        var loadTitleEl = document.getElementById('load-title');
+        if (loadTitleEl) {
+            loadTitleEl.textContent = '训练负荷 ATL ' + Math.round(atlLast) + ' · CTL ' + Math.round(ctlLast) + ' · TSB ' + Math.round(tsbLast);
+        }
+    }
+
+    // ============================================================
+    // 4. 周跑量变化图（趋势 Tab）
+    // ============================================================
+    var weeklyCtx = document.getElementById('weeklyChart');
+    if (weeklyCtx) {
+        weeklyCtx = weeklyCtx.getContext('2d');
+        var weeklyOptions = baseOptions('km');
+        var weeklyChart = new Chart(weeklyCtx, {
+            type: 'bar',
+            data: {
+                labels: weekLabels,
+                datasets: [{
+                    data: weekData,
+                    backgroundColor: colors.secondary,
+                    borderRadius: 4,
+                    borderSkipped: false
+                }]
+            },
+            options: weeklyOptions
+        });
+        registerChart(weeklyChart);
+
+        // claim 标题：近 N 周累计 + 环比方向
+        var weeklyTitleEl = document.getElementById('weekly-title');
+        if (weeklyTitleEl) {
+            var totalWeeks = weekData.length;
+            var totalKm = weekData.reduce(function(a, b) { return a + b; }, 0);
+            var weekOnWeek = '';
+            if (weekData.length >= 2) {
+                var lastWeek = weekData[weekData.length - 1];
+                var prevWeek = weekData[weekData.length - 2];
+                if (lastWeek > prevWeek) weekOnWeek = '环比 ↑' + Math.round((lastWeek - prevWeek) / prevWeek * 100) + '%';
+                else if (lastWeek < prevWeek) weekOnWeek = '环比 ↓' + Math.round((prevWeek - lastWeek) / prevWeek * 100) + '%';
+                else weekOnWeek = '环比持平';
+            }
+            weeklyTitleEl.textContent = '近 ' + totalWeeks + ' 周累计 ' + (Math.round(totalKm * 10) / 10) + ' km' + (weekOnWeek ? '，' + weekOnWeek : '');
+        }
+    }
+
+    // ============================================================
+    // 5. 训练进展组合图（趋势 Tab）
+    // ============================================================
+    if (planChartData && planChartData.length >= 2) {
+        var progressCtx = document.getElementById('progressChart');
+        if (progressCtx) {
+            progressCtx = progressCtx.getContext('2d');
+            var progressLabels = planChartData.map(function(d) { return d.date; });
+            var progressPaceData = planChartData.map(function(d) { return d.actual_pace; });
+            var progressCompleteData = planChartData.map(function(d) { return d.completed ? 1 : 0; });
+
+            var progressOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: { display: true, labels: { color: colors.text, font: { size: 11 }, usePointStyle: true, pointStyleWidth: 8 } },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipTitle,
+                        bodyColor: tooltipBody,
+                        borderColor: 'rgba(255,255,255,0.08)',
+                        borderWidth: 1,
+                        padding: 10,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: function(ctx) {
+                                if (ctx.datasetIndex === 0) {
+                                    return '完成率: ' + (ctx.parsed.y * 100) + '%';
+                                }
+                                return '配速: ' + (ctx.parsed.y != null ? formatPace(ctx.parsed.y) : '--');
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: colors.grid },
+                        ticks: { color: colors.text, maxTicksLimit: 8, font: { size: 11 } }
+                    },
+                    y: {
+                        type: 'linear',
+                        position: 'left',
+                        grid: { color: colors.grid },
+                        ticks: {
+                            color: colors.text,
+                            font: { size: 11 },
+                            callback: function(val) { return formatPace(val); }
+                        },
+                        reverse: true,
+                        title: {
+                            display: true,
+                            text: '配速',
+                            color: colors.text,
+                            font: { size: 11 }
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        position: 'right',
+                        grid: { drawOnChartArea: false },
+                        min: 0,
+                        max: 1,
+                        ticks: {
+                            color: colors.text,
+                            font: { size: 11 },
+                            callback: function(val) { return (val * 100) + '%'; },
+                            stepSize: 0.25
+                        },
+                        title: {
+                            display: true,
+                            text: '完成率',
+                            color: colors.text,
+                            font: { size: 11 }
+                        }
+                    }
+                }
+            };
+
+            var progressChart = new Chart(progressCtx, {
+                type: 'bar',
+                data: {
+                    labels: progressLabels,
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: '完成率',
+                            data: progressCompleteData,
+                            backgroundColor: colors.secondary,
+                            borderRadius: 4,
+                            borderSkipped: false,
+                            yAxisID: 'y1',
+                            order: 2
+                        },
+                        {
+                            type: 'line',
+                            label: '配速',
+                            data: progressPaceData,
+                            borderColor: colors.primary,
+                            backgroundColor: hexToRgba(colors.primary, 0.08),
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 3,
+                            pointBackgroundColor: colors.primary,
+                            pointBorderColor: colors.cardBg,
+                            pointBorderWidth: 2,
+                            pointHoverRadius: 5,
+                            yAxisID: 'y',
+                            order: 1
+                        }
+                    ]
+                },
+                options: progressOptions
+            });
+            registerChart(progressChart);
+        }
+    }
+
+    // ============================================================
+    // 6. 配速分布直方图（分析 Tab）
+    // ============================================================
+    var validPaces = paceData.filter(function(v) { return v != null && v > 0; });
+    var paceDistCanvas = document.getElementById('paceDistChart');
+    var paceDistContainer = document.getElementById('pace-dist-container');
+
+    if (validPaces.length > 0 && paceDistCanvas) {
+        // 30 秒步长分桶，覆盖 [min-30, max+30]
+        var minPace = Math.min.apply(null, validPaces);
+        var maxPace = Math.max.apply(null, validPaces);
+        var binSize = 30;
+        var binStart = Math.floor((minPace - 30) / binSize) * binSize;
+        var binEnd = Math.ceil((maxPace + 30) / binSize) * binSize;
+        var numBins = Math.max(1, Math.round((binEnd - binStart) / binSize));
+
+        var binCounts = new Array(numBins).fill(0);
+        var binLabels = [];
+        var binColors = [];
+        var zoneColors = getZoneColors();
+
+        for (var b = 0; b < numBins; b++) {
+            var lo = binStart + b * binSize;
+            binLabels.push(formatPace(lo));
+            binColors.push(paceBinColor(b, numBins, zoneColors));
+        }
+
+        validPaces.forEach(function(p) {
+            var idx = Math.floor((p - binStart) / binSize);
+            if (idx < 0) idx = 0;
+            if (idx >= numBins) idx = numBins - 1;
+            binCounts[idx]++;
+        });
+
+        // 找峰值区间
+        var peakBinIdx = 0;
+        for (var i = 1; i < numBins; i++) {
+            if (binCounts[i] > binCounts[peakBinIdx]) peakBinIdx = i;
+        }
+        var peakBinLo = binStart + peakBinIdx * binSize;
+        var peakBinHi = peakBinLo + binSize;
+        var peakBinLabel = formatPace(peakBinLo) + '–' + formatPace(peakBinHi);
+
+        var paceDistCtx = paceDistCanvas.getContext('2d');
+        var paceDistChart = new Chart(paceDistCtx, {
+            type: 'bar',
+            data: {
+                labels: binLabels,
+                datasets: [{
+                    data: binCounts,
+                    backgroundColor: binColors,
+                    borderRadius: 4,
+                    categoryPercentage: 1.0,
+                    barPercentage: 0.92
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: tooltipTitle,
+                        bodyColor: tooltipBody,
+                        borderColor: 'rgba(255,255,255,0.08)',
+                        borderWidth: 1,
+                        padding: 10,
+                        cornerRadius: 8,
+                        callbacks: {
+                            title: function(items) {
+                                var idx = items[0].dataIndex;
+                                var lo = binStart + idx * binSize;
+                                var hi = lo + binSize;
+                                return '区间 ' + formatPace(lo) + '–' + formatPace(hi);
+                            },
+                            label: function(ctx) {
+                                var total = validPaces.length;
+                                var pct = total > 0 ? Math.round(ctx.parsed.y / total * 100) : 0;
+                                return ctx.parsed.y + ' 次 (' + pct + '%)';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: colors.grid },
+                        ticks: { color: colors.text, maxTicksLimit: 10, font: { size: 11 } }
+                    },
+                    y: {
+                        grid: { color: colors.grid },
+                        ticks: { color: colors.text, font: { size: 11 }, precision: 0 },
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+        registerChart(paceDistChart);
+
+        // claim 标题
+        var paceDistTitleEl = document.getElementById('pace-dist-title');
+        if (paceDistTitleEl) {
+            paceDistTitleEl.textContent = validPaces.length + ' 次训练配速集中分布于 ' + peakBinLabel + ' 区间';
+        }
+    } else if (paceDistContainer) {
+        paceDistContainer.innerHTML = DS.renderEmptyState('pie-chart', '暂无配速数据', '需要至少 1 条包含配速的记录');
+    }
+
+    // ============================================================
+    // 7. 心率区间分布卡片（分析 Tab）
+    // ============================================================
+    buildHrZoneCard(runsData);
+}
+
+// ============================================================
+// 数据不足处理
+// ============================================================
+(function() {
+    if (!runsData || runsData.length < 2) {
+        if (runsData && runsData.length === 1) {
+            // 只有 1 条记录：显示 EmptyState
+            ['pace-empty', 'hr-empty', 'load-empty', 'weekly-empty'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) {
+                    el.innerHTML += DS.renderEmptyState('bar-chart-3', '数据不足', '至少需要 2 条记录才能生成趋势图');
+                }
+            });
+        } else {
+            // 完全无数据：显示 Skeleton
+            ['pace-skeleton', 'hr-skeleton', 'load-skeleton', 'weekly-skeleton'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) {
+                    el.innerHTML = DS.renderSkeleton('chart');
+                }
+            });
+        }
+
+        // 训练进展 EmptyState
+        if (planChartData && planChartData.length === 1) {
+            var progressEmptyEl = document.getElementById('progress-empty');
+            if (progressEmptyEl) {
+                progressEmptyEl.innerHTML += DS.renderEmptyState('bar-chart-3', '数据不足', '至少需要 2 条计划记录才能生成训练进展图');
+            }
+        }
+        return;
+    }
+
+    // 训练进展 EmptyState（仅 1 条记录）
+    if (planChartData && planChartData.length === 1) {
+        var progressEmptyEl = document.getElementById('progress-empty');
+        if (progressEmptyEl) {
+            progressEmptyEl.innerHTML += DS.renderEmptyState('bar-chart-3', '数据不足', '至少需要 2 条计划记录才能生成训练进展图');
+        }
+    }
+})();
+
+// ============================================================
+// 初始化（延迟到 DOMContentLoaded 确保 base.html 的 getChartColors 等已加载）
+// ============================================================
+document.addEventListener('DOMContentLoaded', function() {
+    populateStats();
+    buildCharts();
+});
+
+// ============================================================
+// 主题切换 — 重建图表与统计摘要
+// ============================================================
+document.addEventListener('rc-theme-change', function() {
+    destroyAllCharts();
+    setTimeout(function() {
+        populateStats();
+        buildCharts();
+    }, 100);
+});
+</script>
+{% endblock %}

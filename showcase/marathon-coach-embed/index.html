@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>跑步教练 · 试运行演示</title>
+<!--
+  可嵌入演示 · Running Coach Demo
+  -------------------------------------------------------------
+  · 单文件、零外部依赖，可直接通过 <iframe> 嵌入腾讯文档。
+  · 复刻真实产品 /training + /coach 的视觉语言与核心交互。
+  · 含实时跑步数据（配速/距离/心率）与实时教练反馈。
+  · 腾讯文档嵌入：先托管本文件到公开地址（Gitee Pages / GitHub Pages /
+    Vercel / 任意静态托管），在腾讯文档中「插入 → 更多 → 嵌入网页」
+    粘贴该地址即可。离线打开 file:// 亦可正常运行。
+-->
+<style>
+  /* ============ 设计令牌（源自 static/theme.css 暗色模式） ============ */
+  :root{
+    --green-50:#E7F9F0; --green-400:#29C98C; --green-500:#16C784; --green-600:#0FA968; --green-700:#0B8F5A;
+    --teal-500:#0EA5E9; --teal-400:#1FAEEA; --teal-50:#E0F2FE;
+    --orange-500:#FF6A1A; --orange-50:#FFF1E8;
+    --amber-500:#F5A623; --red-500:#FF3B30;
+    --gray-0:#F6F9F7; --gray-25:#EEF3F0; --gray-50:#E1E8E4; --gray-100:#CBD4CF;
+    --gray-200:#97A39C; --gray-300:#6E7A73; --gray-400:#566059; --gray-500:#3F4742;
+    --gray-600:#2A302D; --gray-700:#1C201E; --gray-800:#13171A; --gray-850:#151A1F; --gray-900:#1B2127; --gray-950:#232C34;
+  }
+  [data-theme="dark"]{
+    --rc-background:#0E1216; --rc-surface:#151A1F; --rc-surface-elevated:#1B2127; --rc-surface-alt:#10151A;
+    --rc-text:#EAF0EE; --rc-text-secondary:#A9B4AE; --rc-text-muted:#828C86; --rc-text-on-brand:#05291D;
+    --rc-border:rgba(255,255,255,0.09); --rc-border-strong:rgba(255,255,255,0.14); --rc-border-light:rgba(255,255,255,0.05); --rc-chart-grid:rgba(255,255,255,0.06);
+    --rc-brand:#2BD493; --rc-brand-hover:#54E0A6; --rc-brand-active:#2BD493; --rc-on-brand:#05291D; --rc-brand-soft:rgba(43,212,147,0.10); --rc-brand-border:rgba(43,212,147,0.28);
+    --rc-data:#38BDF8; --rc-data-soft:rgba(56,189,248,0.10); --rc-on-data:#06283A;
+    --rc-energy:#FF8A47; --rc-energy-soft:rgba(255,138,71,0.12); --rc-on-energy:#3A1500;
+    --state-success:#2BD493; --state-info:#38BDF8; --state-warning:#FBBF4D; --state-error:#FF6A60;
+    --rc-success:var(--state-success); --rc-info:var(--state-info); --rc-warning:var(--state-warning); --rc-danger:var(--state-error);
+    --rc-ring:#2BD493; --rc-ring-offset:#0E1216;
+    --rc-zone-1:#0E2A1F; --rc-zone-2:#155043; --rc-zone-3:#1E8C63; --rc-zone-4:#2BD493; --rc-zone-5:#7DF0B8;
+    --rc-chart-1:#2BD493; --rc-chart-2:#38BDF8; --rc-chart-3:#FF8A47; --rc-chart-4:#FBBF4D; --rc-chart-5:#FF6A60;
+    --rc-shadow-sm:0 1px 2px rgba(0,0,0,0.30); --rc-shadow-md:0 8px 24px -8px rgba(0,0,0,0.45); --rc-shadow-lg:0 20px 40px -12px rgba(0,0,0,0.55);
+    --rc-radius-sm:4px; --rc-radius-md:8px; --rc-radius-lg:12px; --rc-radius-xl:16px; --rc-radius-full:9999px;
+    --rc-font-display:'Inter Tight','Inter',-apple-system,sans-serif;
+    --rc-font-body:'Inter',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+    --rc-text-xs:0.75rem; --rc-text-sm:0.8125rem; --rc-text-base:0.9375rem; --rc-text-lg:1.125rem; --rc-text-xl:1.375rem; --rc-text-2xl:1.75rem;
+    --rc-space-1:4px; --rc-space-2:8px; --rc-space-3:12px; --rc-space-4:16px; --rc-space-5:20px; --rc-space-6:24px; --rc-space-8:32px; --rc-space-10:40px;
+    --rc-transition:0.2s cubic-bezier(0.4,0,0.2,1);
+    --rc-primary:var(--rc-brand); --rc-primary-dark:var(--rc-brand); --rc-primary-bg:var(--rc-brand-soft); --rc-primary-border:var(--rc-brand-border); --rc-text-on-primary:var(--rc-on-brand);
+    --rc-card:var(--rc-surface); --rc-card-foreground:var(--rc-text); --rc-card-hover:var(--rc-surface-elevated); --rc-muted:var(--rc-surface-elevated); --rc-muted-foreground:var(--rc-text-secondary);
+    --rc-orb-glow:0 0 22px rgba(43,212,147,0.45),0 0 44px rgba(43,212,147,0.20);
+    --rc-orb-glow-strong:0 0 32px rgba(43,212,147,0.60),0 0 72px rgba(43,212,147,0.28);
+    --rc-logo-glow:0 0 14px rgba(43,212,147,0.40);
+    --rc-ambient-night:radial-gradient(circle at 20% 30%, rgba(43,212,147,0.06), transparent 60%);
+  }
+
+  *,*::before,*::after{box-sizing:border-box;}
+  html{font-family:var(--rc-font-body);font-size:16px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+  body{
+    margin:0; width:100%; max-width:100%; overflow-x:hidden;
+    background:var(--rc-background); color:var(--rc-text); line-height:1.6;
+  }
+  .ambient-layer{position:fixed;inset:0;pointer-events:none;z-index:0;background:var(--rc-ambient-night);}
+  .embed-wrap{position:relative;z-index:1;}
+
+  /* ============ 顶部栏（紧凑，复刻 top-nav / brand / Web badge） ============ */
+  .top-bar{
+    position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:var(--rc-space-3);
+    height:52px;padding:0 var(--rc-space-4);background:var(--rc-background);
+    border-bottom:1px solid var(--rc-border);
+  }
+  .brand{display:flex;align-items:center;gap:var(--rc-space-2);text-decoration:none;color:var(--rc-text);font-family:var(--rc-font-display);font-weight:600;font-size:var(--rc-text-lg);}
+  .brand .logo-icon{width:28px;height:28px;border-radius:50%;background:var(--rc-primary);box-shadow:var(--rc-logo-glow);display:flex;align-items:center;justify-content:center;color:var(--rc-text-on-primary);}
+  .badge-web{font-size:var(--rc-text-xs);padding:2px 8px;border-radius:var(--rc-radius-full);background:var(--rc-primary-bg);color:var(--rc-primary);border:1px solid var(--rc-primary-border);font-weight:500;}
+  .nav-spacer{flex:1;}
+  .live-pill{display:inline-flex;align-items:center;gap:6px;font-size:var(--rc-text-xs);font-weight:600;color:var(--rc-danger);border:1px solid rgba(255,106,96,0.4);background:rgba(255,106,96,0.10);border-radius:var(--rc-radius-full);padding:3px 10px;}
+  .live-dot{width:7px;height:7px;border-radius:50%;background:var(--rc-danger);box-shadow:0 0 8px var(--rc-danger);animation:livePulse 1.4s infinite;}
+  @keyframes livePulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.7);}}
+  .theme-toggle{background:none;border:1px solid var(--rc-border);border-radius:var(--rc-radius-full);width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--rc-text-secondary);transition:all var(--rc-transition);}
+  .theme-toggle:hover{background:var(--rc-card-hover);color:var(--rc-primary);}
+
+  /* ============ 内容容器 ============ */
+  .content{padding:var(--rc-space-4) var(--rc-space-4) var(--rc-space-6);max-width:1180px;margin:0 auto;}
+  .page-title{font-family:var(--rc-font-display);font-size:clamp(1.4rem,2.4vw,1.85rem);font-weight:700;letter-spacing:-0.02em;margin:0;}
+  .page-subtitle{font-size:var(--rc-text-sm);color:var(--rc-text-secondary);margin-top:2px;}
+
+  /* ============ 实时训练数据卡（复刻 /training 数据展示 + 实时反馈） ============ */
+  .live-card{border:1px solid var(--rc-primary-border);background:linear-gradient(180deg,var(--rc-brand-soft),var(--rc-surface));border-radius:var(--rc-radius-lg);padding:var(--rc-space-5);margin-top:var(--rc-space-4);box-shadow:var(--rc-shadow-md);}
+  .live-head{display:flex;align-items:center;justify-content:space-between;gap:var(--rc-space-3);margin-bottom:var(--rc-space-4);}
+  .live-head h2{font-size:var(--rc-text-base);font-weight:600;margin:0;display:flex;align-items:center;gap:8px;}
+  .live-status{font-size:var(--rc-text-xs);color:var(--rc-text-muted);display:flex;align-items:center;gap:6px;}
+  .metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--rc-space-3);}
+  .metric{background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:var(--rc-radius-md);padding:var(--rc-space-3);display:flex;flex-direction:column;gap:4px;min-width:0;}
+  .metric .m-top{display:flex;align-items:center;gap:6px;color:var(--rc-text-muted);font-size:var(--rc-text-xs);}
+  .metric .m-val{font-family:var(--rc-font-display);font-size:1.45rem;font-weight:700;line-height:1.1;color:var(--rc-text);font-variant-numeric:tabular-nums;}
+  .metric .m-unit{font-size:var(--rc-text-xs);color:var(--rc-text-muted);font-weight:500;margin-left:3px;}
+  .metric .m-sub{font-size:11px;color:var(--rc-text-muted);}
+  .metric.hr .m-val{color:var(--rc-chart-5);}
+  .zone-badge{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:var(--rc-radius-full);margin-left:6px;vertical-align:middle;}
+
+  .spark-wrap{grid-column:span 6;background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:var(--rc-radius-md);padding:var(--rc-space-3);}
+  .spark-head{display:flex;align-items:center;justify-content:space-between;font-size:var(--rc-text-xs);color:var(--rc-text-muted);margin-bottom:4px;}
+  .spark{width:100%;height:54px;display:block;}
+
+  /* 实时教练反馈条 */
+  .coach-feedback{display:flex;align-items:flex-start;gap:var(--rc-space-3);margin-top:var(--rc-space-4);background:var(--rc-surface);border-left:3px solid var(--rc-primary);border-radius:var(--rc-radius-md);padding:var(--rc-space-3) var(--rc-space-4);}
+  .coach-feedback .cf-icon{color:var(--rc-primary);flex-shrink:0;margin-top:2px;}
+  .coach-feedback .cf-text{font-size:var(--rc-text-sm);color:var(--rc-text);}
+  .coach-feedback .cf-text b{color:var(--rc-primary);}
+
+  /* ============ Coach Orb（复刻 readiness 环 + 呼吸动画） ============ */
+  .coach-orb{position:relative;width:40px;height:40px;border-radius:50%;background:conic-gradient(var(--rc-brand) calc(var(--orb-readiness,76)*1%),var(--rc-border-strong) 0);display:flex;align-items:center;justify-content:center;box-shadow:var(--rc-orb-glow);animation:orb-breathe 4s ease-in-out infinite;flex-shrink:0;}
+  .coach-orb::before{content:'';position:absolute;inset:5px;border-radius:50%;background:radial-gradient(circle at 40% 40%,#93E9C4,#0A6F47);}
+  .coach-orb .orb-value{position:relative;z-index:1;font-family:var(--rc-font-display);font-size:11px;font-weight:700;color:var(--rc-text-on-brand);line-height:1;}
+  .coach-orb.is-thinking{animation:orb-breathe 1.5s ease-in-out infinite;box-shadow:var(--rc-orb-glow-strong);}
+  @keyframes orb-breathe{0%,100%{box-shadow:var(--rc-orb-glow);transform:scale(1);}50%{box-shadow:var(--rc-orb-glow-strong);transform:scale(1.05);}}
+
+  /* ============ 教练双栏布局（复刻 /coach） ============ */
+  .coach-layout{display:flex;gap:var(--rc-space-4);margin-top:var(--rc-space-5);align-items:stretch;}
+  .chat-column{flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--rc-space-3);}
+  .context-panel{width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:var(--rc-space-3);max-height:none;}
+
+  .memory-indicator{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--rc-border);border-radius:var(--rc-radius-full);padding:4px 12px;font-size:var(--rc-text-xs);color:var(--rc-text-muted);}
+  .memory-indicator svg{color:var(--rc-primary);}
+
+  .quick-actions{display:flex;flex-wrap:wrap;gap:var(--rc-space-2);}
+  .quick-btn{display:inline-flex;align-items:center;gap:6px;background:var(--rc-card);border:1px solid var(--rc-border);border-radius:var(--rc-radius-full);padding:6px 12px;font-size:var(--rc-text-sm);color:var(--rc-text-secondary);cursor:pointer;transition:all var(--rc-transition);}
+  .quick-btn:hover{border-color:var(--rc-primary-border);color:var(--rc-primary);background:var(--rc-brand-soft);}
+  .quick-btn svg{width:16px;height:16px;}
+
+  .chat-container{border-radius:var(--rc-radius-lg);border:1px solid var(--rc-border);background:var(--rc-card);display:flex;flex-direction:column;flex:1;min-height:320px;}
+  .chat-messages{flex:1;overflow-y:auto;padding:var(--rc-space-4);display:flex;flex-direction:column;gap:var(--rc-space-4);max-height:420px;}
+  .chat-messages::-webkit-scrollbar{width:5px;}
+  .chat-messages::-webkit-scrollbar-thumb{background:var(--rc-border);border-radius:3px;}
+  .chat-message{max-width:85%;animation:cfIn .3s ease;}
+  .chat-message.user{margin-left:auto;}
+  .chat-message.coach{margin-right:auto;}
+  @keyframes cfIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+  .chat-row{display:flex;align-items:flex-start;gap:var(--rc-space-2);}
+  .chat-bubble-coach{background:var(--rc-surface);border-left:2px solid var(--rc-primary);border-radius:var(--rc-radius-xl);border-bottom-left-radius:var(--rc-radius-md);padding:10px var(--rc-space-4);font-size:var(--rc-text-sm);color:var(--rc-text);}
+  .chat-bubble-user{background:var(--rc-primary);color:var(--rc-text-on-primary);border-radius:var(--rc-radius-xl);border-bottom-right-radius:var(--rc-radius-md);padding:10px var(--rc-space-4);font-size:var(--rc-text-sm);}
+  .chat-time{font-size:11px;color:var(--rc-text-muted);margin-top:3px;}
+  .chat-time-left{margin-left:2px;}
+  .chat-time-right{margin-right:2px;text-align:right;}
+  .hint-bubble{background:var(--rc-data-soft);border:1px solid rgba(56,189,248,0.3);border-radius:var(--rc-radius-lg);padding:10px var(--rc-space-4);font-size:var(--rc-text-sm);color:var(--rc-text);}
+  .hint-tag{display:inline-block;font-size:10px;font-weight:700;color:var(--rc-data);border:1px solid rgba(56,189,248,0.4);border-radius:var(--rc-radius-full);padding:1px 7px;margin-bottom:4px;}
+  .typing-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--rc-text-muted);animation:blink 1.4s infinite both;}
+  .typing-dot:nth-child(2){animation-delay:.2s;}
+  .typing-dot:nth-child(3){animation-delay:.4s;}
+  @keyframes blink{0%,80%,100%{opacity:.2;}40%{opacity:1;}}
+
+  .chat-input-area{border-top:1px solid var(--rc-border);padding:var(--rc-space-3);}
+  .chat-input-row{display:flex;align-items:flex-end;gap:var(--rc-space-2);}
+  .chat-input-field{flex:1;resize:none;min-height:40px;max-height:120px;background:var(--rc-card);border:1px solid var(--rc-border);border-radius:var(--rc-radius-md);padding:10px var(--rc-space-3);color:var(--rc-text);font-size:var(--rc-text-sm);font-family:var(--rc-font-body);outline:none;transition:border-color var(--rc-transition);}
+  .chat-input-field:focus{border-color:var(--rc-primary);box-shadow:0 0 0 2px var(--rc-primary-bg);}
+  .chat-input-field::placeholder{color:var(--rc-text-muted);}
+  .chat-send-btn{width:40px;height:40px;border-radius:var(--rc-radius-md);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;border:none;background:var(--rc-primary);color:var(--rc-text-on-primary);transition:opacity var(--rc-transition);}
+  .chat-send-btn:disabled{opacity:.5;cursor:not-allowed;}
+  .chat-send-btn:not(:disabled):hover{background:var(--rc-brand-hover);}
+
+  .rag-panel{flex-shrink:0;background:var(--rc-card);border:1px solid var(--rc-border);border-left:2px solid var(--rc-primary);border-radius:var(--rc-radius-lg);padding:var(--rc-space-3) var(--rc-space-4);}
+  .rag-head{display:flex;align-items:center;gap:8px;font-size:var(--rc-text-sm);font-weight:600;margin-bottom:6px;}
+  .rag-head svg{color:var(--rc-primary);width:16px;height:16px;}
+  .rag-count{margin-left:auto;font-size:11px;color:var(--rc-info);}
+  .rag-body{font-size:var(--rc-text-xs);color:var(--rc-text-muted);line-height:1.5;}
+  .rag-body code{background:var(--rc-muted);padding:1px 5px;border-radius:4px;color:var(--rc-text-secondary);font-size:11px;}
+
+  /* 上下文面板卡片（复刻 /coach 右侧） */
+  .context-card{background:var(--rc-card);border:1px solid var(--rc-border);border-radius:var(--rc-radius-lg);padding:var(--rc-space-4);}
+  .context-card-title{font-size:var(--rc-text-xs);color:var(--rc-text-muted);font-weight:500;margin-bottom:var(--rc-space-2);text-transform:uppercase;letter-spacing:.05em;}
+  .ctx-stat-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:var(--rc-space-2);}
+  .ctx-stat-label{font-size:var(--rc-text-sm);color:var(--rc-text-secondary);}
+  .ctx-stat-value{font-family:var(--rc-font-display);font-size:1.4rem;font-weight:600;color:var(--rc-text);line-height:1.2;font-variant-numeric:tabular-nums;}
+  .ctx-stat-unit{font-size:var(--rc-text-xs);color:var(--rc-text-muted);margin-left:2px;}
+  .recent-run{display:flex;justify-content:space-between;align-items:center;padding:var(--rc-space-2) 0;border-bottom:1px solid var(--rc-border-light);}
+  .recent-run:last-child{border-bottom:none;}
+  .recent-run .rr-date{font-size:var(--rc-text-xs);color:var(--rc-text-muted);}
+  .recent-run .rr-detail{font-size:var(--rc-text-sm);color:var(--rc-text);}
+  .recent-run .rr-pace{font-size:var(--rc-text-sm);color:var(--rc-primary);font-weight:500;font-variant-numeric:tabular-nums;}
+  .progress-bar{height:6px;background:var(--rc-border);border-radius:3px;overflow:hidden;margin:var(--rc-space-2) 0;}
+  .progress-fill{height:100%;background:var(--rc-primary);border-radius:3px;transition:width .4s ease;}
+  .plan-next{font-size:var(--rc-text-sm);color:var(--rc-text-secondary);padding:var(--rc-space-2);background:var(--rc-muted);border-radius:var(--rc-radius-sm);margin-top:var(--rc-space-2);}
+
+  /* ============ 嵌入提示横幅（仅在未嵌入时显示） ============ */
+  .embed-banner{background:var(--rc-brand-soft);border:1px solid var(--rc-primary-border);border-radius:var(--rc-radius-md);padding:10px var(--rc-space-4);margin-top:var(--rc-space-4);font-size:var(--rc-text-sm);color:var(--rc-text-secondary);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .embed-banner b{color:var(--rc-primary);}
+  .embed-banner code{background:var(--rc-muted);padding:2px 6px;border-radius:4px;font-size:11px;color:var(--rc-text);}
+
+  .footer{text-align:center;color:var(--rc-text-muted);font-size:var(--rc-text-xs);padding:var(--rc-space-6) var(--rc-space-4) var(--rc-space-4);}
+
+  /* ============ 响应式：适配腾讯文档嵌入容器不同宽度 ============ */
+  @media (max-width:900px){
+    .metrics{grid-template-columns:repeat(3,1fr);}
+    .spark-wrap{grid-column:span 3;}
+    .coach-layout{flex-direction:column;}
+    .context-panel{width:100%;flex-direction:row;flex-wrap:wrap;}
+    .context-card{flex:1;min-width:200px;}
+  }
+  @media (max-width:560px){
+    .metrics{grid-template-columns:repeat(2,1fr);}
+    .spark-wrap{grid-column:span 2;}
+    .context-panel{flex-direction:column;}
+    .page-subtitle{display:none;}
+    .brand .brand-text{font-size:var(--rc-text-base);}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .coach-orb,.live-dot,.typing-dot{animation:none!important;}
+  }
+</style>
+</head>
+<body>
+<div class="ambient-layer"></div>
+<div class="embed-wrap">
+
+  <!-- 顶部栏 -->
+  <header class="top-bar">
+    <a class="brand" href="#" onclick="return false;">
+      <span class="logo-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+      </span>
+      <span class="brand-text">跑步教练</span>
+      <span class="badge-web">Web</span>
+    </a>
+    <span class="nav-spacer"></span>
+    <span class="live-pill"><span class="live-dot"></span>LIVE 训练中</span>
+    <button class="theme-toggle" id="themeToggle" title="切换主题">
+      <svg id="themeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </button>
+  </header>
+
+  <!-- 内容 -->
+  <main class="content">
+    <div>
+      <h1 class="page-title">AI 教练 · 实时试运行</h1>
+      <p class="page-subtitle">基于真实跑步数据提供个性化指导 · 演示数据 / 可嵌入腾讯文档</p>
+    </div>
+
+    <!-- 实时训练数据 -->
+    <section class="live-card" aria-label="实时训练数据">
+      <div class="live-head">
+        <h2>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--rc-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+          实时训练状态
+        </h2>
+        <span class="live-status"><span class="live-dot"></span><span id="syncText">实时同步中</span></span>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <div class="m-top">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            时长
+          </div>
+          <div class="m-val" id="mElapsed">00:00</div>
+          <div class="m-sub">目标 50:00</div>
+        </div>
+        <div class="metric">
+          <div class="m-top">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+            距离
+          </div>
+          <div class="m-val"><span id="mDist">0.00</span><span class="m-unit">km</span></div>
+          <div class="m-sub">目标 10 km</div>
+        </div>
+        <div class="metric">
+          <div class="m-top">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path></svg>
+            当前配速
+          </div>
+          <div class="m-val" id="mPace">5:30</div>
+          <div class="m-sub">/km</div>
+        </div>
+        <div class="metric">
+          <div class="m-top">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+            平均配速
+          </div>
+          <div class="m-val" id="mAvg">5:30</div>
+          <div class="m-sub">/km</div>
+        </div>
+        <div class="metric hr">
+          <div class="m-top">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+            心率
+            <span class="zone-badge" id="mZone">Z2</span>
+          </div>
+          <div class="m-val"><span id="mHr">148</span><span class="m-unit">bpm</span></div>
+          <div class="m-sub" id="mZoneName">有氧区间</div>
+        </div>
+        <div class="metric">
+          <div class="m-top">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            步频
+          </div>
+          <div class="m-val"><span id="mCad">180</span><span class="m-unit">spm</span></div>
+          <div class="m-sub">步幅 0.93m</div>
+        </div>
+
+        <div class="spark-wrap">
+          <div class="spark-head"><span>心率趋势</span><span id="sparkInfo">最近 40s</span></div>
+          <svg class="spark" id="spark" viewBox="0 0 300 54" preserveAspectRatio="none">
+            <polyline id="sparkLine" fill="none" stroke="var(--rc-chart-5)" stroke-width="2" points=""></polyline>
+          </svg>
+        </div>
+      </div>
+
+      <!-- 实时教练反馈 -->
+      <div class="coach-feedback">
+        <span class="cf-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path><polyline points="3.5 12 7 12 10 9 13 15 16 12 20.5 12"></polyline></svg>
+        </span>
+        <div class="cf-text" id="coachFeedback">教练已接入实时数据，开始训练后我会持续给出配速与心率建议。</div>
+      </div>
+    </section>
+
+    <!-- 嵌入提示（仅独立打开时显示） -->
+    <div class="embed-banner" id="embedBanner">
+      <span>📎 这是<b>可嵌入演示</b>：在腾讯文档「插入 → 更多 → 嵌入网页」中粘贴本页公开地址即可内嵌。</span>
+      <code>&lt;iframe src="你的托管地址"&gt;&lt;/iframe&gt;</code>
+    </div>
+
+    <!-- 教练双栏 -->
+    <div class="coach-layout">
+      <div class="chat-column">
+        <div class="memory-indicator">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path><polyline points="3.5 12 7 12 10 9 13 15 16 12 20.5 12"></polyline></svg>
+          <span id="memText">教练记忆：已读取近 14 天数据</span>
+        </div>
+
+        <div class="quick-actions" id="quickActions">
+          <button class="quick-btn" onclick="askQuick('评估我的训练负荷是否合理')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path></svg>评估训练负荷
+          </button>
+          <button class="quick-btn" onclick="askQuick('给我下一周的训练建议')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>下一周建议
+          </button>
+          <button class="quick-btn" onclick="askQuick('分析我的配速是否匹配当前能力')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>分析我的配速
+          </button>
+          <button class="quick-btn" onclick="askQuick('我需要注意哪些伤病风险')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path><polyline points="3.5 12 7 12 10 9 13 15 16 12 20.5 12"></polyline></svg>伤病预防建议
+          </button>
+        </div>
+
+        <div class="chat-container">
+          <div class="chat-messages" id="chatMessages">
+            <div class="chat-message coach">
+              <div class="chat-row">
+                <div class="coach-orb" id="chatOrb" style="--orb-readiness:78"><span class="orb-value">78</span></div>
+                <div>
+                  <div class="chat-bubble-coach"><p>你好！我是你的 AI 跑步教练。我可以帮你分析训练数据、制定训练计划、提供配速建议和伤病预防指导。</p></div>
+                  <div class="chat-time chat-time-left">刚刚</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="chat-input-area">
+            <div class="chat-input-row">
+              <textarea id="chatInput" rows="1" class="chat-input-field" placeholder="输入你的问题..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}" oninput="this.style.height='';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+              <button id="sendBtn" class="chat-send-btn" onclick="sendMessage()" disabled>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13"></path><path d="M22 2 15 22l-4-9-9-4 20-7z"></path></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <section class="rag-panel">
+          <div class="rag-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+            知识来源
+            <span class="rag-count" id="ragCount">RAG · 已接入</span>
+          </div>
+          <div class="rag-body" id="ragBody">
+            教练回复时会自动标注引用，例如：<code>《丹尼尔斯跑步方程式》</code> · <code>《跑步伤痛慢跑指南》</code>
+          </div>
+        </section>
+      </div>
+
+      <!-- 上下文面板 -->
+      <aside class="context-panel">
+        <div class="context-card">
+          <div class="context-card-title">跑者画像</div>
+          <div class="ctx-stat-row"><span class="ctx-stat-label">30天跑量</span><span class="ctx-stat-value">142<span class="ctx-stat-unit">km</span></span></div>
+          <div class="ctx-stat-row"><span class="ctx-stat-label">平均配速</span><span class="ctx-stat-value">5:42<span class="ctx-stat-unit">/km</span></span></div>
+          <div class="ctx-stat-row"><span class="ctx-stat-label">周训练频率</span><span class="ctx-stat-value">4<span class="ctx-stat-unit">次/周</span></span></div>
+          <div class="ctx-stat-row"><span class="ctx-stat-label">目标比赛</span><span class="ctx-stat-value" style="font-size:1rem;">全马 42.2K</span></div>
+        </div>
+        <div class="context-card">
+          <div class="context-card-title">最近训练</div>
+          <div class="recent-run"><div><div class="rr-date">07-18</div><div class="rr-detail">8.0km · 轻松跑</div></div><div class="rr-pace">5:55</div></div>
+          <div class="recent-run"><div><div class="rr-date">07-16</div><div class="rr-detail">12.0km · 节奏跑</div></div><div class="rr-pace">5:18</div></div>
+          <div class="recent-run"><div><div class="rr-date">07-14</div><div class="rr-detail">6.0km · 恢复跑</div></div><div class="rr-pace">6:12</div></div>
+        </div>
+        <div class="context-card">
+          <div class="context-card-title">活跃计划</div>
+          <div class="ctx-stat-row"><span class="ctx-stat-label">全马 16 周计划</span><span class="ctx-stat-value">64<span class="ctx-stat-unit">%</span></span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:64%"></div></div>
+          <div style="font-size:11px;color:var(--rc-text-muted);">9 / 14 已完成</div>
+          <div class="plan-next">下一课：Day 10 · 长距离 18km @ 6:10</div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="footer">跑步教练 Demo · 数据均为模拟 · 复刻 Flask + DeepSeek 双模型训练代理的试运行界面</div>
+  </main>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ---------- 工具 ---------- */
+  function fmtPace(secPerKm){
+    if(!secPerKm||secPerKm<=0) return '--:--';
+    var s=Math.round(secPerKm);
+    return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+  }
+  function fmtClock(sec){
+    var m=Math.floor(sec/60), s=sec%60;
+    return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  }
+  function $(id){return document.getElementById(id);}
+  function escapeHtml(t){var d=document.createElement('div');d.textContent=t;return d.innerHTML;}
+  function renderMd(t){
+    return escapeHtml(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+  }
+
+  /* ---------- 主题切换（嵌入时也能用，存 sessionStorage） ---------- */
+  var themeToggle=$('themeToggle'), themeIcon=$('themeIcon');
+  try{var saved=sessionStorage.getItem('rc-theme');if(saved){document.documentElement.setAttribute('data-theme',saved);updateIcon(saved);}}catch(e){}
+  themeToggle.addEventListener('click',function(){
+    var cur=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
+    document.documentElement.setAttribute('data-theme',cur);
+    updateIcon(cur);
+    try{sessionStorage.setItem('rc-theme',cur);}catch(e){}
+  });
+  function updateIcon(theme){
+    if(theme==='light'){
+      themeIcon.innerHTML='<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>';
+    }else{
+      themeIcon.innerHTML='<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>';
+    }
+  }
+
+  /* ---------- 嵌入检测：隐藏嵌入横幅 ---------- */
+  try{if(window.self!==window.top){var b=$('embedBanner');if(b)b.style.display='none';}}catch(e){}
+
+  /* ============================================================
+     实时训练模拟引擎
+     ============================================================ */
+  var session={
+    elapsed:0, distance:0, targetKm:10,
+    basePace:330, curPace:330, avgPace:330, paceSum:0,
+    hr:148, hrBaseline:150, cad:180,
+    hrHist:[], lastZone:2, tick:0
+  };
+  var ZONES=[
+    {id:1,name:'恢复区间',color:'#2BD493'},
+    {id:2,name:'有氧区间',color:'#2BD493'},
+    {id:3,name:'马拉松配速区',color:'#38BDF8'},
+    {id:4,name:'阈值区间',color:'#FBBF4D'},
+    {id:5,name:'最大区间',color:'#FF6A60'}
+  ];
+  function zoneOf(hr,age){var max=220-age;var p=hr/max;if(p<.6)return 1;if(p<.7)return 2;if(p<.8)return 3;if(p<.9)return 4;return 5;}
+
+  function pushSpark(){
+    var svg=$('spark'), line=$('sparkLine');
+    var w=300,h=54,data=session.hrHist;
+    if(data.length<2){line.setAttribute('points','');return;}
+    var min=Math.min.apply(null,data)-4, max=Math.max.apply(null,data)+4;
+    var span=(max-min)||1;
+    var pts=data.map(function(v,i){
+      var x=(i/(data.length-1))*w;
+      var y=h-((v-min)/span)*(h-8)-4;
+      return x.toFixed(1)+','+y.toFixed(1);
+    }).join(' ');
+    line.setAttribute('points',pts);
+    var z=ZONES[session.lastZone-1];
+    line.setAttribute('stroke',z.color);
+  }
+
+  // 实时教练反馈文案（按区间）
+  var ZONE_HINTS={
+    1:'心率处于恢复区间，非常适合慢跑有氧基础，保持轻松对话节奏即可。',
+    2:'心率处于有氧区间，脂肪供能效率高，保持当前配速，注意规律呼吸。',
+    3:'进入马拉松配速区，注意补给节奏，保持稳定步频，避免前段过快。',
+    4:'心率进入阈值区间，这是提升耐力的关键强度，坚持但用「说话测试」自测——能断断续续说话即可。',
+    5:'心率偏高进入最大区间，建议立即降速恢复，避免过度训练导致风险。'
+  };
+
+  function tick(){
+    session.elapsed++;
+    session.tick++;
+
+    // 配速：围绕基准小幅游走，偶尔加速
+    var noise=(Math.random()*16-8);
+    if(session.tick%23===0) noise-=18; // 偶发加速
+    session.curPace=Math.max(280,Math.min(420,session.basePace+noise));
+    // 距离按当前配速累加（1 秒 = 1/curPace km）
+    session.distance+=1/session.curPace;
+    session.paceSum+=session.curPace;
+    session.avgPace=session.paceSum/session.elapsed;
+
+    // 心率：随配速相关随机游走
+    var target=130+(session.curPace-280)/140*55; // 配速越快 HR 越高
+    session.hrBaseline+=(target-session.hrBaseline)*0.08;
+    session.hr=Math.round(Math.max(115,Math.min(188,session.hrBaseline+(Math.random()*8-4))));
+    var z=zoneOf(session.hr,30);
+    session.hrHist.push(session.hr);
+    if(session.hrHist.length>40) session.hrHist.shift();
+
+    // 步频
+    session.cad=Math.round(176+Math.random()*10);
+
+    // 渲染
+    $('mElapsed').textContent=fmtClock(session.elapsed);
+    $('mDist').textContent=session.distance.toFixed(2);
+    $('mPace').textContent=fmtPace(session.curPace);
+    $('mAvg').textContent=fmtPace(session.avgPace);
+    $('mHr').textContent=session.hr;
+    $('mCad').textContent=session.cad;
+    var zone=ZONES[z-1];
+    var zbadge=$('mZone');
+    zbadge.textContent='Z'+z;
+    zbadge.style.background=zone.color+'22';
+    zbadge.style.color=zone.color;
+    $('mZoneName').textContent=zone.name;
+    pushSpark();
+
+    // 区间切换或定期：实时教练反馈 + 自动提示
+    if(z!==session.lastZone){
+      session.lastZone=z;
+      setFeedback('<b>教练：</b>'+ZONE_HINTS[z]);
+      pushCoachHint(zone.name+' · '+ZONE_HINTS[z]);
+    }else if(session.tick%18===0){
+      var tip=coachLiveTip();
+      setFeedback('<b>教练：</b>'+tip);
+    }
+
+    // 完成
+    if(session.distance>=session.targetKm){
+      setFeedback('<b>教练：</b>🎉 已达成 10km 目标！配速稳定、心率控制在有氧区间，本次训练非常高效。点击「下一周建议」查看恢复安排。');
+      clearInterval(timer);
+      $('syncText').textContent='训练完成';
+    }
+  }
+
+  function coachLiveTip(){
+    var r=Math.random();
+    if(session.hr>172) return '当前心率偏高，建议将配速放慢 10–15 秒/km，让心率回落到阈值以下。';
+    if(session.curPace<300) return '配速很快，注意触地时间别过长，保持上半身放松、小步快频。';
+    if(session.distance>session.targetKm*0.7) return '进入后段，糖原消耗上升，建议小口补水，保持配速节奏。';
+    return '节奏不错，保持当前步频 180 左右，跑步经济性最好。';
+  }
+
+  function setFeedback(html){$('coachFeedback').innerHTML=html;}
+
+  /* ============================================================
+     教练对话（复刻 /coach 交互）
+     ============================================================ */
+  var chatMessages=$('chatMessages'), chatInput=$('chatInput'), sendBtn=$('sendBtn');
+  var isSending=false;
+  chatInput.addEventListener('input',function(){sendBtn.disabled=!this.value.trim()||isSending;});
+
+  var REPLIES=[
+    {k:['负荷','训练负荷','强度'],a:'根据近 14 天数据，你的周跑量约 35km，强度分布合理（2 次轻松 + 1 次节奏 + 1 次长距离）。**训练负荷处于安全上限的 82%**，建议本周增加一次 30 分钟恢复跑，避免过度疲劳累积。'},
+    {k:['下周','计划','建议','安排'],a:'下一周建议：\n· 周一 休息 / 交叉训练\n· 周三 轻松跑 8km @ 6:00\n· 周五 节奏跑 10km（含 5km @ 5:15）\n· 周日 长距离 18km @ 6:10\n注意周日长距离前补充碳水，跑后 30 分钟内蛋白质恢复。'},
+    {k:['配速','能力','pb','成绩'],a:'你的阈值配速约 **5:05/km**，当前 10km 目标配速 5:30 偏保守，有约 25 秒余量。若要冲击全马 Sub-4，建议把马拉松配速逐步提到 5:40 并稳定完成 3 次以上 30km 长距离。'},
+    {k:['伤病','风险','伤痛','膝盖','预防'],a:'基于你的跑姿与里程，主要风险在 **髂胫束与足底筋膜**。建议：\n1. 每次跑后滚泡沫轴 10 分钟\n2. 每周 2 次力量训练（臀桥、单腿硬拉）\n3. 跑鞋每 600–800km 更换\n当前伤痛风险评级：低。'},
+    {k:['心率','hr',' zones','区间'],a:'你本次训练心率多落在 Z2–Z3 有氧/马拉松配速区，燃脂与有氧基础收益最佳。若想提升 VO2max，可每周加入 1 次 Z4 阈值间歇（如 4×1000m @ 4:40）。'}
+  ];
+  function matchReply(msg){
+    for(var i=0;i<REPLIES.length;i++){for(var j=0;j<REPLIES[i].k.length;j++){if(msg.indexOf(REPLIES[i].k[j])>=0)return REPLIES[i].a;}}
+    return '我已结合你的实时数据进行分析。你可以试着问我：**评估训练负荷 / 下一周建议 / 分析配速 / 伤病预防**。需要我针对某项展开吗？';
+  }
+
+  function addMsg(role,content,hint){
+    var div=document.createElement('div');
+    div.className='chat-message '+role;
+    if(role==='coach'&&hint){
+      div.innerHTML='<div class="hint-bubble"><span class="hint-tag">实时提示</span><div>'+renderMd(content)+'</div></div><div class="chat-time chat-time-left">刚刚</div>';
+    }else if(role==='coach'){
+      div.innerHTML='<div class="chat-row"><div class="coach-orb" id="orb-'+(Math.random()+'').slice(2,7)+'" style="--orb-readiness:78"><span class="orb-value">78</span></div><div><div class="chat-bubble-coach">'+renderMd(content)+'</div><div class="chat-time chat-time-left">刚刚</div></div></div>';
+    }else{
+      div.innerHTML='<div class="chat-bubble-user">'+renderMd(content)+'</div><div class="chat-time chat-time-right">刚刚</div>';
+    }
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop=chatMessages.scrollHeight;
+  }
+  function pushCoachHint(text){addMsg('coach',text,true);}
+
+  function addTyping(){
+    var div=document.createElement('div');
+    div.className='chat-message coach';div.id='typing';
+    div.innerHTML='<div class="chat-row"><div class="coach-orb is-thinking" style="--orb-readiness:78"><span class="orb-value">78</span></div><div class="chat-bubble-coach"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>';
+    chatMessages.appendChild(div);chatMessages.scrollTop=chatMessages.scrollHeight;
+  }
+  function removeTyping(){var t=$('typing');if(t)t.remove();}
+
+  function setOrb(state){
+    var o=$('chatOrb');if(!o)return;
+    o.classList.remove('is-thinking');if(state)o.classList.add(state);
+  }
+
+  function sendMessage(){
+    var msg=chatInput.value.trim();
+    if(!msg||isSending)return;
+    isSending=true;setOrb('is-thinking');
+    addMsg('user',msg);
+    chatInput.value='';chatInput.style.height='';sendBtn.disabled=true;
+    addTyping();
+    var reply=matchReply(msg);
+    // 模拟流式输出：逐字显示
+    setTimeout(function(){
+      removeTyping();
+      var coachDiv=document.createElement('div');
+      coachDiv.className='chat-message coach';
+      coachDiv.innerHTML='<div class="chat-row"><div class="coach-orb" style="--orb-readiness:78"><span class="orb-value">78</span></div><div><div class="chat-bubble-coach"></div><div class="chat-time chat-time-left">刚刚</div></div></div>';
+      chatMessages.appendChild(coachDiv);
+      var bubble=coachDiv.querySelector('.chat-bubble-coach');
+      var i=0;setOrb('is-speaking');
+      var timer2=setInterval(function(){
+        i+=2;
+        bubble.innerHTML=renderMd(reply.slice(0,i));
+        chatMessages.scrollTop=chatMessages.scrollHeight;
+        if(i>=reply.length){clearInterval(timer2);isSending=false;setOrb(null);sendBtn.disabled=!chatInput.value.trim();}
+      },18);
+      // RAG 引用
+      $('ragCount').textContent='RAG · 引用 2';
+    },650);
+  }
+  function askQuick(q){chatInput.value=q;sendBtn.disabled=false;sendMessage();}
+
+  // 开场 6 秒后给一条实时提示，让 demo 立即"活"起来
+  setTimeout(function(){pushCoachHint('已接入实时传感器：当前配速 5:30、心率 '+session.hr+' bpm，处于有氧区间，起步节奏很稳。');},2600);
+
+  /* ---------- 启动 ---------- */
+  var timer=setInterval(tick,1000);
+  tick();
+
+  // 暴露给全局（供 onclick 调用）
+  window.sendMessage=sendMessage;
+  window.askQuick=askQuick;
+})();
+</script>
+</body>
+</html>

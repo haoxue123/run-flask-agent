@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}跑步教练{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/theme.css">
+    <link rel="stylesheet" href="/static/design-system.css">
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    {% block chartjs %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    {% endblock %}
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <!-- 氛围层 -->
+    <div class="ambient-layer is-night" data-ambient="auto"></div>
+
+    <!-- 移动端侧边栏 Overlay -->
+    <div class="mobile-overlay" id="mobile-overlay" onclick="toggleMobileSidebar()"></div>
+
+    <div class="app-shell">
+        <!-- 顶部导航栏 -->
+        <header class="top-nav">
+            <!-- 汉堡菜单（移动端） -->
+            <button class="hamburger-btn" onclick="toggleMobileSidebar()" aria-label="菜单">
+                <i data-lucide="menu" style="width:18px;height:18px"></i>
+            </button>
+
+            <a href="/" class="brand">
+                <div class="logo-icon">
+                    <i data-lucide="activity" style="width:16px;height:16px"></i>
+                </div>
+                <span>跑步教练</span>
+            </a>
+            <span class="badge-web">Web</span>
+
+            <div class="nav-spacer"></div>
+
+            <div class="nav-actions">
+                <!-- 搜索 -->
+                <div class="search-wrapper" id="search-wrapper">
+                    <button class="search-trigger" onclick="toggleSearch()" aria-label="搜索">
+                        <i data-lucide="search" style="width:16px;height:16px"></i>
+                    </button>
+                    <input type="search" class="search-input" placeholder="搜索训练记录..." id="search-input" onblur="closeSearch()">
+                </div>
+
+                <!-- 主题切换 -->
+                <button class="theme-toggle" onclick="toggleTheme()" title="切换主题" aria-label="切换主题">
+                    <i data-lucide="sun" style="width:16px;height:16px" id="theme-icon-sun"></i>
+                    <i data-lucide="moon" style="width:16px;height:16px" id="theme-icon-moon"></i>
+                </button>
+
+            <!-- 通知（I4：无真实通知时不显示红点，避免假信号） -->
+            <button class="notification-btn relative" aria-label="通知">
+                <i data-lucide="bell" style="width:16px;height:16px"></i>
+                <span class="badge-dot" id="notification-dot" hidden></span>
+            </button>
+
+                <!-- 用户头像 -->
+                <div class="user-avatar" title="用户">
+                    <i data-lucide="user" style="width:16px;height:16px"></i>
+                </div>
+            </div>
+        </header>
+
+        <!-- 侧边栏 -->
+        {% set nav_data = [
+            {'group': '数据', 'items': [
+                {'href': '/', 'label': '总览', 'icon': 'layout-dashboard'},
+                {'href': '/insights', 'label': '洞察', 'icon': 'trending-up'},
+            ]},
+            {'group': '规划', 'items': [
+                {'href': '/training', 'label': '训练计划', 'icon': 'calendar-days'},
+                {'href': '/coach', 'label': 'AI 教练', 'icon': 'message-circle'},
+            ]},
+        ] %}
+        <aside class="sidebar" id="sidebar">
+            {% for group in nav_data %}
+            <div class="nav-group">
+                <div class="nav-group-label">{{ group.group }}</div>
+                {% for item in group['items'] %}
+                <a href="{{ item.href }}" class="nav-item {{ 'active' if request.path == item.href else '' }}">
+                    <i data-lucide="{{ item.icon }}" class="nav-icon"></i>
+                    <span>{{ item.label }}</span>
+                </a>
+                {% endfor %}
+            </div>
+            {% endfor %}
+
+            <!-- Orb 卡片（可点击 → 进入 AI 教练台；I2：Orb 升级为就绪度状态环）-->
+            <a href="/coach" class="orb-card">
+                <div class="coach-orb" id="sidebar-orb"><span class="orb-value" id="sidebar-orb-value">--</span></div>
+                <div class="orb-label">AI 教练</div>
+                <div class="orb-status">在线 · 随时可问</div>
+            </a>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <!-- 移动端底部导航 -->
+    <div class="mobile-bottom-nav">
+        {% set mobile_tabs = [
+            ('/', 'layout-dashboard', '总览'),
+            ('/insights', 'trending-up', '洞察'),
+            ('/training', 'calendar-days', '计划'),
+            ('/coach', 'message-circle', '教练'),
+        ] %}
+        {% for href, icon, label in mobile_tabs %}
+        <a href="{{ href }}" class="{{ 'active' if request.path == href else '' }}">
+            <i data-lucide="{{ icon }}" style="width:18px;height:18px"></i>
+            <span>{{ label }}</span>
+        </a>
+        {% endfor %}
+    </div>
+
+    <script src="/static/components.js"></script>
+    {% block scripts %}{% endblock %}
+    <script>
+    // ============================================================
+    // 主题切换
+    // ============================================================
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('coach-theme', theme);
+        var isLight = theme === 'light';
+        var sunEl = document.getElementById('theme-icon-sun');
+        var moonEl = document.getElementById('theme-icon-moon');
+        if (sunEl) sunEl.style.display = isLight ? '' : 'none';
+        if (moonEl) moonEl.style.display = isLight ? 'none' : '';
+        document.dispatchEvent(new CustomEvent('rc-theme-change', { detail: { isDark: theme === 'dark' } }));
+    }
+
+    function toggleTheme() {
+        var current = document.documentElement.getAttribute('data-theme');
+        applyTheme(current === 'light' ? 'dark' : 'light');
+    }
+
+    // I2：侧边栏 Orb 渲染就绪度状态环（由 window.COACH_ORB.readiness 驱动）
+    function initCoachOrb() {
+        var orb = document.getElementById('sidebar-orb');
+        if (!orb) return;
+        var data = window.COACH_ORB || {};
+        var readiness = (typeof data.readiness === 'number' && data.readiness >= 0) ? data.readiness : null;
+        if (readiness !== null) {
+            orb.style.setProperty('--orb-readiness', readiness);
+            var valEl = document.getElementById('sidebar-orb-value');
+            if (valEl) valEl.textContent = readiness;
+        }
+    }
+
+    (function() {
+        var saved = localStorage.getItem('coach-theme') || 'dark';
+        applyTheme(saved === 'light' ? 'light' : 'dark');
+        initCoachOrb();
+    })();
+
+    // ============================================================
+    // 搜索
+    // ============================================================
+    function toggleSearch() {
+        var wrapper = document.getElementById('search-wrapper');
+        var input = document.getElementById('search-input');
+        wrapper.classList.toggle('is-open');
+        if (wrapper.classList.contains('is-open')) {
+            setTimeout(function() { input.focus(); }, 300);
+        }
+    }
+
+    function closeSearch() {
+        setTimeout(function() {
+            var input = document.getElementById('search-input');
+            if (!input.value) {
+                document.getElementById('search-wrapper').classList.remove('is-open');
+            }
+        }, 150);
+    }
+
+    // ============================================================
+    // 移动端侧边栏
+    // ============================================================
+    function toggleMobileSidebar() {
+        var sidebar = document.getElementById('sidebar');
+        var overlay = document.getElementById('mobile-overlay');
+        if (sidebar) sidebar.classList.toggle('is-open');
+        if (overlay) overlay.classList.toggle('is-open');
+    }
+
+    // ============================================================
+    // 氛围层时段切换
+    // ============================================================
+    (function() {
+        function updateAmbient() {
+            var layer = document.querySelector('.ambient-layer');
+            if (!layer) return;
+            var hour = new Date().getHours();
+            var cls = 'is-night';
+            if (hour >= 5 && hour < 8) cls = 'is-dawn';
+            else if (hour >= 8 && hour < 17) cls = 'is-noon';
+            else if (hour >= 17 && hour < 20) cls = 'is-dusk';
+            layer.className = 'ambient-layer ' + cls;
+        }
+        updateAmbient();
+        setInterval(updateAmbient, 60000);
+    })();
+
+    // ============================================================
+    // 图表生命周期管理
+    // ============================================================
+    window._chartInstances = [];
+
+    function registerChart(instance) {
+        if (instance) window._chartInstances.push(instance);
+    }
+
+    function hexToRgba(hex, alpha) {
+        hex = hex.replace('#', '');
+        if (hex.length === 3) hex = hex.split('').map(function(c) { return c + c; }).join('');
+        var r = parseInt(hex.substring(0, 2), 16);
+        var g = parseInt(hex.substring(2, 4), 16);
+        var b = parseInt(hex.substring(4, 6), 16);
+        return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+    }
+
+    function getChartColors() {
+        var style = getComputedStyle(document.documentElement);
+        return {
+            primary: style.getPropertyValue('--rc-chart-1').trim() || '#2BD493',
+            secondary: style.getPropertyValue('--rc-chart-2').trim() || '#38BDF8',
+            tertiary: style.getPropertyValue('--rc-chart-3').trim() || '#FF8A47',
+            quaternary: style.getPropertyValue('--rc-chart-4').trim() || '#FBBF4D',
+            quinary: style.getPropertyValue('--rc-chart-5').trim() || '#FF6A60',
+            text: style.getPropertyValue('--rc-text-secondary').trim() || '#A9B4AE',
+            grid: style.getPropertyValue('--rc-chart-grid').trim() || 'rgba(255,255,255,0.06)',
+        };
+    }
+
+    function destroyAllCharts() {
+        if (window._chartInstances && window._chartInstances.length) {
+            window._chartInstances.forEach(function(c) { try { c.destroy(); } catch(e) {} });
+            window._chartInstances = [];
+        }
+    }
+
+    document.addEventListener('rc-theme-change', function() {
+        destroyAllCharts();
+        if (typeof buildCharts === 'function') {
+            setTimeout(buildCharts, 100);
+        }
+    });
+
+    lucide.createIcons();
+    </script>
+</body>
+</html>

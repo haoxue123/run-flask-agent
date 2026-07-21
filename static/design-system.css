@@ -1,0 +1,255 @@
+/* ============================================================
+   COACH Design System v2 — Legacy compatibility layer
+   theme.css is now the single source of truth for --rc-* tokens.
+   This file maps legacy --ds-* variables to --rc-* equivalents
+   and provides utility classes (skeleton, toast, quick-action, etc.)
+   ============================================================ */
+
+/* ===== Backward Compatibility: --ds-* → --rc-* mapping ===== */
+:root {
+  /* Base colors */
+  --ds-color-brand: var(--rc-primary);
+  --ds-color-brand-light: var(--rc-primary-light);
+  --ds-color-brand-dark: var(--rc-primary-dark);
+  --ds-color-brand-glow: var(--rc-primary);
+  --ds-color-success: var(--rc-success);
+  --ds-color-warning: var(--rc-warning);
+  --ds-color-error: var(--rc-danger);
+  --ds-color-info: var(--rc-info);
+
+  /* Surfaces */
+  --ds-surface: var(--rc-background);
+  --ds-surface-raised: var(--rc-card);
+  --ds-surface-overlay: var(--rc-card);
+  --ds-surface-muted: var(--rc-card-hover);
+
+  /* Text */
+  --ds-text: var(--rc-text);
+  --ds-text-secondary: var(--rc-text-secondary);
+  --ds-text-muted: var(--rc-text-muted);
+  --ds-text-inverse: var(--rc-text-on-primary);
+
+  /* Borders */
+  --ds-border: var(--rc-border);
+  --ds-border-hover: var(--rc-primary-border);
+  --ds-border-focus: var(--rc-primary);
+
+  /* Cards */
+  --ds-card-bg: var(--rc-card);
+  --ds-card-border: var(--rc-border);
+  --ds-card-shadow: var(--rc-shadow-sm);
+  --ds-card-radius: var(--rc-radius-lg);
+
+  /* Buttons */
+  --ds-button-primary-bg: var(--rc-primary);
+  --ds-button-primary-text: var(--rc-text-on-primary);
+  --ds-button-secondary-bg: var(--rc-card-hover);
+  --ds-button-secondary-text: var(--rc-text);
+  --ds-button-radius: var(--rc-radius-md);
+  --ds-button-transition: var(--rc-transition);
+
+  /* Inputs */
+  --ds-input-bg: var(--rc-card);
+  --ds-input-border: var(--rc-border);
+  --ds-input-text: var(--rc-text);
+  --ds-input-placeholder: var(--rc-text-muted);
+  --ds-input-radius: var(--rc-radius-md);
+}
+
+/* ===== Utility Classes ===== */
+.page-transition {
+  animation: ds-fadeSlideIn 300ms ease-out;
+}
+@keyframes ds-fadeSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-transition { animation: none; }
+}
+
+/* ===== Skeleton Pulse ===== */
+@keyframes ds-skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.8; }
+}
+.ds-skeleton {
+  background: var(--ds-surface-muted);
+  border-radius: 6px;
+  animation: ds-skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* ===== Toast Animation ===== */
+@keyframes ds-toast-in {
+  from { opacity: 0; transform: translateX(100%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes ds-toast-out {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(100%); }
+}
+.ds-toast {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 9999;
+  padding: 0.75rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: ds-toast-in 300ms ease-out;
+  max-width: 360px;
+}
+.ds-toast.ds-toast--out {
+  animation: ds-toast-out 300ms ease-in forwards;
+}
+.ds-toast--success { background: var(--ds-color-success); color: #fff; }
+.ds-toast--error   { background: var(--ds-color-error); color: #fff; }
+.ds-toast--warning { background: var(--ds-color-warning); color: #fff; }
+
+/* ===== Card Hover Effects ===== */
+.ds-card-interactive {
+  transition: transform var(--ds-button-transition), box-shadow var(--ds-button-transition);
+}
+.ds-card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* ===== Button Transitions ===== */
+.ds-btn {
+  transition: background-color var(--ds-button-transition), opacity var(--ds-button-transition);
+}
+.ds-btn:hover { opacity: 0.9; }
+.ds-btn:active { opacity: 0.8; }
+
+/* ===== Empty State ===== */
+.ds-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: var(--ds-text-secondary);
+}
+.ds-empty-state svg {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 0.75rem;
+  opacity: 0.5;
+}
+.ds-empty-state h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--ds-text);
+}
+.ds-empty-state p {
+  font-size: 0.8125rem;
+  margin-bottom: 1rem;
+}
+
+/* ===== QuickAction ===== */
+.ds-quick-action {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: var(--ds-card-bg);
+  border: 1px solid var(--ds-border);
+  cursor: pointer;
+  transition: transform var(--ds-button-transition), box-shadow var(--ds-button-transition);
+  text-decoration: none;
+  color: var(--ds-text);
+}
+.ds-quick-action:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.ds-quick-action .ds-quick-action-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--ds-surface-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-color-brand);
+}
+.ds-quick-action span {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* ===== Mobile Bottom Tab Bar ===== */
+@media (max-width: 767px) {
+  .ds-mobile-tab-bar {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: var(--ds-card-bg);
+    border-top: 1px solid var(--ds-border);
+    z-index: 40;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .ds-mobile-tab-bar a {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    color: var(--ds-text-muted);
+    text-decoration: none;
+    font-size: 0.625rem;
+    transition: color 150ms;
+  }
+  .ds-mobile-tab-bar a.active {
+    color: var(--ds-color-brand);
+  }
+  .ds-mobile-tab-bar a svg {
+    width: 20px;
+    height: 20px;
+  }
+  main { padding-bottom: 72px !important; }
+}
+
+@media (min-width: 768px) {
+  .ds-mobile-tab-bar { display: none; }
+}
+
+/* ===== Sidebar Overlay (mobile) ===== */
+.ds-sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 50;
+}
+.ds-sidebar-overlay.open { display: block; }
+.ds-sidebar-mobile {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 260px;
+  background: var(--ds-surface);
+  border-right: 1px solid var(--ds-border);
+  z-index: 51;
+  transform: translateX(-100%);
+  transition: transform 250ms ease;
+  overflow-y: auto;
+}
+.ds-sidebar-mobile.open { transform: translateX(0); }
+
+/* ===== Responsive StatCard ===== */
+@media (max-width: 639px) {
+  .ds-statcard-value { font-size: 48px !important; }
+}

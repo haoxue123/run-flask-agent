@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.git/
+.env
+.env.*
+data/
+# 保留 RAG 知识库与示例模板（运行时需要）
+!data/knowledge/
+!data/knowledge/**
+!data/manual_input.example.json
+deploy/
+deploy/certs/
+deploy/logs/
+.chrome-tmp/

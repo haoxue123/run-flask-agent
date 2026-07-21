@@ -1,0 +1,27 @@
+# 马拉松训练计划 Agent 依赖
+# ==============================
+
+# 运动文件解析（工具使用模式：文件导入）
+gpxpy>=1.6.0
+fitparse>=1.2.0
+# TCX 用 Python 标准库 xml.etree.ElementTree 解析，无需额外依赖
+
+# DeepSeek LLM 调用（兼容 OpenAI SDK）
+openai>=1.30.0
+
+# 环境变量管理
+python-dotenv>=1.0.0
+
+# Notebook 环境
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# 训练计划可视化
+matplotlib>=3.7.0
+
+# Web 应用框架
+flask>=3.0.0
+
+# RAG 知识库（启用语义检索时需安装；缺失时 rag 模块会静默降级）
+chromadb>=0.4.22
+sentence-transformers>=2.2.0

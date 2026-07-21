@@ -1,0 +1,856 @@
+{% extends "base.html" %}
+{% block title %}教练 | COACH{% endblock %}
+{% block chartjs %}{% endblock %}
+{% block head %}
+<style>
+    /* ============================================================
+       Coach 页面专用样式
+       ============================================================ */
+
+    /* ---- 教练页：让 main-content 成为 flex 列容器，使 coach-layout 可以 flex:1 填充 ---- */
+    .main-content { display: flex; flex-direction: column; }
+
+    /* ---- 页面标题 ---- */
+    .page-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        margin-bottom: var(--rc-space-4);
+        flex-shrink: 0;
+    }
+    .page-title {
+        font-size: 32px;
+        font-weight: 700;
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+        font-family: var(--rc-font-display);
+    }
+    .page-subtitle {
+        font-size: var(--rc-text-sm);
+        color: var(--rc-text-secondary);
+    }
+
+    /* ---- 快捷问题 ---- */
+    .quick-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--rc-space-3);
+        margin-bottom: var(--rc-space-4);
+        flex-shrink: 0;
+    }
+
+    /* ---- 聊天容器 ---- */
+    .chat-container {
+        border-radius: var(--rc-radius-lg);
+        border: 1px solid var(--rc-border);
+        background: var(--rc-card);
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 300px;
+    }
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: var(--rc-space-4);
+        display: flex;
+        flex-direction: column;
+        gap: var(--rc-space-4);
+    }
+    .chat-messages::-webkit-scrollbar { width: 4px; }
+    .chat-messages::-webkit-scrollbar-track { background: transparent; }
+    .chat-messages::-webkit-scrollbar-thumb { background: var(--rc-border); border-radius: 2px; }
+    .chat-messages::-webkit-scrollbar-thumb:hover { background: var(--rc-text-muted); }
+
+    /* ---- 聊天气泡 ---- */
+    .chat-message {
+        max-width: 80%;
+        animation: coachFadeIn 0.3s ease;
+    }
+    .chat-message.user {
+        margin-left: auto;
+    }
+    .chat-message.coach {
+        margin-right: auto;
+    }
+    @keyframes coachFadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .chat-row {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--rc-space-3);
+    }
+    .chat-user-row {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+    }
+    .chat-avatar {
+        width: 32px;
+        height: 32px;
+        flex-shrink: 0;
+        border-radius: 50%;
+        background: var(--rc-muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .chat-avatar-icon {
+        width: 16px;
+        height: 16px;
+        color: var(--rc-primary);
+    }
+    .chat-bubble-coach {
+        background: var(--rc-card);
+        border-left: 2px solid var(--rc-primary);
+        border-radius: var(--rc-radius-xl);
+        border-bottom-left-radius: var(--rc-radius-md);
+        padding: var(--rc-space-3) var(--rc-space-4);
+        font-size: var(--rc-text-sm);
+        color: var(--rc-text);
+    }
+    .chat-bubble-user {
+        background: var(--rc-primary);
+        color: var(--rc-text-on-primary);
+        border-radius: var(--rc-radius-xl);
+        border-bottom-right-radius: var(--rc-radius-md);
+        padding: var(--rc-space-3) var(--rc-space-4);
+        font-size: var(--rc-text-sm);
+    }
+    .chat-time {
+        font-size: var(--rc-text-xs);
+        color: var(--rc-text-muted);
+        margin-top: var(--rc-space-1);
+    }
+    .chat-time-left {
+        margin-left: var(--rc-space-1);
+    }
+    .chat-time-right {
+        margin-right: var(--rc-space-1);
+    }
+
+    /* ---- 打字动画 ---- */
+    .typing-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--rc-text-muted);
+        animation: coachBlink 1.4s infinite both;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes coachBlink {
+        0%, 80%, 100% { opacity: 0.2; }
+        40% { opacity: 1; }
+    }
+
+    /* ---- 输入区 ---- */
+    .chat-input-area {
+        border-top: 1px solid var(--rc-border);
+        padding: var(--rc-space-4);
+    }
+    .chat-input-row {
+        display: flex;
+        align-items: flex-end;
+        gap: var(--rc-space-2);
+    }
+    .chat-input-field {
+        flex: 1;
+        resize: none;
+        min-height: 40px;
+        max-height: 120px;
+    }
+    .chat-input-field::placeholder {
+        color: var(--rc-text-muted);
+    }
+    .chat-send-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: var(--rc-radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        cursor: pointer;
+        border: none;
+        transition: opacity var(--rc-transition);
+    }
+    .chat-send-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .chat-send-btn:not(:disabled):hover {
+        opacity: 0.9;
+    }
+
+    /* ---- 按钮禁用 ---- */
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* ---- Coach Orb 修饰符（页面级，不动 theme.css） ---- */
+    .coach-orb--chat { width: 32px; height: 32px; flex-shrink: 0; }
+    .coach-orb--chat::after { inset: -3px; }
+    .coach-orb--header { width: 28px; height: 28px; }
+
+    /* ---- 教练记忆指示器 ---- */
+    .memory-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--rc-border);
+        border-radius: var(--rc-radius-full);
+        padding: 4px 12px;
+        font-size: var(--rc-text-xs);
+        color: var(--rc-text-muted);
+        flex-shrink: 0;
+    }
+    .memory-indicator i {
+        width: 14px;
+        height: 14px;
+        color: var(--rc-primary);
+    }
+
+    /* ---- 知识来源（RAG）面板 ---- */
+    .rag-panel {
+        flex-shrink: 0;
+        max-height: 180px;
+        overflow-y: auto;
+        padding: var(--rc-space-4);
+        background: var(--rc-card);
+        border: 1px solid var(--rc-border);
+        border-left: 2px solid var(--rc-primary);
+        border-radius: var(--rc-radius-lg);
+    }
+    .rag-panel-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: var(--rc-space-2);
+    }
+    .rag-panel-head i {
+        width: 16px;
+        height: 16px;
+        color: var(--rc-primary);
+    }
+    .rag-panel-head h2 {
+        font-size: var(--rc-text-sm);
+        font-weight: 600;
+        margin: 0;
+        flex: 1;
+    }
+    .rag-count {
+        font-size: var(--rc-text-xs);
+        color: var(--state-info);
+    }
+    .rag-empty {
+        font-size: var(--rc-text-sm);
+        color: var(--rc-text-muted);
+        margin: 0;
+    }
+
+    /* ============================================================
+       两栏布局 + 右侧上下文面板
+       ============================================================ */
+    .coach-layout { display: flex; gap: var(--rc-space-4); flex: 1; min-height: 0; }
+    .chat-column { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; gap: var(--rc-space-3); }
+    .context-panel {
+        width: 280px; flex-shrink: 0;
+        background: var(--rc-muted);
+        border-radius: var(--rc-radius-lg);
+        padding: var(--rc-space-4);
+        overflow-y: auto;
+        display: flex; flex-direction: column; gap: var(--rc-space-3);
+    }
+    .coach-layout.panel-collapsed .context-panel { display: none; }
+    .panel-toggle {
+        position: absolute; top: 0; right: 0;
+        background: var(--rc-card); border: 1px solid var(--rc-border);
+        border-radius: var(--rc-radius-md); padding: 6px; cursor: pointer;
+        color: var(--rc-text-muted); z-index: 5; transition: color 0.2s;
+    }
+    .panel-toggle:hover { color: var(--rc-primary); }
+    .context-card {
+        background: var(--rc-card); border: 1px solid var(--rc-border);
+        border-radius: var(--rc-radius-lg); padding: var(--rc-space-4);
+    }
+    .context-card-title {
+        font-size: var(--rc-text-xs); color: var(--rc-text-muted);
+        font-weight: 500; margin-bottom: var(--rc-space-2);
+        text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .context-stat-row {
+        display: flex; justify-content: space-between; align-items: baseline;
+        margin-bottom: var(--rc-space-2);
+    }
+    .context-stat-label { font-size: var(--rc-text-sm); color: var(--rc-text-secondary); }
+    .context-stat-value {
+        font-family: var(--rc-font-display, 'Inter Tight', sans-serif);
+        font-size: 1.5rem; font-weight: 600; color: var(--rc-text);
+        line-height: 1.2;
+    }
+    .context-stat-unit { font-size: var(--rc-text-xs); color: var(--rc-text-muted); margin-left: 2px; }
+    .recent-run-item {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: var(--rc-space-2) 0;
+        border-bottom: 1px solid var(--rc-border-light, var(--rc-border));
+    }
+    .recent-run-item:last-child { border-bottom: none; }
+    .recent-run-date { font-size: var(--rc-text-xs); color: var(--rc-text-muted); }
+    .recent-run-detail { font-size: var(--rc-text-sm); color: var(--rc-text); }
+    .recent-run-pace { font-size: var(--rc-text-sm); color: var(--rc-primary); font-weight: 500; }
+    .progress-bar {
+        height: 6px; background: var(--rc-border); border-radius: 3px;
+        overflow: hidden; margin: var(--rc-space-2) 0;
+    }
+    .progress-fill {
+        height: 100%; background: var(--rc-primary); border-radius: 3px;
+        transition: width 0.3s ease;
+    }
+    .plan-next {
+        font-size: var(--rc-text-sm); color: var(--rc-text-secondary);
+        padding: var(--rc-space-2); background: var(--rc-muted);
+        border-radius: var(--rc-radius-sm); margin-top: var(--rc-space-2);
+    }
+    .skeleton-line {
+        height: 12px; background: var(--rc-border); border-radius: 6px;
+        margin-bottom: 8px; animation: skeleton-pulse 1.5s infinite ease-in-out;
+    }
+    .skeleton-line:last-child { width: 60%; margin-bottom: 0; }
+    @keyframes skeleton-pulse { 0%,100% { opacity: 0.6; } 50% { opacity: 0.3; } }
+    .panel-error {
+        font-size: var(--rc-text-xs); color: var(--state-danger, #ef4444);
+        text-align: center; padding: var(--rc-space-2);
+    }
+    .panel-retry-btn {
+        display: block; margin: var(--rc-space-2) auto 0;
+        font-size: var(--rc-text-xs); color: var(--rc-primary);
+        background: none; border: 1px solid var(--rc-border);
+        border-radius: var(--rc-radius-sm); padding: 4px 12px; cursor: pointer;
+    }
+    .panel-retry-btn:hover { border-color: var(--rc-primary); }
+
+    @media (max-width: 768px) {
+        .context-panel { display: none; }
+        .coach-layout { flex-direction: column; }
+        .panel-toggle { display: none; }
+        .chat-column { height: auto; }
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="coach-layout" id="coachLayout">
+  <div class="chat-column">
+    <button class="panel-toggle" id="panelToggle" title="切换上下文面板">
+      <i data-lucide="panel-right-open"></i>
+    </button>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">AI 教练</h1>
+        <p class="page-subtitle">与 AI 教练一对一对话，基于你的真实数据获取个性化建议</p>
+    </div>
+    <span class="coach-orb coach-orb--header" id="chat-header-orb" aria-hidden="true"></span>
+</div>
+
+<!-- 教练记忆指示器（静态占位，预留 DOM 钩子供未来扩展） -->
+<div class="memory-indicator" id="memory-indicator" title="教练记忆">
+    <i data-lucide="brain"></i>
+    <span class="memory-text">教练记忆加载中…</span>
+</div>
+
+<!-- 快捷问题 -->
+<div class="quick-actions" id="quick-questions">
+    <button onclick="askQuick('评估我的训练负荷是否合理')" class="ds-quick-action">
+        <div class="ds-quick-action-icon">
+            <i data-lucide="gauge" style="width:20px;height:20px;"></i>
+        </div>
+        <span>评估训练负荷</span>
+    </button>
+    <button onclick="askQuick('给我下一周的训练建议')" class="ds-quick-action">
+        <div class="ds-quick-action-icon">
+            <i data-lucide="calendar" style="width:20px;height:20px;"></i>
+        </div>
+        <span>下一周建议</span>
+    </button>
+    <button onclick="askQuick('分析我的配速是否匹配当前能力')" class="ds-quick-action">
+        <div class="ds-quick-action-icon">
+            <i data-lucide="clock" style="width:20px;height:20px;"></i>
+        </div>
+        <span>分析我的配速</span>
+    </button>
+    <button onclick="askQuick('我需要注意哪些伤病风险')" class="ds-quick-action">
+        <div class="ds-quick-action-icon">
+            <i data-lucide="heart-pulse" style="width:20px;height:20px;"></i>
+        </div>
+        <span>伤病预防建议</span>
+    </button>
+</div>
+
+<!-- 聊天区域 -->
+<div class="chat-container">
+    <div class="chat-messages" id="chat-messages">
+        <!-- 欢迎消息 -->
+        <div class="chat-message coach">
+            <div class="chat-row">
+                <div class="coach-orb coach-orb--chat" aria-hidden="true"></div>
+                <div>
+                    <div class="chat-bubble-coach">
+                        <p>你好！我是你的 AI 跑步教练。我可以帮你分析训练数据、制定训练计划、提供配速建议和伤病预防指导。</p>
+                    </div>
+                    <div class="chat-time chat-time-left">刚刚</div>
+                </div>
+            </div>
+        </div>
+        {% if has_profile %}
+        <div class="chat-message coach">
+            <div class="chat-row">
+                <div class="coach-orb coach-orb--chat" aria-hidden="true"></div>
+                <div>
+                    <div class="chat-bubble-coach">
+                        <p>我已读取了你的跑步数据，准备好为你提供个性化建议。</p>
+                    </div>
+                    <div class="chat-time chat-time-left">刚刚</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 输入区 -->
+    <div class="chat-input-area">
+        <div class="chat-input-row">
+            <textarea
+                id="chat-input"
+                rows="1"
+                placeholder="输入你的问题..."
+                class="chat-input-field"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"
+                oninput="this.style.height='';this.style.height=Math.min(this.scrollHeight,120)+'px'"
+            ></textarea>
+            <button
+                id="send-btn"
+                onclick="sendMessage()"
+                class="chat-send-btn btn btn-primary"
+                disabled
+            >
+                <i data-lucide="send" style="width:16px;height:16px;"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 知识来源（RAG）面板 — 静态占位，预留 DOM 钩子供未来扩展 -->
+<section class="rag-panel" id="rag-panel">
+    <div class="rag-panel-head">
+        <i data-lucide="book-open"></i>
+        <h2>知识来源</h2>
+        <span class="rag-count" id="rag-count">RAG · 待命中</span>
+    </div>
+    <div id="rag-body" class="rag-body">
+        <p class="rag-empty">暂无知识来源引用——教练回复时会自动标注引用</p>
+    </div>
+</section>
+  </div><!-- /.chat-column -->
+
+  <aside class="context-panel" id="contextPanel">
+    <!-- Card 1: 跑者画像 -->
+    <div class="context-card" id="profileCard">
+      <div class="context-card-title">跑者画像</div>
+      <div id="profileContent">
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line"></div>
+      </div>
+    </div>
+
+    <!-- Card 2: 最近训练 -->
+    <div class="context-card" id="recentRunsCard">
+      <div class="context-card-title">最近训练</div>
+      <div id="recentRunsContent">
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line"></div>
+      </div>
+    </div>
+
+    <!-- Card 3: 活跃计划 -->
+    <div class="context-card" id="planCard">
+      <div class="context-card-title">活跃计划</div>
+      <div id="planContent">
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line"></div>
+      </div>
+    </div>
+  </aside>
+</div><!-- /.coach-layout -->
+{% endblock %}
+{% block scripts %}
+<script>
+(function() {
+    var chatMessages = document.getElementById('chat-messages');
+    var chatInput = document.getElementById('chat-input');
+    var sendBtn = document.getElementById('send-btn');
+    var isSending = false;
+
+    // 启用/禁用发送按钮
+    chatInput.addEventListener('input', function() {
+        sendBtn.disabled = !this.value.trim() || isSending;
+    });
+
+    // 相对时间格式化
+    function relativeTime(date) {
+        var now = new Date();
+        var diff = Math.floor((now - date) / 1000);
+        if (diff < 60) return '刚刚';
+        if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
+        if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
+        return Math.floor(diff / 86400) + '天前';
+    }
+
+    // 安全转义 HTML
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Markdown 渲染
+    function renderMarkdown(text) {
+        var safe = escapeHtml(text);
+        safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        safe = safe.replace(/\n/g, '<br>');
+        return safe;
+    }
+
+    // 添加消息气泡
+    function addMessage(role, content) {
+        var div = document.createElement('div');
+        div.className = 'chat-message ' + role;
+
+        if (role === 'coach') {
+            div.innerHTML =
+                '<div class="chat-row">' +
+                '<div class="coach-orb coach-orb--chat" aria-hidden="true"></div>' +
+                '<div>' +
+                '<div class="chat-bubble-coach">' + renderMarkdown(content) + '</div>' +
+                '<div class="chat-time chat-time-left">' + relativeTime(new Date()) + '</div>' +
+                '</div>' +
+                '</div>';
+        } else {
+            div.innerHTML =
+                '<div class="chat-user-row">' +
+                '<div class="chat-bubble-user">' + renderMarkdown(content) + '</div>' +
+                '<div class="chat-time chat-time-right">' + relativeTime(new Date()) + '</div>' +
+                '</div>';
+        }
+
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        lucide.createIcons();
+        return div;
+    }
+
+    // 显示 typing 动画
+    function addTyping() {
+        var div = document.createElement('div');
+        div.className = 'chat-message coach';
+        div.id = 'typing-indicator';
+        div.innerHTML =
+            '<div class="chat-row">' +
+            '<div class="coach-orb coach-orb--chat is-thinking" id="typing-orb"></div>' +
+            '<div class="chat-bubble-coach">' +
+            '<span class="typing-dot"></span>' +
+            '<span class="typing-dot"></span>' +
+            '<span class="typing-dot"></span>' +
+            '</div>' +
+            '</div>';
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        lucide.createIcons();
+    }
+
+    // 移除 typing 动画
+    function removeTyping() {
+        var el = document.getElementById('typing-indicator');
+        if (el) el.remove();
+    }
+
+    // 设置 header orb 状态（is-thinking / is-speaking / is-alert / null=idle）
+    function setOrbState(state) {
+        var orb = document.getElementById('chat-header-orb');
+        if (!orb) return;
+        orb.classList.remove('is-thinking', 'is-speaking', 'is-alert');
+        if (state) orb.classList.add(state);
+    }
+
+    // 发送消息
+    function sendMessage() {
+        var msg = chatInput.value.trim();
+        if (!msg || isSending) return;
+
+        isSending = true;
+        setOrbState('is-thinking');
+        addMessage('user', msg);
+        chatInput.value = '';
+        chatInput.style.height = '';
+        sendBtn.disabled = true;
+        addTyping();
+
+        fetch('/api/coach/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: msg })
+        })
+        .then(function(resp) {
+            if (!resp.ok) {
+                removeTyping();
+                addMessage('coach', '教练暂时无法回复，请稍后重试。');
+                DS.showToast('发送失败，请重试', 'error');
+                isSending = false;
+                sendBtn.disabled = !chatInput.value.trim();
+                setOrbState('is-alert');
+                setTimeout(function() { setOrbState(null); }, 2000);
+                return;
+            }
+
+            removeTyping();
+            var reader = resp.body.getReader();
+            var decoder = new TextDecoder();
+            var fullText = '';
+            var coachDiv = null;
+            var buffer = '';    // SSE 跨 chunk 缓冲区
+            var rafId = null;   // RAF 批量更新 ID
+            var hasStartedSpeaking = false;  // 首个 token 到达时切 is-speaking（仅一次）
+
+            function flushStreamText() {
+                if (coachDiv) {
+                    var bubble = coachDiv.querySelector('.chat-bubble-coach');
+                    if (bubble) bubble.innerHTML = renderMarkdown(fullText);
+                } else {
+                    coachDiv = addMessage('coach', '');
+                    var bubble2 = coachDiv.querySelector('.chat-bubble-coach');
+                    if (bubble2) bubble2.innerHTML = renderMarkdown(fullText);
+                }
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                rafId = null;
+            }
+
+            function readStream() {
+                reader.read().then(function(result) {
+                    if (result.done) {
+                        // 处理缓冲区中剩余数据
+                        if (buffer.trim()) {
+                            var lines = buffer.split('\n');
+                            for (var i = 0; i < lines.length; i++) {
+                                processLine(lines[i]);
+                            }
+                        }
+                        isSending = false;
+                        sendBtn.disabled = !chatInput.value.trim();
+                        setOrbState(null);
+                        return;
+                    }
+
+                    var text = decoder.decode(result.value, { stream: true });
+                    buffer += text;
+                    var lines = buffer.split('\n');
+                    // 最后一行可能不完整，保留到下次
+                    buffer = lines.pop();
+
+                    for (var i = 0; i < lines.length; i++) {
+                        processLine(lines[i]);
+                    }
+
+                    readStream();
+                }).catch(function() {
+                    isSending = false;
+                    sendBtn.disabled = !chatInput.value.trim();
+                    setOrbState(null);
+                });
+            }
+
+            function processLine(line) {
+                if (line.indexOf('data: ') === 0) {
+                    var payload = line.slice(6);
+                    if (payload === '[DONE]') return;
+
+                    try {
+                        var data = JSON.parse(payload);
+                        if (data.chunk) {
+                            fullText += data.chunk;
+                            // 首个 token 到达：从 is-thinking 切到 is-speaking（仅一次）
+                            if (!hasStartedSpeaking) {
+                                hasStartedSpeaking = true;
+                                setOrbState('is-speaking');
+                            }
+                            // RAF 批量更新：每帧最多渲染一次
+                            if (!rafId) {
+                                rafId = requestAnimationFrame(flushStreamText);
+                            }
+                        } else if (data.error) {
+                            addMessage('coach', '教练暂时无法回复：' + data.error);
+                            DS.showToast('发送失败，请重试', 'error');
+                        }
+                    } catch (e) {
+                        // 非 JSON 行，忽略
+                    }
+                }
+            }
+
+            readStream();
+        })
+        .catch(function() {
+            removeTyping();
+            addMessage('coach', '网络错误，请稍后重试。');
+            DS.showToast('发送失败，请重试', 'error');
+            isSending = false;
+            sendBtn.disabled = !chatInput.value.trim();
+            setOrbState('is-alert');
+            setTimeout(function() { setOrbState(null); }, 2000);
+        });
+    }
+
+    // 快捷问题
+    function askQuick(question) {
+        chatInput.value = question;
+        sendBtn.disabled = false;
+        sendMessage();
+    }
+
+    // 导出到全局
+    window.sendMessage = sendMessage;
+    window.askQuick = askQuick;
+    window.renderMarkdown = renderMarkdown;
+    window.addMessage = addMessage;
+})();
+</script>
+
+<!-- 右侧上下文面板逻辑（独立 script，函数挂载到 window 以供 onclick 重试按钮调用） -->
+<script>
+// 配速格式化：秒/km -> m:ss
+function formatPace(secPerKm) {
+    if (!secPerKm || secPerKm <= 0) return '--';
+    var s = Math.round(parseFloat(secPerKm));
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+
+// 加载跑者画像 + 最近训练（卡片 1 & 2）
+function loadProfileData() {
+    var profileContent = document.getElementById('profileContent');
+    var runsContent = document.getElementById('recentRunsContent');
+    if (!profileContent || !runsContent) return;
+
+    fetch('/api/data/profile')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.ok) throw new Error(data.error || '加载失败');
+
+            // 卡片 1：跑者画像
+            var stats = data.stats || {};
+            var html = '';
+            html += '<div class="context-stat-row"><span class="context-stat-label">30天跑量</span><span class="context-stat-value">' + (stats.thirty_day_volume || 0) + '<span class="context-stat-unit">km</span></span></div>';
+            html += '<div class="context-stat-row"><span class="context-stat-label">平均配速</span><span class="context-stat-value">' + formatPace(stats.avg_pace) + '<span class="context-stat-unit">/km</span></span></div>';
+            html += '<div class="context-stat-row"><span class="context-stat-label">周训练频率</span><span class="context-stat-value">' + (stats.weekly_frequency || 0) + '<span class="context-stat-unit">次/周</span></span></div>';
+            if (data.target_race) {
+                html += '<div class="context-stat-row"><span class="context-stat-label">目标比赛</span><span style="font-size:var(--rc-text-sm);color:var(--rc-text);">' + data.target_race + '</span></div>';
+            }
+            profileContent.innerHTML = html;
+
+            // 卡片 2：最近训练
+            var runs = data.recent_runs || [];
+            if (runs.length === 0) {
+                runsContent.innerHTML = '<p style="font-size:var(--rc-text-xs);color:var(--rc-text-muted);text-align:center;">暂无训练记录</p>';
+            } else {
+                var runsHtml = '';
+                runs.forEach(function(run) {
+                    runsHtml += '<div class="recent-run-item">';
+                    runsHtml += '<div><div class="recent-run-date">' + (run.日期 || '--') + '</div><div class="recent-run-detail">' + (run.距离_km || 0) + 'km · ' + (run.活动名称 || '跑步') + '</div></div>';
+                    runsHtml += '<div class="recent-run-pace">' + formatPace(run.平均配速_秒每公里) + '</div>';
+                    runsHtml += '</div>';
+                });
+                runsContent.innerHTML = runsHtml;
+            }
+        })
+        .catch(function(err) {
+            profileContent.innerHTML = '<p class="panel-error">数据加载失败</p><button class="panel-retry-btn" onclick="loadProfileData()">重试</button>';
+            runsContent.innerHTML = '<p class="panel-error">数据加载失败</p>';
+        });
+}
+
+// 加载活跃训练计划（卡片 3）
+function loadPlanData() {
+    var planContent = document.getElementById('planContent');
+    if (!planContent) return;
+
+    fetch('/api/plan/load')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var plan = data.plan || [];
+            var meta = data.meta || {};
+
+            if (plan.length === 0) {
+                planContent.innerHTML = '<p style="font-size:var(--rc-text-xs);color:var(--rc-text-muted);text-align:center;">暂无活跃计划</p>';
+                return;
+            }
+
+            var completed = plan.filter(function(d) { return d.completed; }).length;
+            var total = plan.length;
+            var pct = Math.round(completed / total * 100);
+
+            // 找下一课（首个未完成）
+            var nextSession = plan.find(function(d) { return !d.completed; });
+
+            var html = '';
+            html += '<div class="context-stat-row"><span class="context-stat-label">' + (meta.target_race || '训练计划') + '</span><span class="context-stat-value">' + pct + '<span class="context-stat-unit">%</span></span></div>';
+            html += '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>';
+            html += '<div style="font-size:var(--rc-text-xs);color:var(--rc-text-muted);">' + completed + '/' + total + ' 已完成</div>';
+            if (nextSession) {
+                html += '<div class="plan-next">下一课：Day ' + (nextSession.day || '?') + ' · ' + (nextSession.type || '训练') + '</div>';
+            }
+            planContent.innerHTML = html;
+        })
+        .catch(function(err) {
+            planContent.innerHTML = '<p class="panel-error">计划加载失败</p><button class="panel-retry-btn" onclick="loadPlanData()">重试</button>';
+        });
+}
+
+// 初始化上下文面板：折叠/展开 + 数据加载
+function initContextPanel() {
+    var layout = document.getElementById('coachLayout');
+    var toggle = document.getElementById('panelToggle');
+    if (!layout || !toggle) return;
+
+    // 从 localStorage 恢复折叠状态
+    if (localStorage.getItem('coach-panel-collapsed') === '1') {
+        layout.classList.add('panel-collapsed');
+        var ic = toggle.querySelector('i');
+        if (ic) ic.setAttribute('data-lucide', 'panel-right-close');
+    }
+
+    toggle.addEventListener('click', function() {
+        layout.classList.toggle('panel-collapsed');
+        var collapsed = layout.classList.contains('panel-collapsed');
+        localStorage.setItem('coach-panel-collapsed', collapsed ? '1' : '0');
+        var icon = toggle.querySelector('i');
+        if (icon) icon.setAttribute('data-lucide', collapsed ? 'panel-right-close' : 'panel-right-open');
+        if (window.lucide) lucide.createIcons();
+    });
+
+    // 加载数据
+    loadProfileData();
+    loadPlanData();
+}
+
+// 暴露到全局，供 onclick 重试按钮调用
+window.formatPace = formatPace;
+window.loadProfileData = loadProfileData;
+window.loadPlanData = loadPlanData;
+window.initContextPanel = initContextPanel;
+
+document.addEventListener('DOMContentLoaded', initContextPanel);
+</script>
+{% endblock %}

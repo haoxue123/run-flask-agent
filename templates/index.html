@@ -1,0 +1,630 @@
+{% extends "base.html" %}
+{% block title %}数据总览 | COACH{% endblock %}
+{% block content %}
+
+<style>
+/* ============================================================
+   页面级布局样式
+   ============================================================ */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--rc-space-4);
+    margin-bottom: var(--rc-space-6);
+}
+@media (min-width: 560px) {
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (min-width: 769px) {
+    .kpi-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.kpi-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--rc-space-3);
+}
+.kpi-card-label {
+    font-size: var(--rc-text-xs);
+    font-weight: 500;
+    color: var(--rc-text-muted);
+}
+.kpi-card-icon {
+    width: 16px;
+    height: 16px;
+    color: var(--rc-primary);
+}
+.kpi-card-value {
+    display: flex;
+    align-items: baseline;
+    gap: var(--rc-space-1);
+    margin-bottom: var(--rc-space-2);
+}
+.kpi-card-number {
+    font-family: var(--rc-font-display);
+    font-size: 4rem;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--rc-primary-strong);
+}
+.kpi-card-unit {
+    font-size: var(--rc-text-sm);
+    color: var(--rc-text-muted);
+}
+.kpi-card-footer {
+    font-size: var(--rc-text-xs);
+    color: var(--rc-text-muted);
+    display: flex;
+    align-items: center;
+    gap: var(--rc-space-2);
+}
+.kpi-skeleton {
+    height: 60px;
+    width: 100%;
+    background: var(--rc-card-hover);
+    border-radius: var(--rc-radius-sm);
+}
+.kpi-trend {
+    font-weight: 500;
+}
+.kpi-trend.up {
+    color: var(--state-success);
+}
+.kpi-trend.down {
+    color: var(--state-warning);
+}
+.kpi-trend.flat {
+    color: var(--rc-text-muted);
+}
+
+/* Sparkline 容器 */
+.sparkline-container {
+    height: 32px;
+    width: 100%;
+    margin-top: var(--rc-space-1);
+}
+
+/* 中部双列布局 */
+.dashboard-middle {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--rc-space-4);
+    margin-bottom: var(--rc-space-6);
+}
+@media (min-width: 769px) {
+    .dashboard-middle {
+        grid-template-columns: 2fr 1fr;
+    }
+}
+
+/* 跑步列表表格 */
+.runlist-table {
+    width: 100%;
+    font-size: var(--rc-text-sm);
+    border-collapse: collapse;
+}
+.runlist-table thead th {
+    font-size: var(--rc-text-xs);
+    color: var(--rc-text-muted);
+    font-weight: 500;
+    text-align: left;
+    padding-bottom: var(--rc-space-2);
+    border-bottom: 1px solid var(--rc-border);
+}
+.runlist-table thead th:nth-child(3),
+.runlist-table thead th:nth-child(4),
+.runlist-table thead th:nth-child(5) {
+    text-align: right;
+}
+.runlist-table thead th:last-child {
+    width: 32px;
+}
+.runlist-table tbody td {
+    padding: var(--rc-space-2) 0;
+}
+.runlist-table tbody tr {
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.runlist-table tbody tr:hover {
+    background: var(--rc-card-hover);
+}
+.runlist-table tbody tr + tr td {
+    border-top: 1px solid var(--rc-border-light);
+}
+.runlist-table .run-date {
+    color: var(--rc-text-muted);
+}
+.runlist-table .run-name {
+    font-weight: 500;
+}
+.runlist-table .run-dist,
+.runlist-table .run-pace,
+.runlist-table .run-hr {
+    text-align: right;
+}
+.runlist-table .run-pace {
+    color: var(--rc-primary);
+}
+.runlist-table .run-chevron {
+    text-align: right;
+    color: var(--rc-text-muted);
+    opacity: 0.5;
+    transition: opacity 0.15s ease;
+}
+.runlist-table tbody tr:hover .run-chevron {
+    opacity: 1;
+}
+
+/* 训练趋势图容器 */
+.trend-chart-container {
+    height: 220px;
+}
+
+/* 教练周报卡 */
+.coach-weekly-card {
+    border-left: 2px solid var(--rc-data);
+}
+.coach-weekly-header {
+    display: flex;
+    align-items: center;
+    gap: var(--rc-space-3);
+    margin-bottom: var(--rc-space-4);
+}
+.coach-weekly-title {
+    display: flex;
+    align-items: center;
+    gap: var(--rc-space-2);
+}
+.coach-weekly-ai-badge {
+    font-size: var(--rc-text-xs);
+    padding: 2px 8px;
+    border-radius: var(--rc-radius-full);
+    font-weight: 500;
+    background: rgba(46, 134, 199, 0.12);
+    background: color-mix(in srgb, var(--state-info) 15%, transparent);
+    color: var(--state-info);
+}
+.coach-weekly-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--rc-space-3);
+}
+.coach-weekly-section {
+    font-size: var(--rc-text-sm);
+    line-height: 1.6;
+}
+.coach-weekly-section-label {
+    font-size: var(--rc-text-xs);
+    font-weight: 600;
+    color: var(--rc-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--rc-space-1);
+}
+.coach-weekly-section-text {
+    color: var(--rc-text-secondary);
+}
+.coach-weekly-section.risk .coach-weekly-section-text {
+    color: var(--state-warning);
+}
+
+/* 快速操作区 */
+.quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--rc-space-3);
+}
+
+</style>
+
+<!-- ============================================================ -->
+<!-- 页面标题 -->
+<!-- ============================================================ -->
+<div style="margin-bottom: var(--rc-space-6);">
+    <h1 class="font-display" style="font-size: var(--rc-text-3xl); margin: 0 0 var(--rc-space-1) 0;">数据总览</h1>
+    <p style="font-size: var(--rc-text-sm); color: var(--rc-text-muted); margin: 0;">本周训练数据与教练洞察</p>
+</div>
+
+<!-- ============================================================ -->
+<!-- KPI 卡片区：桌面 4 列，移动端 2 列 -->
+<!-- ============================================================ -->
+<div class="kpi-grid">
+    <!-- 周跑量 -->
+    <div class="card">
+        <div class="kpi-card-header">
+            <span class="kpi-card-label">周跑量</span>
+            <i data-lucide="trending-up" class="kpi-card-icon"></i>
+        </div>
+        <div class="kpi-card-value">
+            {% if kpi.weekly_distance is not none and kpi.weekly_distance != '-' and kpi.weekly_distance != 0 and kpi.weekly_distance != '0' %}
+            <span class="kpi-card-number tnum">{{ kpi.weekly_distance }}</span>
+            <span class="kpi-card-unit">km</span>
+            {% else %}
+            <span class="kpi-card-number" style="color: var(--rc-text-muted);">--</span>
+            {% endif %}
+        </div>
+        <div class="kpi-card-footer">
+            <span>最近 7 天</span>
+            {% if weekly_trend is not none and weekly_series and weekly_series|length > 0 %}
+            <span class="kpi-trend {% if weekly_trend > 0 %}up{% elif weekly_trend < 0 %}down{% else %}flat{% endif %}">
+                {{ '+' if weekly_trend > 0 else '' }}{{ weekly_trend }}% vs上周
+            </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 平均配速 -->
+    <div class="card">
+        <div class="kpi-card-header">
+            <span class="kpi-card-label">平均配速</span>
+            <i data-lucide="clock" class="kpi-card-icon"></i>
+        </div>
+        <div class="kpi-card-value">
+            {% if kpi.avg_pace is not none and kpi.avg_pace != '-' and kpi.avg_pace != '0' %}
+            <span class="kpi-card-number tnum">{{ kpi.avg_pace }}</span>
+            <span class="kpi-card-unit">min/km</span>
+            {% else %}
+            <span class="kpi-card-number" style="color: var(--rc-text-muted);">--</span>
+            {% endif %}
+        </div>
+        <div class="kpi-card-footer">最近 7 天</div>
+    </div>
+
+    <!-- 训练负荷 -->
+    <div class="card">
+        <div class="kpi-card-header">
+            <span class="kpi-card-label">训练负荷</span>
+            <i data-lucide="gauge" class="kpi-card-icon"></i>
+        </div>
+        <div class="kpi-card-value">
+            {% if kpi.training_load is not none and kpi.training_load != '-' and kpi.training_load != 0 and kpi.training_load != '0' %}
+            <span class="kpi-card-number tnum">{{ kpi.training_load }}</span>
+            {% else %}
+            <span class="kpi-card-number" style="color: var(--rc-text-muted);">--</span>
+            {% endif %}
+        </div>
+        <div class="kpi-card-footer">
+            {% if kpi.training_load is not none and kpi.training_load != '-' %}
+            {% if kpi.training_load|int >= 80 %}
+            <span class="badge badge-warning">偏高</span>
+            {% else %}
+            <span class="badge badge-success">适中</span>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% if weekly_series and weekly_series|length > 0 %}
+        <div class="sparkline-container">
+            <canvas id="loadSparkline"></canvas>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 就绪度 -->
+    <div class="card">
+        <div class="kpi-card-header">
+            <span class="kpi-card-label">就绪度</span>
+            <i data-lucide="zap" class="kpi-card-icon"></i>
+        </div>
+        <div class="kpi-card-value">
+            {% if kpi.readiness is not none and kpi.readiness != '-' and kpi.readiness != 0 and kpi.readiness != '0' %}
+            <span class="kpi-card-number tnum">{{ kpi.readiness }}</span>
+            {% else %}
+            <span class="kpi-card-number" style="color: var(--rc-text-muted);">--</span>
+            {% endif %}
+        </div>
+        <div class="kpi-card-footer">
+            {% if kpi.readiness is not none and kpi.readiness != '-' %}
+            {% if kpi.readiness|int >= 70 %}
+            <span class="badge badge-success">状态良好</span>
+            {% else %}
+            <span class="badge badge-warning">需关注</span>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 中部双列：RunList + 训练趋势图 -->
+<!-- ============================================================ -->
+<div class="dashboard-middle">
+    <!-- 左列：最近跑步列表 -->
+    <div class="card">
+        <h2 class="font-display" style="font-size: var(--rc-text-xl); margin: 0 0 var(--rc-space-4) 0;">最近跑步</h2>
+        {% if profile.get("近期跑步数据") %}
+        <div style="overflow-x: auto;">
+            <table class="runlist-table">
+                <thead>
+                    <tr>
+                        <th>日期</th>
+                        <th>活动</th>
+                        <th>距离</th>
+                        <th>配速</th>
+                        <th>心率</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for run in profile["近期跑步数据"][:5] %}
+                    <tr onclick="location.href='/insights'">
+                        <td class="run-date tnum">{{ run["日期"] }}</td>
+                        <td class="run-name">{{ run["活动名称"] }}</td>
+                        <td class="run-dist tnum">{{ run["距离_km"] }} km</td>
+                        <td class="run-pace tnum">{% if run['平均配速_秒每公里'] is not none %}{{ run['平均配速_秒每公里'] // 60 }}'{{ '%02d' % (run['平均配速_秒每公里'] % 60) }}"{% else %}--{% endif %}</td>
+                        <td class="run-hr tnum">{{ run["平均心率"] }}</td>
+                        <td class="run-chevron"><i data-lucide="chevron-right" style="width: 14px; height: 14px;"></i></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon"><i data-lucide="dumbbell" style="width: 48px; height: 48px;"></i></div>
+            <div class="empty-title">暂无跑步数据</div>
+            <div class="empty-desc">上传运动文件或填写手动数据以开始训练</div>
+            <a href="/training" class="btn btn-primary">上传数据</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 右列：训练趋势图 -->
+    <div class="card">
+        <h2 class="font-display" style="font-size: var(--rc-text-xl); margin: 0 0 var(--rc-space-4) 0;">训练趋势</h2>
+        {% if weekly_series and weekly_series|length > 0 %}
+        <div class="trend-chart-container">
+            <canvas id="readinessTrendChart"></canvas>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon"><i data-lucide="bar-chart-3" style="width: 48px; height: 48px;"></i></div>
+            <div class="empty-title">暂无趋势数据</div>
+            <div class="empty-desc">上传运动数据后即可查看训练趋势</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- 配速 / 心率趋势（I6：补齐 dashboard 趋势图，kpi.js 逻辑已备） -->
+<!-- ============================================================ -->
+<div class="card" style="margin-bottom: var(--rc-space-6);">
+    <h2 class="font-display" style="font-size: var(--rc-text-xl); margin: 0 0 var(--rc-space-4) 0;">配速 / 心率趋势</h2>
+    {% if profile.get("近期跑步数据") and profile["近期跑步数据"]|length >= 2 %}
+    <div style="display: grid; grid-template-columns: 1fr; gap: var(--rc-space-4);">
+        <div>
+            <div class="kpi-card-label" style="margin-bottom: var(--rc-space-1);">配速 (min/km)</div>
+            <div style="height: 170px;"><canvas id="paceChart"></canvas></div>
+        </div>
+        <div>
+            <div class="kpi-card-label" style="margin-bottom: var(--rc-space-1);">心率 (bpm)</div>
+            <div style="height: 170px;"><canvas id="hrChart"></canvas></div>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding: var(--rc-space-8) 0;">
+        <div class="empty-icon"><i data-lucide="activity" style="width: 40px; height: 40px;"></i></div>
+        <div class="empty-title">数据不足</div>
+        <div class="empty-desc">至少需要 2 次跑步记录以绘制趋势</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ============================================================ -->
+<!-- 教练周报卡 -->
+<!-- ============================================================ -->
+{% if coach_weekly %}
+<div class="card coach-weekly-card" style="margin-bottom: var(--rc-space-6);">
+    <div class="coach-weekly-header">
+        <div class="coach-orb" style="flex-shrink: 0;"></div>
+        <div class="coach-weekly-title">
+            <span class="font-display" style="font-weight: 600;">教练周报</span>
+            <span class="coach-weekly-ai-badge">AI 分析</span>
+        </div>
+    </div>
+    <div class="coach-weekly-body">
+        <div class="coach-weekly-section">
+            <div class="coach-weekly-section-label">总结</div>
+            <div class="coach-weekly-section-text">{{ coach_weekly.summary }}</div>
+        </div>
+        <div class="coach-weekly-section">
+            <div class="coach-weekly-section-label">建议</div>
+            <div class="coach-weekly-section-text">{{ coach_weekly.suggestion }}</div>
+        </div>
+        <div class="coach-weekly-section risk">
+            <div class="coach-weekly-section-label">风险</div>
+            <div class="coach-weekly-section-text">{{ coach_weekly.risk }}</div>
+        </div>
+        <div class="coach-weekly-section">
+            <div class="coach-weekly-section-label">依据</div>
+            <div class="coach-weekly-section-text">{{ coach_weekly.basis }}</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ============================================================ -->
+<!-- 快速操作区 -->
+<!-- ============================================================ -->
+<div class="quick-actions">
+    <a href="/training" class="btn btn-primary">
+        <i data-lucide="upload" style="width: 16px; height: 16px;"></i>
+        <span>上传数据</span>
+    </a>
+    <a href="/training" class="btn btn-secondary">
+        <i data-lucide="calendar-plus" style="width: 16px; height: 16px;"></i>
+        <span>生成计划</span>
+    </a>
+    <a href="/coach" class="btn btn-secondary">
+        <i data-lucide="message-circle" style="width: 16px; height: 16px;"></i>
+        <span>咨询教练</span>
+    </a>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/upload.js"></script>
+<script src="/static/kpi.js"></script>
+<script>
+const profileData = {{ profile.get("近期跑步数据", []) | tojson }};
+const weeklySeries = {{ weekly_series | tojson }};
+
+// I2：注入就绪度，驱动侧边栏 Orb 状态环
+{% if kpi.readiness is not none %}window.COACH_ORB = { readiness: {{ kpi.readiness }} };
+{% else %}window.COACH_ORB = { readiness: null };
+{% endif %}
+
+// 保留：原 updateTargetDist 函数（由 upload.js 导出，此处保留引用以防其他地方引用）
+function updateTargetDist() {
+    if (window.COACH && window.COACH.upload && window.COACH.upload.updateTargetDist) {
+        window.COACH.upload.updateTargetDist();
+    }
+}
+
+// 保留：原 generatePlan 函数（由 plan.js 导出，此处保留引用以防其他地方引用）
+function generatePlan() {
+    if (window.COACH && window.COACH.plan && window.COACH.plan.generatePlan) {
+        window.COACH.plan.generatePlan();
+    }
+}
+
+// 保留：原 refreshData 函数（由 upload.js 导出，此处保留引用以防其他地方引用）
+function refreshData(e) {
+    if (window.COACH && window.COACH.upload && window.COACH.upload.refreshData) {
+        window.COACH.upload.refreshData(e);
+    }
+}
+
+// 渲染训练负荷 Sparkline（KPI 卡片内极小折线图）
+function renderLoadSparkline() {
+    var ctx = document.getElementById('loadSparkline');
+    if (!ctx || !weeklySeries || weeklySeries.length === 0) return;
+
+    var colors = getChartColors();
+    var primary = colors.primary;
+
+    var labels = weeklySeries.map(function(d) { return d.date; });
+    var data = weeklySeries.map(function(d) { return d.distance; });
+
+    var chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                borderColor: primary,
+                backgroundColor: hexToRgba(primary, 0.1),
+                borderWidth: 1.5,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 3,
+                pointHoverBackgroundColor: primary,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) { return ctx.raw + ' km'; }
+                    }
+                }
+            },
+            scales: {
+                x: { display: false },
+                y: { display: false, min: 0 }
+            },
+            elements: {
+                line: { borderWidth: 1.5 }
+            }
+        }
+    });
+    registerChart(chart);
+}
+
+// 渲染训练趋势图（右列 7 天跑量柱状图）
+function renderReadinessTrendChart() {
+    var ctx = document.getElementById('readinessTrendChart');
+    if (!ctx || !weeklySeries || weeklySeries.length === 0) return;
+
+    var colors = getChartColors();
+    var primary = colors.primary;
+    var gridColor = colors.grid;
+    var textColor = colors.text;
+
+    var labels = weeklySeries.map(function(d) { return d.date; });
+    var data = weeklySeries.map(function(d) { return d.distance; });
+
+    var chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '跑量',
+                data: data,
+                backgroundColor: hexToRgba(primary, 0.6),
+                borderColor: primary,
+                borderWidth: 1,
+                borderRadius: 4,
+                hoverBackgroundColor: primary,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) { return ctx.raw + ' km'; }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { color: textColor, font: { size: 11 } }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: { color: gridColor },
+                    ticks: {
+                        color: textColor,
+                        font: { size: 11 },
+                        callback: function(v) { return v + ' km'; }
+                    }
+                }
+            }
+        }
+    });
+    registerChart(chart);
+}
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+    renderLoadSparkline();
+    renderReadinessTrendChart();
+    if (window.COACH && window.COACH.kpi) window.COACH.kpi.renderCharts(profileData);
+});
+
+// 监听主题切换，重建图表
+document.addEventListener('rc-theme-change', function() {
+    destroyAllCharts();
+    setTimeout(function() {
+        renderLoadSparkline();
+        renderReadinessTrendChart();
+        if (window.COACH && window.COACH.kpi) window.COACH.kpi.renderCharts(profileData);
+    }, 100);
+});
+</script>
+{% endblock %}

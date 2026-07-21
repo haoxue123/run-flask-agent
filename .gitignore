@@ -1,0 +1,50 @@
+# ===== 敏感文件（密钥/凭证，绝不提交）=====
+.env
+.env.*
+!.env.example
+
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# ===== 系统/编辑器 =====
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# ===== 本地临时/缓存 =====
+.chrome-tmp/
+.trae-html-share-packages/
+
+# ===== 部署运行时（不入库）=====
+deploy/certs/
+deploy/logs/
+
+# ===== 用户运动数据（隐私，不入库）=====
+# 注意：不能写成 `data/`（整目录忽略会让下面的 ! 取反失效，
+# 因为 Git 无法在父目录被忽略后重新包含子文件）。
+# 改为忽略 data/ 下的运行时/私人产物，同时保留 knowledge/ 与示例模板。
+data/_rag_temp/
+data/charts/
+data/chroma_db/
+data/eval/
+data/uploads/
+data/*.json
+data/*.csv
+data/*.png
+data/*.bin
+data/*.bak
+data/*.gpx
+data/*.tcx
+data/*.fit
+data/*.md
+# 但保留 RAG 知识库与示例模板（部署/运行必需）
+!data/knowledge/
+!data/knowledge/**
+!data/manual_input.example.json
+
+# ===== 工作区记忆（不入库）=====
+.workbuddy/

@@ -1,0 +1,521 @@
+{
+  "data": [
+    {
+      "id": "page-overview",
+      "title": "项目总览",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1784297000000,
+      "canvasData": {
+        "x": 0,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/overview.html",
+        "interactions": [
+          {
+            "domId": "cta-enter",
+            "targetPageId": "page-dashboard",
+            "transitionLabel": "进入总览"
+          },
+          {
+            "domId": "idx-dashboard",
+            "targetPageId": "page-dashboard",
+            "hideEdge": true,
+            "transitionLabel": "页面索引"
+          },
+          {
+            "domId": "idx-analysis",
+            "targetPageId": "page-analysis",
+            "hideEdge": true,
+            "transitionLabel": "页面索引"
+          },
+          {
+            "domId": "idx-training",
+            "targetPageId": "page-training",
+            "hideEdge": true,
+            "transitionLabel": "页面索引"
+          },
+          {
+            "domId": "idx-trends",
+            "targetPageId": "page-trends",
+            "hideEdge": true,
+            "transitionLabel": "页面索引"
+          },
+          {
+            "domId": "idx-coach",
+            "targetPageId": "page-coach",
+            "hideEdge": true,
+            "transitionLabel": "页面索引"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-dashboard",
+      "title": "数据总览",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1784297000000,
+      "canvasData": {
+        "x": 620,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/dashboard.html",
+        "interactions": [
+          {
+            "domId": "cta-analysis",
+            "targetPageId": "page-analysis",
+            "transitionLabel": "深度分析"
+          },
+          {
+            "domId": "nav-analysis",
+            "targetPageId": "page-analysis",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-training",
+            "targetPageId": "page-training",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-trends",
+            "targetPageId": "page-trends",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-coach",
+            "targetPageId": "page-coach",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-analysis",
+      "title": "单次跑步深度分析",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1784297000000,
+      "canvasData": {
+        "x": 1240,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/analysis.html",
+        "interactions": [
+          {
+            "domId": "cta-training",
+            "targetPageId": "page-training",
+            "transitionLabel": "训练计划"
+          },
+          {
+            "domId": "nav-dashboard",
+            "targetPageId": "page-dashboard",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-training",
+            "targetPageId": "page-training",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-trends",
+            "targetPageId": "page-trends",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-coach",
+            "targetPageId": "page-coach",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-training",
+      "title": "训练计划管理",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1784297000000,
+      "canvasData": {
+        "x": 1860,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/training.html",
+        "interactions": [
+          {
+            "domId": "cta-trends",
+            "targetPageId": "page-trends",
+            "transitionLabel": "长期趋势"
+          },
+          {
+            "domId": "nav-dashboard",
+            "targetPageId": "page-dashboard",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-analysis",
+            "targetPageId": "page-analysis",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-trends",
+            "targetPageId": "page-trends",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-coach",
+            "targetPageId": "page-coach",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-trends",
+      "title": "长期趋势",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1784297000000,
+      "canvasData": {
+        "x": 2480,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/trends.html",
+        "interactions": [
+          {
+            "domId": "cta-coach",
+            "targetPageId": "page-coach",
+            "transitionLabel": "教练工作台"
+          },
+          {
+            "domId": "nav-dashboard",
+            "targetPageId": "page-dashboard",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-analysis",
+            "targetPageId": "page-analysis",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-training",
+            "targetPageId": "page-training",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-coach",
+            "targetPageId": "page-coach",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-coach",
+      "title": "教练工作台",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1784297000000,
+      "canvasData": {
+        "x": 3100,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/coach.html",
+        "interactions": [
+          {
+            "domId": "nav-dashboard",
+            "targetPageId": "page-dashboard",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-analysis",
+            "targetPageId": "page-analysis",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-training",
+            "targetPageId": "page-training",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-trends",
+            "targetPageId": "page-trends",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-training-upload",
+      "title": "训练计划管理 · 含上传入口",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1784297000000,
+      "canvasData": {
+        "x": 1860,
+        "y": 630,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/training-upload.html",
+        "interactions": [
+          {
+            "domId": "cta-trends",
+            "targetPageId": "page-trends",
+            "transitionLabel": "长期趋势"
+          },
+          {
+            "domId": "nav-dashboard",
+            "targetPageId": "page-dashboard",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-analysis",
+            "targetPageId": "page-analysis",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-trends",
+            "targetPageId": "page-trends",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-coach",
+            "targetPageId": "page-coach",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-execution",
+      "title": "训练执行追踪 · 计划 vs 实际",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1784561000000,
+      "canvasData": {
+        "x": 1240,
+        "y": 1247,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/execution.html",
+        "interactions": [
+          {
+            "domId": "cta-training",
+            "targetPageId": "page-training",
+            "transitionLabel": "调整训练计划"
+          },
+          {
+            "domId": "cta-trends",
+            "targetPageId": "page-trends",
+            "transitionLabel": "长期趋势"
+          },
+          {
+            "domId": "nav-dashboard",
+            "targetPageId": "page-dashboard",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-analysis",
+            "targetPageId": "page-analysis",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-trends",
+            "targetPageId": "page-trends",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-training",
+            "targetPageId": "page-training",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-coach",
+            "targetPageId": "page-coach",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-training-science",
+      "title": "训练科学 · 生理内核建模",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1784561000000,
+      "canvasData": {
+        "x": 1240,
+        "y": 627,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/training-science.html",
+        "interactions": [
+          {
+            "domId": "cta-training",
+            "targetPageId": "page-training",
+            "transitionLabel": "调整训练计划"
+          },
+          {
+            "domId": "nav-dashboard",
+            "targetPageId": "page-dashboard",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-analysis",
+            "targetPageId": "page-analysis",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-trends",
+            "targetPageId": "page-trends",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-training",
+            "targetPageId": "page-training",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-coach",
+            "targetPageId": "page-coach",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-knowledge-agent",
+      "title": "知识推理与记忆 · Agent 核心",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1784561000000,
+      "canvasData": {
+        "x": 2480,
+        "y": 536,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/knowledge-agent.html",
+        "interactions": [
+          {
+            "domId": "cta-coach",
+            "targetPageId": "page-coach",
+            "transitionLabel": "开始对话"
+          },
+          {
+            "domId": "nav-dashboard",
+            "targetPageId": "page-dashboard",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-analysis",
+            "targetPageId": "page-analysis",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-trends",
+            "targetPageId": "page-trends",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-training",
+            "targetPageId": "page-training",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          },
+          {
+            "domId": "nav-coach",
+            "targetPageId": "page-coach",
+            "hideEdge": true,
+            "transitionLabel": "侧栏导航"
+          }
+        ]
+      }
+    },
+    {
+      "id": "image-001",
+      "title": "晨光山道跑者主视觉",
+      "type": "image",
+      "version": 1,
+      "createdAt": 1784297000000,
+      "canvasData": {
+        "x": 0,
+        "y": 1908
+      },
+      "devMetadata": {
+        "imageSrc": "assets/hero-trail.jpg"
+      }
+    },
+    {
+      "id": "image-002",
+      "title": "教练对话氛围主视觉",
+      "type": "image",
+      "version": 1,
+      "createdAt": 1784297000000,
+      "canvasData": {
+        "x": 620,
+        "y": 1908
+      },
+      "devMetadata": {
+        "imageSrc": "assets/hero-coach.jpg"
+      }
+    }
+  ],
+  "config": {
+    "autoLayout": true,
+    "deviceType": "desktop",
+    "projectName": "跑步教练 Agent · Web 端"
+  }
+}

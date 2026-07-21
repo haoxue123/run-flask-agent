@@ -1,0 +1,1422 @@
+{% extends "base.html" %}
+{% block title %}训练计划 | COACH{% endblock %}
+{% block chartjs %}{% endblock %}
+{% block head %}
+<style>
+    /* ============================================================
+       Training 页面专用样式
+       ============================================================ */
+
+    /* ---- 页面标题 ---- */
+    .page-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        margin-bottom: var(--rc-space-4);
+    }
+    .page-title {
+        font-size: 32px;
+        font-weight: 700;
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+        font-family: var(--rc-font-display);
+    }
+    .page-subtitle {
+        font-size: var(--rc-text-sm);
+        color: var(--rc-text-secondary);
+        margin-top: var(--rc-space-1);
+    }
+
+    /* ---- 步骤指示器 ---- */
+    .steps {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        padding: var(--rc-space-4) 0;
+    }
+    .step-indicator {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: var(--rc-text-sm);
+        font-weight: 700;
+        transition: all 0.3s ease;
+        background: var(--rc-muted);
+        color: var(--rc-muted-foreground);
+    }
+    .step-indicator.active {
+        background: var(--rc-primary);
+        color: var(--rc-text-on-primary);
+    }
+    .step-indicator.done {
+        background: var(--rc-success);
+        color: #fff;
+    }
+    .step-line {
+        width: 48px;
+        height: 2px;
+        transition: background-color 0.3s ease;
+        background: var(--rc-muted);
+    }
+    .step-line.done {
+        background: var(--rc-success);
+    }
+    .step-content {
+        display: none;
+        animation: ds-fadeSlideIn 300ms ease-out;
+    }
+    .step-content.active {
+        display: block;
+    }
+
+    /* ---- Tailwind 兼容类 (JS 动态使用) ---- */
+    .bg-muted { background: var(--rc-muted); }
+    .text-muted-foreground { color: var(--rc-muted-foreground); }
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .gap-2 { gap: var(--rc-space-2); }
+
+    /* ---- 三列网格 ---- */
+    .card-grid-3 {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--rc-space-4);
+    }
+    @media (min-width: 768px) {
+        .card-grid-3 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+
+    /* ---- 上传区域 ---- */
+    .upload-area {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: var(--rc-space-2);
+        height: 128px;
+        border-radius: var(--rc-radius-md);
+        border: 2px dashed var(--rc-border);
+        cursor: pointer;
+        transition: border-color var(--rc-transition);
+        background: var(--rc-muted);
+    }
+    .upload-area:hover {
+        border-color: var(--rc-primary);
+    }
+    .upload-area-icon {
+        width: 32px;
+        height: 32px;
+        color: var(--rc-text-muted);
+    }
+    .upload-area-text {
+        font-size: var(--rc-text-sm);
+        color: var(--rc-text-muted);
+    }
+    .upload-area-hint {
+        font-size: var(--rc-text-xs);
+        color: var(--rc-text-muted);
+    }
+    .file-list {
+        margin-top: var(--rc-space-3);
+    }
+    .file-list > div + div {
+        margin-top: var(--rc-space-1);
+    }
+
+    /* ---- 卡片标题 ---- */
+    .card-title {
+        font-size: 22px;
+        font-weight: 600;
+    }
+    .card-title-icon {
+        width: 20px;
+        height: 20px;
+        color: var(--rc-primary);
+    }
+    .card-title-row {
+        display: flex;
+        align-items: center;
+        gap: var(--rc-space-2);
+    }
+    .card-title-row.mb-1 { margin-bottom: var(--rc-space-1); }
+    .card-title-row.mb-3 { margin-bottom: var(--rc-space-3); }
+    .card-title-row.mb-4 { margin-bottom: var(--rc-space-4); }
+    .card-icon-round {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--rc-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .card-icon-round i {
+        width: 20px;
+        height: 20px;
+        color: var(--rc-text-on-primary);
+    }
+    .card-desc {
+        font-size: var(--rc-text-xs);
+        color: var(--rc-text-muted);
+        margin-bottom: var(--rc-space-3);
+    }
+
+    /* ---- 表单字段 ---- */
+    .form-label {
+        font-size: var(--rc-text-xs);
+        color: var(--rc-text-muted);
+        margin-bottom: var(--rc-space-1);
+        display: block;
+    }
+    .form-input-full {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .form-input-readonly {
+        opacity: 0.6;
+    }
+
+    /* ---- 手动面板 ---- */
+    .manual-panel-content {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.35s ease;
+    }
+    .manual-panel-content.open {
+        max-height: 600px;
+    }
+    .manual-panel-chevron {
+        transition: transform 0.35s ease;
+    }
+    .manual-panel-header.open .manual-panel-chevron {
+        transform: rotate(180deg);
+    }
+
+    /* ---- 二列网格 ---- */
+    .form-grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--rc-space-3);
+    }
+    .form-grid-2.col-span-2 {
+        grid-column: 1 / -1;
+    }
+    .form-grid-2 .col-span-2 {
+        grid-column: 1 / -1;
+    }
+
+    /* ---- 操作按钮行 ---- */
+    .action-row {
+        display: flex;
+        align-items: center;
+        gap: var(--rc-space-2);
+        margin-top: var(--rc-space-4);
+    }
+    .action-hint {
+        font-size: var(--rc-text-xs);
+        color: var(--rc-text-muted);
+        margin-top: var(--rc-space-2);
+    }
+
+    /* ---- 确认摘要 ---- */
+    .confirm-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--rc-space-4);
+    }
+    @media (min-width: 768px) {
+        .confirm-grid {
+            grid-template-columns: repeat(4, 1fr);
+        }
+    }
+    .confirm-item {
+        text-align: center;
+    }
+    .confirm-item-label {
+        font-size: var(--rc-text-xs);
+        color: var(--rc-text-muted);
+        margin-bottom: var(--rc-space-1);
+    }
+    .confirm-item-value {
+        font-size: var(--rc-text-sm);
+        font-weight: 600;
+    }
+    .confirm-detail {
+        margin-top: var(--rc-space-4);
+        padding-top: var(--rc-space-4);
+        border-top: 1px solid var(--rc-border);
+    }
+    .confirm-detail-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: var(--rc-text-sm);
+    }
+    .confirm-detail-row + .confirm-detail-row {
+        margin-top: var(--rc-space-1);
+    }
+    .confirm-detail-label {
+        color: var(--rc-text-muted);
+    }
+
+    /* ---- 计划摘要 ---- */
+    .summary-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--rc-space-3);
+    }
+    @media (min-width: 768px) {
+        .summary-grid {
+            grid-template-columns: repeat(4, 1fr);
+        }
+    }
+    .summary-item {
+        text-align: center;
+    }
+    .summary-value {
+        font-size: var(--rc-text-2xl);
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+    }
+    .summary-label {
+        font-size: var(--rc-text-xs);
+        color: var(--rc-text-muted);
+    }
+    .summary-badge {
+        margin-left: auto;
+        background: var(--rc-muted);
+        color: var(--rc-muted-foreground);
+        font-size: var(--rc-text-xs);
+        padding: 2px 8px;
+        border-radius: var(--rc-radius-sm);
+    }
+    .summary-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: var(--rc-space-3);
+    }
+    .summary-tag {
+        font-size: var(--rc-text-xs);
+        padding: 2px 6px;
+        border-radius: var(--rc-radius-sm);
+    }
+
+    /* ---- 完成率进度条 ---- */
+    .progress-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: var(--rc-space-2);
+    }
+    .progress-label {
+        font-size: var(--rc-text-sm);
+        font-weight: 500;
+    }
+    .progress-value {
+        font-size: var(--rc-text-sm);
+        font-variant-numeric: tabular-nums;
+        color: var(--rc-primary);
+    }
+    .progress-bar {
+        height: 8px;
+        border-radius: var(--rc-radius-full);
+        background: var(--rc-muted);
+        overflow: hidden;
+    }
+    .progress-bar-fill {
+        height: 100%;
+        border-radius: var(--rc-radius-full);
+        background: var(--rc-primary);
+        transition: width 0.3s ease;
+    }
+
+    /* ---- 计划月历 ---- */
+    .plan-day {
+        cursor: pointer;
+        transition: transform 0.18s cubic-bezier(0.2, 0.7, 0.3, 1),
+                    border-color 0.18s, background-color 0.18s, box-shadow 0.18s;
+    }
+    .plan-day:hover {
+        transform: translateY(-3px) scale(1.02);
+        background: var(--rc-card-hover);
+        box-shadow: var(--rc-shadow-sm);
+    }
+    .plan-day.completed {
+        opacity: 0.6;
+    }
+    .plan-day.completed::after {
+        display: none;
+    }
+    .plan-month-header {
+        display: flex;
+        align-items: center;
+        gap: var(--rc-space-3);
+        margin-bottom: var(--rc-space-4);
+    }
+    .plan-text {
+        font-family: var(--rc-font-mono);
+        font-size: var(--rc-text-xs);
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: var(--rc-muted);
+        border-radius: var(--rc-radius-md);
+        padding: var(--rc-space-3);
+        margin-top: var(--rc-space-2);
+    }
+    .plan-text-details {
+        margin-top: var(--rc-space-3);
+    }
+    .plan-text-details summary {
+        cursor: pointer;
+        font-size: var(--rc-text-xs);
+        color: var(--rc-text-muted);
+    }
+
+    /* ---- 错误提示 ---- */
+    .error-box {
+        border-radius: var(--rc-radius-lg);
+        border: 1px solid var(--rc-border);
+        border-left: 4px solid var(--rc-danger);
+        background: var(--rc-card);
+        padding: var(--rc-space-5);
+        display: flex;
+        align-items: flex-start;
+        gap: var(--rc-space-3);
+        margin-top: var(--rc-space-4);
+    }
+    .error-box-icon {
+        width: 20px;
+        height: 20px;
+        color: var(--rc-danger);
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+    .error-box-text {
+        font-size: var(--rc-text-sm);
+        color: var(--rc-danger);
+    }
+
+    /* ---- 编辑弹窗 ---- */
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .modal-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    .modal-card {
+        position: relative;
+        border-radius: var(--rc-radius-lg);
+        border: 1px solid var(--rc-border);
+        background: var(--rc-card);
+        padding: var(--rc-space-6);
+        width: 100%;
+        max-width: 400px;
+        margin: 0 var(--rc-space-4);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: var(--rc-space-4);
+    }
+    .modal-title {
+        font-family: var(--rc-font-display);
+        font-weight: 600;
+        font-size: var(--rc-text-lg);
+    }
+    .modal-close {
+        width: 24px;
+        height: 24px;
+        border-radius: var(--rc-radius-sm);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        border: none;
+        background: transparent;
+        color: var(--rc-text-muted);
+    }
+    .modal-close:hover {
+        background: var(--rc-muted);
+    }
+    .modal-body {
+        display: flex;
+        flex-direction: column;
+        gap: var(--rc-space-3);
+    }
+    .modal-footer {
+        display: flex;
+        gap: var(--rc-space-2);
+        margin-top: var(--rc-space-4);
+    }
+    .modal-footer .btn {
+        flex: 1;
+        justify-content: center;
+        padding: var(--rc-space-2) var(--rc-space-4);
+        border-radius: var(--rc-radius-md);
+        font-size: var(--rc-text-sm);
+    }
+    .modal-check-row {
+        display: flex;
+        align-items: center;
+        gap: var(--rc-space-2);
+    }
+    .modal-check-row label {
+        font-size: var(--rc-text-sm);
+    }
+
+    /* ---- 分隔线 ---- */
+    .card-divider {
+        border: none;
+        border-top: 1px solid var(--rc-border);
+    }
+
+    /* ---- 卡片间距 ---- */
+    .card + .card {
+        margin-top: var(--rc-space-4);
+    }
+
+    /* ---- 图片响应式 ---- */
+    .responsive-img {
+        width: 100%;
+        height: auto;
+        border-radius: var(--rc-radius-md);
+    }
+
+    /* ---- 按钮禁用 ---- */
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* ---- 生成按钮 spinner ---- */
+    .btn-loading {
+        position: relative;
+        pointer-events: none;
+    }
+    .btn-loading .btn-spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        animation: btn-spin 0.6s linear infinite;
+        margin-right: var(--rc-space-1);
+        vertical-align: middle;
+    }
+    @keyframes btn-spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* ---- 图片加载失败 fallback ---- */
+    .img-fallback {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 160px;
+        background: var(--rc-muted);
+        border-radius: var(--rc-radius-md);
+        color: var(--rc-text-muted);
+        font-size: var(--rc-text-sm);
+    }
+
+    /* ---- 确认摘要分隔 ---- */
+    .confirm-item + .confirm-item {
+        border-left: 1px solid var(--rc-border);
+    }
+    @media (max-width: 767px) {
+        .confirm-item + .confirm-item {
+            border-left: none;
+            border-top: 1px solid var(--rc-border);
+            padding-top: var(--rc-space-3);
+        }
+    }
+
+    /* ---- 编辑弹窗动画 ---- */
+    .modal-overlay {
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.25s ease, visibility 0.25s ease;
+    }
+    .modal-overlay.open {
+        opacity: 1;
+        visibility: visible;
+    }
+    .modal-overlay .modal-card {
+        transform: translateY(12px) scale(0.97);
+        transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.3, 1);
+    }
+    .modal-overlay.open .modal-card {
+        transform: translateY(0) scale(1);
+    }
+
+    /* 尊重用户的减少动效偏好 */
+    @media (prefers-reduced-motion: reduce) {
+        .plan-day, .plan-day:hover { transition: none; transform: none; }
+        .step-content { animation: none; }
+    }
+</style>
+<link rel="stylesheet" href="/static/execution.css">
+{% endblock %}
+{% block content %}
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">训练计划</h1>
+            <p class="page-subtitle">上传运动文件或填写数据，AI 教练为你生成个性化训练计划</p>
+        </div>
+    </div>
+
+    <!-- Step 指示器 -->
+    <div class="steps">
+        <div class="step-indicator active" data-step="1">1</div>
+        <div class="step-line" data-line="1"></div>
+        <div class="step-indicator" data-step="2">2</div>
+        <div class="step-line" data-line="2"></div>
+        <div class="step-indicator" data-step="3">3</div>
+    </div>
+
+    <!-- ==================== Step 1：上传 + 目标 + 手动数据 ==================== -->
+    <div class="step-content active" id="step-1">
+        <div class="card-grid-3">
+            <!-- 卡片 A：拖拽上传区 -->
+            <div class="card">
+                <div class="card-title-row mb-1">
+                    <i data-lucide="upload" class="card-title-icon"></i>
+                    <h3 class="card-title">上传运动文件</h3>
+                </div>
+                <p class="card-desc">支持 GPX / TCX / FIT / CSV，可多选</p>
+                <label for="files" class="upload-area">
+                    <i data-lucide="cloud-upload" class="upload-area-icon"></i>
+                    <span class="upload-area-text">拖拽 GPX / TCX / FIT / CSV 文件到此处或点击上传</span>
+                    <span class="upload-area-hint">支持 GPX / TCX / FIT / CSV 格式</span>
+                </label>
+                <input type="file" id="files" name="files" multiple accept=".gpx,.tcx,.fit,.csv" style="display:none;">
+                <div id="file-list" class="file-list"></div>
+            </div>
+
+            <!-- 卡片 B：训练目标设置 -->
+            <div class="card">
+                <div class="card-title-row mb-3">
+                    <i data-lucide="target" class="card-title-icon"></i>
+                    <h3 class="card-title">训练目标设置</h3>
+                </div>
+                <div class="form-grid-2">
+                    <div>
+                        <label class="form-label" for="target_race">目标比赛</label>
+                        <select id="target_race" name="target_race" class="form-input-full" onchange="updateTargetDist()">
+                            <option value="">无特定目标</option>
+                            <option value="5K" {% if profile.get('目标', {}).get('目标比赛') == '5K' %}selected{% endif %}>5K</option>
+                            <option value="10K" {% if profile.get('目标', {}).get('目标比赛') == '10K' %}selected{% endif %}>10K</option>
+                            <option value="半马" {% if profile.get('目标', {}).get('目标比赛') == '半马' %}selected{% endif %}>半马(21.1K)</option>
+                            <option value="全马" {% if profile.get('目标', {}).get('目标比赛') == '全马' %}selected{% endif %}>全马(42.2K)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" for="target_distance">目标距离</label>
+                        <input type="text" id="target_distance" name="target_distance" readonly class="form-input-full form-input-readonly">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="form-label" for="target_time">目标完赛时间</label>
+                        <input type="text" id="target_time" name="target_time" value="{{ profile.get('目标', {}).get('目标完赛时间', '06:00:00') }}" class="form-input-full">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="form-label" for="plan_duration">计划周期</label>
+                        <select id="plan_duration" name="plan_duration" class="form-input-full">
+                            <option value="7">7 天</option>
+                            <option value="30">30 天</option>
+                            <option value="90">90 天</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 卡片 C：手动填写运动数据（折叠面板） -->
+            <div class="card">
+                <div class="card-title-row mb-3 manual-panel-header" id="manual-panel-header" style="cursor:pointer;" onclick="toggleManualPanel()">
+                    <i data-lucide="edit-3" class="card-title-icon"></i>
+                    <h3 class="card-title">手动填写运动数据</h3>
+                    <i data-lucide="chevron-down" class="manual-panel-chevron" style="width:16px;height:16px;color:var(--rc-text-muted);margin-left:auto;transition:transform 0.35s ease;"></i>
+                </div>
+                <p class="card-desc">如果您无法上传 GPX/TCX/FIT/CSV 文件，可在此手动输入单次运动记录</p>
+                <div class="manual-panel-content" id="manual-panel">
+                    <div class="form-grid-2" style="padding-top:var(--rc-space-1);">
+                        <div>
+                            <label class="form-label" for="run_date">最近跑步日期</label>
+                            <input type="date" id="run_date" name="run_date" class="form-input-full">
+                        </div>
+                        <div>
+                            <label class="form-label" for="run_distance">距离 km</label>
+                            <input type="number" id="run_distance" name="run_distance" step="0.1" min="0" class="form-input-full">
+                        </div>
+                        <div>
+                            <label class="form-label" for="run_duration">时长 分钟</label>
+                            <input type="number" id="run_duration" name="run_duration" step="0.1" min="0" class="form-input-full">
+                        </div>
+                        <div>
+                            <label class="form-label" for="run_pace">配速 如 6:30</label>
+                            <input type="text" id="run_pace" name="run_pace" placeholder="6:30" class="form-input-full">
+                        </div>
+                        <div>
+                            <label class="form-label" for="run_hr">平均心率</label>
+                            <input type="number" id="run_hr" name="run_hr" min="0" class="form-input-full">
+                        </div>
+                        <div>
+                            <label class="form-label" for="run_name">活动名称</label>
+                            <input type="text" id="run_name" name="run_name" placeholder="晨跑" class="form-input-full">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="action-row">
+            <button type="button" onclick="refreshData(event)" class="btn btn-secondary">
+                <i data-lucide="refresh-cw" style="width:16px;height:16px;"></i>
+                <span>更新数据</span>
+            </button>
+            <button type="button" onclick="goToStep(2)" class="btn btn-primary">
+                <i data-lucide="arrow-right" style="width:16px;height:16px;"></i>
+                <span>下一步</span>
+            </button>
+        </div>
+        <p class="action-hint">"更新数据"仅保存数据并刷新总览，不消耗 AI 额度</p>
+    </div>
+
+    <!-- ==================== Step 2：确认 + 生成 ==================== -->
+    <div class="step-content" id="step-2">
+        <!-- 信息摘要卡片 -->
+        <div class="card">
+            <div class="card-title-row mb-4">
+                <i data-lucide="clipboard-check" class="card-title-icon"></i>
+                <h3 style="font-weight:600;font-size:var(--rc-text-lg);">确认信息</h3>
+            </div>
+            <div class="confirm-grid" id="confirm-summary">
+                <div class="confirm-item">
+                    <div class="confirm-item-label">目标比赛</div>
+                    <div class="confirm-item-value" id="confirm-race">-</div>
+                </div>
+                <div class="confirm-item">
+                    <div class="confirm-item-label">完赛时间</div>
+                    <div class="confirm-item-value" id="confirm-time">-</div>
+                </div>
+                <div class="confirm-item">
+                    <div class="confirm-item-label">计划周期</div>
+                    <div class="confirm-item-value" id="confirm-duration">-</div>
+                </div>
+                <div class="confirm-item">
+                    <div class="confirm-item-label">上传文件</div>
+                    <div class="confirm-item-value" id="confirm-files">-</div>
+                </div>
+            </div>
+            <div class="confirm-detail" id="confirm-detail">
+                <div class="confirm-detail-row"><span class="confirm-detail-label">最近跑步</span><span id="confirm-run">-</span></div>
+                <div class="confirm-detail-row"><span class="confirm-detail-label">目标距离</span><span id="confirm-dist">-</span></div>
+            </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="action-row">
+            <button type="button" onclick="goToStep(1)" class="btn btn-secondary">
+                <i data-lucide="arrow-left" style="width:16px;height:16px;"></i>
+                <span>返回修改</span>
+            </button>
+            <button type="button" id="generate-btn" onclick="generatePlan()" class="btn btn-primary">
+                <span class="btn-spinner" style="display:none;"></span>
+                <i data-lucide="sparkles" style="width:16px;height:16px;"></i>
+                <span id="generate-btn-text">生成训练计划</span>
+            </button>
+        </div>
+
+        <!-- Skeleton 占位 -->
+        <div id="skeleton-area" class="card" style="display:none;margin-top:var(--rc-space-4);"></div>
+
+        <!-- 错误提示 -->
+        <div id="error-msg" class="error-box" style="display:none;">
+            <i data-lucide="alert-circle" class="error-box-icon"></i>
+            <div class="error-box-text" id="error-text"></div>
+        </div>
+    </div>
+
+    <!-- ==================== Step 3：查看计划 ==================== -->
+    <div class="step-content" id="step-3">
+        <!-- 完成率进度条 -->
+        <div class="card">
+            <div class="progress-row">
+                <span class="progress-label">训练完成率</span>
+                <span class="progress-value" id="completion-rate">0/0</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-bar-fill" id="completion-bar" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- 计划摘要 -->
+        <div class="card">
+            <div class="card-title-row mb-3">
+                <i data-lucide="clipboard-list" class="card-title-icon"></i>
+                <h3 style="font-weight:600;">计划摘要</h3>
+                <span id="summary-badge" class="summary-badge"></span>
+            </div>
+            <div class="summary-grid" id="plan-summary">
+                <div class="summary-item">
+                    <div class="summary-value" id="sum-total-km">-</div>
+                    <div class="summary-label">总跑量 km</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value" id="sum-run-days">-</div>
+                    <div class="summary-label">训练日</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value" id="sum-rest-days">-</div>
+                    <div class="summary-label">休息日</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value" id="sum-avg-pace">-</div>
+                    <div class="summary-label">平均配速</div>
+                </div>
+            </div>
+            <div class="summary-tags" id="sum-type-tags"></div>
+        </div>
+
+        <!-- 教练计划月历 -->
+        <div class="card">
+            <div class="plan-month-header">
+                <div class="card-icon-round">
+                    <i data-lucide="activity"></i>
+                </div>
+                <h3 class="card-title">教练计划</h3>
+                <span id="source-badge" class="summary-badge"></span>
+            </div>
+            <div id="plan-calendar" style="margin-bottom:var(--rc-space-4);"></div>
+            <details class="plan-text-details">
+                <summary style="cursor:pointer;font-size:var(--rc-text-xs);color:var(--rc-text-muted);">查看完整计划文本</summary>
+                <pre id="plan-text" class="plan-text"></pre>
+            </details>
+        </div>
+
+        <!-- 配速图 -->
+        <div class="card">
+            <div class="card-title-row mb-4">
+                <i data-lucide="line-chart" class="card-title-icon"></i>
+                <h3 class="card-title">配速折线图</h3>
+            </div>
+            <img id="pace-chart" class="responsive-img" alt="配速折线图" onload="this.style.display='';var fb=document.getElementById('pace-fallback');if(fb)fb.style.display='none';" onerror="this.onerror=null;this.style.display='none';var fb=document.getElementById('pace-fallback');if(fb)fb.style.display='flex';">
+            <div id="pace-fallback" class="img-fallback" style="display:none;">
+                <span>配速图加载失败，请重新生成计划</span>
+            </div>
+        </div>
+
+        <!-- 自动保存按钮 -->
+        <div class="action-row">
+            <button type="button" onclick="goToStep(1)" class="btn btn-secondary">
+                <i data-lucide="arrow-left" style="width:16px;height:16px;"></i>
+                <span>返回修改</span>
+            </button>
+            <button type="button" onclick="saveEdit()" class="btn btn-primary">
+                <i data-lucide="save" style="width:16px;height:16px;"></i>
+                <span>保存计划</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 编辑弹窗 -->
+    <div id="edit-modal" class="modal-overlay">
+        <div class="modal-backdrop" onclick="closeEditModal()"></div>
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">编辑 <span id="edit-day-label">第1天</span></h3>
+                <button onclick="closeEditModal()" class="modal-close">
+                    <i data-lucide="x" style="width:16px;height:16px;"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div>
+                    <label class="form-label" for="edit-type">训练类型</label>
+                    <select id="edit-type" class="form-input-full">
+                        <option value="休息">休息</option>
+                        <option value="恢复跑">恢复跑</option>
+                        <option value="轻松跑">轻松跑</option>
+                        <option value="慢跑">慢跑</option>
+                        <option value="节奏跑">节奏跑</option>
+                        <option value="长距离">长距离</option>
+                        <option value="间歇跑">间歇跑</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label" for="edit-distance">距离 km</label>
+                    <input type="number" id="edit-distance" step="0.1" min="0" class="form-input-full">
+                </div>
+                <div>
+                    <label class="form-label" for="edit-pace">配速</label>
+                    <input type="text" id="edit-pace" placeholder="6:00" class="form-input-full">
+                </div>
+                <div>
+                    <label class="form-label" for="edit-completed">完成状态</label>
+                    <div class="modal-check-row">
+                        <input type="checkbox" id="edit-completed">
+                        <label for="edit-completed">已完成</label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button onclick="saveEdit()" class="btn btn-primary">保存</button>
+                <button onclick="closeEditModal()" class="btn btn-secondary">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 执行追踪面板 -->
+    <div id="execution-panel" class="exec-panel-overlay" style="display:none;">
+        <div class="exec-panel-card">
+            <div class="exec-panel-header">
+                <h3 id="exec-day-label">第 1 天 · 休息</h3>
+                <button class="exec-panel-close" onclick="ExecutionPanel.close()">
+                    <i data-lucide="x" style="width:16px;height:16px;"></i>
+                </button>
+            </div>
+            <div class="exec-panel-body">
+                <!-- 计划详情 -->
+                <div class="exec-panel-section">
+                    <div class="exec-panel-section-title">计划详情</div>
+                    <div class="exec-detail-list" id="exec-plan-detail"></div>
+                </div>
+                <!-- 实际执行表单 -->
+                <div class="exec-panel-section">
+                    <div class="exec-panel-section-title">实际执行</div>
+                    <div class="exec-form-row">
+                        <div class="exec-form-group">
+                            <label for="exec-actual-distance">实际距离 (km)</label>
+                            <input type="number" id="exec-actual-distance" step="0.01" min="0" placeholder="如 5.0">
+                        </div>
+                        <div class="exec-form-group">
+                            <label for="exec-actual-pace">实际配速 (分:秒)</label>
+                            <input type="text" id="exec-actual-pace" placeholder="如 6:30">
+                        </div>
+                    </div>
+                    <div class="exec-form-group">
+                        <label for="exec-actual-duration">实际时长 (分钟)</label>
+                        <input type="number" id="exec-actual-duration" step="0.1" min="0" placeholder="如 32.5">
+                    </div>
+                    <div class="exec-form-group">
+                        <label for="exec-feeling">训练感受（可选）</label>
+                        <textarea id="exec-feeling" placeholder="记录今天的训练感受..."></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="exec-panel-footer">
+                <button class="exec-btn exec-btn-secondary" onclick="ExecutionPanel.close()">取消</button>
+                <button class="exec-btn exec-btn-primary" id="exec-submit-btn" onclick="ExecutionPanel.submit()">
+                    <span id="exec-submit-text">标记完成</span>
+                </button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/plan_calendar.js"></script>
+<script src="/static/execution.js"></script>
+<script src="/static/upload.js"></script>
+<script>
+    // ============================================================
+    // 全局状态
+    // ============================================================
+    var completedDays = new Set();
+    var currentEditDay = null;
+    var allPlanDays = [];
+    var planTextData = '';
+    var chartUrlData = '';
+    var sourceData = '';
+
+    // ============================================================
+    // 外部函数桥接（upload.js 内部的函数通过 IIFE 导出到 window.COACH.upload）
+    // ============================================================
+    function updateTargetDist() {
+        if (window.COACH && window.COACH.upload && window.COACH.upload.updateTargetDist) {
+            window.COACH.upload.updateTargetDist();
+        }
+    }
+
+    function refreshData(e) {
+        if (window.COACH && window.COACH.upload && window.COACH.upload.refreshData) {
+            window.COACH.upload.refreshData(e);
+        }
+    }
+
+    // 手动填写面板折叠/展开
+    function toggleManualPanel() {
+        var panel = document.getElementById('manual-panel');
+        var header = document.getElementById('manual-panel-header');
+        var isOpen = panel.classList.toggle('open');
+        header.classList.toggle('open');
+        if (!isOpen) {
+            var icon = header.querySelector('.manual-panel-chevron');
+            if (icon) icon.style.transform = '';
+        }
+        lucide.createIcons();
+    }
+
+    // ============================================================
+    // 分步导航
+    // ============================================================
+    function goToStep(n) {
+        // 隐藏所有步骤
+        var contents = document.querySelectorAll('.step-content');
+        for (var i = 0; i < contents.length; i++) {
+            contents[i].classList.remove('active');
+        }
+        // 显示目标步骤
+        var target = document.getElementById('step-' + n);
+        if (target) target.classList.add('active');
+
+        // 更新指示器
+        var indicators = document.querySelectorAll('.step-indicator');
+        var lines = document.querySelectorAll('.step-line');
+        for (var j = 0; j < indicators.length; j++) {
+            var step = parseInt(indicators[j].getAttribute('data-step'));
+            indicators[j].classList.remove('active', 'done', 'bg-muted', 'text-muted-foreground');
+            if (step < n) {
+                indicators[j].classList.add('done');
+            } else if (step === n) {
+                indicators[j].classList.add('active');
+            } else {
+                indicators[j].classList.add('bg-muted', 'text-muted-foreground');
+            }
+        }
+        for (var k = 0; k < lines.length; k++) {
+            var lineStep = parseInt(lines[k].getAttribute('data-line'));
+            lines[k].classList.remove('done');
+            if (lineStep < n) {
+                lines[k].classList.add('done');
+            }
+        }
+
+        // 进入 Step 2 时填充确认摘要
+        if (n === 2) {
+            populateConfirmSummary();
+        }
+
+        lucide.createIcons();
+    }
+
+    // ============================================================
+    // Step 2：填充确认摘要
+    // ============================================================
+    function populateConfirmSummary() {
+        var raceEl = document.getElementById('target_race');
+        var race = raceEl ? (raceEl.options[raceEl.selectedIndex] ? raceEl.options[raceEl.selectedIndex].text : '-') : '-';
+        document.getElementById('confirm-race').textContent = race || '无特定目标';
+
+        var timeEl = document.getElementById('target_time');
+        document.getElementById('confirm-time').textContent = timeEl ? (timeEl.value || '-') : '-';
+
+        var durEl = document.getElementById('plan_duration');
+        var durVal = durEl ? durEl.value : '7';
+        var durLabel = durEl && durEl.options[durEl.selectedIndex] ? durEl.options[durEl.selectedIndex].text : (durVal + ' 天');
+        document.getElementById('confirm-duration').textContent = durLabel;
+
+        var filesEl = document.getElementById('files');
+        var fileCount = filesEl ? filesEl.files.length : 0;
+        document.getElementById('confirm-files').textContent = fileCount > 0 ? fileCount + ' 个文件' : '无';
+
+        var distEl = document.getElementById('target_distance');
+        document.getElementById('confirm-dist').textContent = distEl ? (distEl.value || '-') : '-';
+
+        var runDate = document.getElementById('run_date');
+        var runDist = document.getElementById('run_distance');
+        var runPace = document.getElementById('run_pace');
+        if (runDate && runDate.value && runDist && runDist.value) {
+            var runInfo = runDate.value + ' / ' + runDist.value + 'km';
+            if (runPace && runPace.value) runInfo += ' / ' + runPace.value;
+            document.getElementById('confirm-run').textContent = runInfo;
+        } else {
+            document.getElementById('confirm-run').textContent = '未填写';
+        }
+    }
+
+    // ============================================================
+    // Step 2：生成训练计划
+    // ============================================================
+    function generatePlan() {
+        var btn = document.getElementById('generate-btn');
+        var btnText = document.getElementById('generate-btn-text');
+        var btnSpinner = btn ? btn.querySelector('.btn-spinner') : null;
+        var sparkleIcon = btn ? btn.querySelector('[data-lucide="sparkles"]') : null;
+        var errorMsg = document.getElementById('error-msg');
+        var errorText = document.getElementById('error-text');
+        var skeletonArea = document.getElementById('skeleton-area');
+
+        var fd = (window.COACH && window.COACH.upload && window.COACH.upload.buildFormData)
+            ? window.COACH.upload.buildFormData()
+            : new FormData();
+
+        btn.disabled = true;
+        btn.classList.add('btn-loading');
+        if (btnText) btnText.textContent = '生成中...';
+        if (btnSpinner) btnSpinner.style.display = 'inline-block';
+        if (sparkleIcon) sparkleIcon.style.display = 'none';
+        if (errorMsg) errorMsg.style.display = 'none';
+
+        // 显示骨架屏
+        if (skeletonArea && window.DS && window.DS.renderSkeleton) {
+            skeletonArea.innerHTML = window.DS.renderSkeleton('list');
+            skeletonArea.style.display = 'block';
+        }
+
+        fetch('/generate', { method: 'POST', body: fd })
+            .then(function(resp) { return resp.json(); })
+            .then(function(data) {
+                if (skeletonArea) skeletonArea.style.display = 'none';
+
+                if (data.success) {
+                    planTextData = data.plan || '';
+                    chartUrlData = data.chart_url || '';
+                    sourceData = data.source || '';
+
+                    // 使用结构化数据渲染（优先），fallback 到文本解析
+                    var days;
+                    if (data.structured && data.structured.length > 0) {
+                        days = window.PlanCalendar.normalizeStructuredDays(data.structured);
+                    } else {
+                        days = window.PlanCalendar.parsePlan(planTextData);
+                    }
+                    allPlanDays = days;
+                    completedDays.clear();
+
+                    // 渲染 Step 3
+                    var calendar = document.getElementById('plan-calendar');
+                    if (calendar) window.PlanCalendar.renderCalendar(calendar, days);
+
+                    var planTextEl = document.getElementById('plan-text');
+                    if (planTextEl) planTextEl.textContent = planTextData;
+
+                    var chartImg = document.getElementById('pace-chart');
+                    if (chartImg && chartUrlData) chartImg.src = chartUrlData;
+
+                    var sourceBadge = document.getElementById('source-badge');
+                    if (sourceBadge) sourceBadge.textContent = '数据源：' + sourceData;
+
+                    updateCompletion();
+                    updatePlanSummary(days);
+
+                    // 自动保存
+                    savePlanToServer(days, planTextData, chartUrlData, sourceData);
+
+                    goToStep(3);
+                } else {
+                    if (errorText) errorText.textContent = data.error || '生成失败';
+                    if (errorMsg) errorMsg.style.display = 'flex';
+                    if (window.DS && window.DS.showToast) {
+                        window.DS.showToast('生成失败', 'error');
+                    }
+                }
+            })
+            .catch(function(e) {
+                if (skeletonArea) skeletonArea.style.display = 'none';
+                if (errorText) errorText.textContent = '请求失败：' + e.message;
+                if (errorMsg) errorMsg.style.display = 'flex';
+                if (window.DS && window.DS.showToast) {
+                    window.DS.showToast('生成失败', 'error');
+                }
+            })
+            .finally(function() {
+                btn.disabled = false;
+                btn.classList.remove('btn-loading');
+                if (btnText) btnText.textContent = '生成训练计划';
+                if (btnSpinner) btnSpinner.style.display = 'none';
+                if (sparkleIcon) sparkleIcon.style.display = '';
+                lucide.createIcons();
+            });
+    }
+
+    // ============================================================
+    // 自动保存计划到服务器
+    // ============================================================
+    function savePlanToServer(days, planText, chartUrl, source) {
+        var planData = {
+            days: days,
+            plan_text: planText,
+            chart_url: chartUrl,
+            source: source,
+            plan_duration: (document.getElementById('plan_duration') || {}).value || '7',
+            created_at: new Date().toISOString()
+        };
+        fetch('/api/plan/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(planData)
+        }).catch(function() {});
+    }
+
+    // ============================================================
+    // Step 3：完成率
+    // ============================================================
+    function updateCompletion() {
+        var total = document.querySelectorAll('.plan-day').length || allPlanDays.length || 7;
+        var done = completedDays.size;
+        var pct = total > 0 ? Math.round((done / total) * 100) : 0;
+        document.getElementById('completion-rate').textContent = done + '/' + total;
+        document.getElementById('completion-bar').style.width = pct + '%';
+    }
+
+    // 配速字符串 -> 秒（兼容 "6'30\"", "6'30", "6:30", "377"）
+    function parsePaceToSec(paceStr) {
+        if (!paceStr || typeof paceStr !== 'string') return null;
+        var cleaned = paceStr.replace(/['′]/g, ':').replace(/["″]/g, ':');
+        var parts = cleaned.split(':').filter(function(p) { return p !== ''; }).map(Number);
+        if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+            return parts[0] * 60 + parts[1];
+        }
+        var single = parseFloat(paceStr);
+        if (!isNaN(single)) return Math.round(single * 60);
+        return null;
+    }
+
+    // ============================================================
+    // Step 3：更新计划摘要
+    // ============================================================
+    function updatePlanSummary(days) {
+        var totalKm = 0, runDays = 0, restDays = 0, paceCount = 0, paceTotal = 0;
+        var typeCount = {};
+        days.forEach(function(d) {
+            var dist = parseFloat(d.distance) || 0;
+            totalKm += dist;
+            if (d.type === '休息') {
+                restDays++;
+            } else {
+                runDays++;
+                typeCount[d.type] = (typeCount[d.type] || 0) + 1;
+            }
+            if (d.target_pace_sec != null) {
+                paceTotal += parseFloat(d.target_pace_sec);
+                paceCount++;
+            } else if (d.pace) {
+                var p = parsePaceToSec(d.pace);
+                if (p != null) {
+                    paceTotal += p;
+                    paceCount++;
+                }
+            }
+        });
+        totalKm = Math.round(totalKm * 10) / 10;
+        document.getElementById('sum-total-km').textContent = totalKm || '-';
+        document.getElementById('sum-run-days').textContent = runDays;
+        document.getElementById('sum-rest-days').textContent = restDays;
+        if (paceCount > 0) {
+            var avgSec = Math.round(paceTotal / paceCount);
+            document.getElementById('sum-avg-pace').textContent = Math.floor(avgSec / 60) + ':' + ('0' + (avgSec % 60)).slice(-2);
+        } else {
+            document.getElementById('sum-avg-pace').textContent = '-';
+        }
+        document.getElementById('summary-badge').textContent = days.length + ' 天计划';
+        var tags = '';
+        var tagColors = { '节奏跑': 'rgba(198,255,31,0.15)', '间歇跑': 'rgba(255,140,0,0.15)', '长距离': 'rgba(100,149,237,0.15)', '轻松跑': 'rgba(144,238,144,0.15)', '慢跑': 'rgba(144,238,144,0.15)', '恢复跑': 'rgba(60,179,113,0.15)', '冲刺跑': 'rgba(255,69,0,0.15)', 'LSD': 'rgba(100,149,237,0.15)' };
+        for (var t in typeCount) {
+            var bg = tagColors[t] || 'rgba(255,255,255,0.1)';
+            var label = tagColors[t] ? t : '未分类';
+            tags += '<span class="summary-tag" style="background:' + bg + '">' + label + ' ×' + typeCount[t] + '</span>';
+        }
+        document.getElementById('sum-type-tags').innerHTML = tags || '<span style="font-size:var(--rc-text-xs);color:var(--rc-text-muted);">暂无训练安排</span>';
+    }
+
+    // ============================================================
+    // Step 3：编辑弹窗
+    // ============================================================
+    function openEditModal(day, type, pace, distance, completed) {
+        currentEditDay = day;
+        document.getElementById('edit-day-label').textContent = '第' + day + '天';
+        document.getElementById('edit-type').value = type || '休息';
+        document.getElementById('edit-distance').value = distance || '';
+        document.getElementById('edit-pace').value = pace || '';
+        document.getElementById('edit-completed').checked = completed || false;
+        var modal = document.getElementById('edit-modal');
+        modal.classList.add('open');
+        lucide.createIcons();
+    }
+
+    function closeEditModal() {
+        document.getElementById('edit-modal').classList.remove('open');
+        currentEditDay = null;
+    }
+
+    function saveEdit() {
+        if (!currentEditDay) {
+            // 没有打开的编辑弹窗 → 保存当前计划
+            saveAllDays();
+            return;
+        }
+
+        var type = document.getElementById('edit-type').value;
+        var distance = document.getElementById('edit-distance').value;
+        var pace = document.getElementById('edit-pace').value;
+        var completed = document.getElementById('edit-completed').checked;
+
+        if (completed) {
+            completedDays.add(currentEditDay);
+        } else {
+            completedDays.delete(currentEditDay);
+        }
+        updateCompletion();
+
+        var gridDay = document.querySelector('.plan-day[data-day="' + currentEditDay + '"]');
+        if (gridDay) {
+            var typeSpan = gridDay.querySelector('.plan-type');
+            var paceSpan = gridDay.querySelector('.plan-pace');
+            var distSpan = gridDay.querySelector('.plan-distance');
+            var checkIcon = gridDay.querySelector('[data-lucide="check-circle"]');
+            if (typeSpan) typeSpan.textContent = type;
+            if (paceSpan && pace) { paceSpan.textContent = pace; paceSpan.style.display = ''; }
+            if (distSpan && distance) { distSpan.textContent = distance + 'km'; distSpan.style.display = ''; }
+            if (completed) {
+                gridDay.classList.add('completed');
+            } else {
+                gridDay.classList.remove('completed');
+                if (checkIcon) checkIcon.remove();
+            }
+        }
+
+        // 更新 allPlanDays
+        for (var i = 0; i < allPlanDays.length; i++) {
+            if (allPlanDays[i].day === currentEditDay) {
+                allPlanDays[i].type = type;
+                allPlanDays[i].pace = pace;
+                allPlanDays[i].distance = distance;
+                allPlanDays[i].completed = completed;
+                break;
+            }
+        }
+
+        updatePlanSummary(allPlanDays);
+        saveAllDays();
+        closeEditModal();
+    }
+
+    function saveAllDays() {
+        var days = [];
+        var dayEls = document.querySelectorAll('.plan-day');
+        dayEls.forEach(function(el) {
+            var dayNum = parseInt(el.getAttribute('data-day'));
+            var typeEl = el.querySelector('.plan-type');
+            var paceEl = el.querySelector('.plan-pace');
+            var distEl = el.querySelector('.plan-distance');
+            days.push({
+                day: dayNum,
+                type: typeEl ? typeEl.textContent : '休息',
+                pace: paceEl ? paceEl.textContent : '',
+                distance: distEl ? distEl.textContent.replace('km', '') : '',
+                completed: completedDays.has(dayNum)
+            });
+        });
+
+        fetch('/api/plan/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ days: days })
+        }).then(function(resp) { return resp.json(); })
+          .then(function(data) {
+              if (data.success && window.DS && window.DS.showToast) {
+                  window.DS.showToast('计划已保存', 'success');
+              }
+          }).catch(function() {});
+    }
+
+    // ============================================================
+    // 事件监听
+    // ============================================================
+
+    // 监听 plan-day-click 事件（来自 plan_calendar.js）
+    document.addEventListener('plan-day-click', function(e) {
+        var d = e.detail;
+        if (window.ExecutionPanel) {
+            window.ExecutionPanel.open(d);
+        } else {
+            openEditModal(d.day, d.type, d.pace, d.distance, completedDays.has(d.day));
+        }
+    });
+
+    // 监听 execution-saved 事件（来自 execution.js，标记完成后刷新）
+    document.addEventListener('execution-saved', function(e) {
+        var updatedPlan = e.detail.plan;
+        if (updatedPlan && updatedPlan.length > 0) {
+            var days = window.PlanCalendar.normalizeStructuredDays(updatedPlan);
+            allPlanDays = days;
+            completedDays.clear();
+            days.forEach(function(d) {
+                if (d.completed) completedDays.add(d.day);
+            });
+            updateCompletion();
+            updatePlanSummary(days);
+        }
+    });
+
+    // ============================================================
+    // 页面加载：自动恢复已保存计划
+    // ============================================================
+    function loadSavedPlan() {
+        fetch('/api/plan/load')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.plan && data.plan.length > 0) {
+                    allPlanDays = data.plan;
+                    completedDays.clear();
+                    data.plan.forEach(function(d) {
+                        if (d.completed) completedDays.add(d.day);
+                    });
+
+                    var normalizedDays = window.PlanCalendar.normalizeStructuredDays(data.plan);
+
+                    var calendar = document.getElementById('plan-calendar');
+                    if (calendar) window.PlanCalendar.renderCalendar(calendar, data.plan);
+
+                    updateCompletion();
+                    updatePlanSummary(normalizedDays);
+
+                    var sourceBadge = document.getElementById('source-badge');
+                    if (sourceBadge) sourceBadge.textContent = '已保存的计划';
+
+                    var planTextEl = document.getElementById('plan-text');
+                    if (planTextEl && data.meta && data.meta.generated_at) {
+                        planTextEl.textContent = '上次生成：' + data.meta.generated_at;
+                    }
+
+                    // 恢复计划周期
+                    if (data.meta && data.meta.plan_duration) {
+                        var durEl = document.getElementById('plan_duration');
+                        if (durEl) durEl.value = String(data.meta.plan_duration);
+                    }
+
+                    // 恢复配速图表
+                    var chartImg = document.getElementById('pace-chart');
+                    if (chartImg && data.meta && data.meta.chart_url) {
+                        chartImg.src = data.meta.chart_url;
+                    }
+
+                    goToStep(3);
+                }
+            })
+            .catch(function() {});
+    }
+
+    // 页面加载后执行
+    document.addEventListener('DOMContentLoaded', function() {
+        loadSavedPlan();
+        lucide.createIcons();
+    });
+</script>
+{% endblock %}

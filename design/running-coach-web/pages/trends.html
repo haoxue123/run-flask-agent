@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>长期趋势</title>
+    <style id="theme-vars">
+/* Running Coach Agent — Sunrise/Moonlight warm-cool dual theme
+   Day (light) = warm cream + sunrise amber; Night (dark) = deep indigo + moonlight mint.
+   Accent-only discipline: ≤8% screen, never body text / large fill / chart grid.
+   Dark is default primary mode. Time-aware ambient layer, physically isolated. */
+/* 主色角色约束：accent-only —— 用于主 CTA、选中态、关键数据强调、focus ring；
+   禁止作正文文字色、禁止作大面积背景填充、禁止作图表网格线。
+   每模式同屏主色像素占比 ≤8%，不出现 >120px 连续主色色块。 */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&display=swap');
+
+:root {
+  /* ===== day / sunrise (light) ===== */
+  --rc-background: #FAF6EF;
+  --rc-card: #FFFFFF;
+  --rc-card-foreground: #1F1410;
+  --rc-popover: #FFFFFF;
+  --rc-popover-foreground: #1F1410;
+  --rc-muted: #F0E9DD;
+  --rc-muted-foreground: #6B5D52;
+  --rc-foreground: #1F1410;
+
+  --rc-primary: #B45309;
+  --rc-primary-strong: #7C2D12;
+  --rc-primary-foreground: #FFFFFF;
+
+  --rc-destructive: #B91C1C;
+  --rc-destructive-foreground: #FFFFFF;
+  --state-success: #15803D;
+  --state-warning: #A16207;
+  --state-error: #B91C1C;
+  --state-info: #1D4ED8;
+
+  --rc-zone-1: #FEF3E2;
+  --rc-zone-2: #FDE0A6;
+  --rc-zone-3: #F5B454;
+  --rc-zone-4: #D97706;
+  --rc-zone-5: #7C2D12;
+
+  --rc-border: rgba(31,20,16,0.12);
+  --rc-chart-grid: rgba(31,20,16,0.08);
+  --rc-input: #F0E9DD;
+  --rc-ring: #B45309;
+
+  --rc-chart-1: #B45309;
+  --rc-chart-2: #C2410C;
+  --rc-chart-3: #D97706;
+  --rc-chart-4: #9A3412;
+  --rc-chart-5: #7C2D12;
+
+  --rc-sidebar: #F3EBDD;
+  --rc-sidebar-foreground: #1F1410;
+  --rc-sidebar-primary: #B45309;
+  --rc-sidebar-primary-foreground: #FFFFFF;
+  --rc-sidebar-accent: #F0E9DD;
+  --rc-sidebar-accent-foreground: #1F1410;
+  --rc-sidebar-border: rgba(31,20,16,0.10);
+  --rc-sidebar-ring: #B45309;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-serif: 'Inter Tight', 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --rc-font-display: 'Inter Tight', 'Inter', -apple-system, sans-serif;
+
+  --rc-radius: 8px; --rc-radius-sm: 4px; --rc-radius-md: 8px; --rc-radius-lg: 12px;
+  --rc-radius-small: 4px; --rc-radius-medium: 8px; --rc-radius-large: 12px; --rc-radius-full: 9999px;
+  --rc-spacing: 0.25rem;
+
+  --rc-shadow-x: 0px; --rc-shadow-y: 1px; --rc-shadow-blur: 2px; --rc-shadow-spread: 0px;
+  --rc-shadow-opacity: 0.04; --rc-shadow-color: rgba(0,0,0,0.04);
+  --rc-shadow-2xs: 0 1px 2px 0 rgba(0,0,0,0.04);
+  --rc-shadow-xs: 0 1px 2px 0 rgba(0,0,0,0.04);
+  --rc-shadow-sm: 0 1px 3px 0 rgba(0,0,0,0.04), 0 1px 2px -1px rgba(0,0,0,0.04);
+  --rc-shadow: 0 2px 4px -1px rgba(0,0,0,0.04), 0 1px 3px -1px rgba(0,0,0,0.04);
+  --rc-shadow-md: 0 4px 8px -2px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05);
+  --rc-shadow-lg: 0 8px 16px -4px rgba(0,0,0,0.08), 0 4px 8px -4px rgba(0,0,0,0.06);
+  --rc-shadow-xl: 0 16px 32px -8px rgba(0,0,0,0.10), 0 8px 16px -8px rgba(0,0,0,0.08);
+  --rc-shadow-2xl: 0 24px 48px -12px rgba(0,0,0,0.12);
+
+  --rc-tracking-tight: -0.02em; --rc-tracking-normal: -0.01em;
+
+  --rc-orb-glow: 0 0 16px rgba(180,83,9,0.35);
+  --rc-logo-glow: 0 0 12px rgba(180,83,9,0.30);
+  --rc-orb-highlight: #FDE0A6;
+  --rc-orb-shadow: #7C2D12;
+
+  --rc-ambient-dawn:  linear-gradient(90deg, transparent 0%, rgba(217,119,6,0.07) 50%, transparent 100%);
+  --rc-ambient-noon:  linear-gradient(180deg, rgba(255,247,237,0) 0%, rgba(255,247,237,0) 100%);
+  --rc-ambient-dusk:  linear-gradient(90deg, transparent 0%, rgba(194,65,12,0.06) 50%, transparent 100%);
+  --rc-ambient-night: radial-gradient(circle at 20% 30%, rgba(180,83,9,0.05) 0%, transparent 60%);
+}
+
+.dark {
+  /* ===== night / moonlight (dark, default primary) ===== */
+  --rc-background: #0B1020;
+  --rc-card: #131A2E;
+  --rc-card-foreground: #E8EDF5;
+  --rc-popover: #131A2E;
+  --rc-popover-foreground: #E8EDF5;
+  --rc-muted: #1A2238;
+  --rc-muted-foreground: #8B97B0;
+  --rc-foreground: #E8EDF5;
+
+  --rc-primary: #5EEAD4;
+  --rc-primary-foreground: #0B1020;
+  --rc-primary-strong: var(--rc-primary);
+
+  --rc-destructive: #F87171;
+  --rc-destructive-foreground: #0B1020;
+  --state-success: #4ADE80;
+  --state-warning: #FBBF24;
+  --state-error: #F87171;
+  --state-info: #60A5FA;
+
+  --rc-zone-1: #0A2A33;
+  --rc-zone-2: #0E4D52;
+  --rc-zone-3: #14857F;
+  --rc-zone-4: #2DD4BF;
+  --rc-zone-5: #5EEAD4;
+
+  --rc-border: rgba(232,237,245,0.08);
+  --rc-chart-grid: rgba(232,237,245,0.06);
+  --rc-input: #1A2238;
+  --rc-ring: #5EEAD4;
+
+  --rc-chart-1: #5EEAD4;
+  --rc-chart-2: #22D3EE;
+  --rc-chart-3: #14B8A6;
+  --rc-chart-4: #38BDF8;
+  --rc-chart-5: #7DD3FC;
+
+  --rc-sidebar: #090E1C;
+  --rc-sidebar-foreground: #E8EDF5;
+  --rc-sidebar-primary: #5EEAD4;
+  --rc-sidebar-primary-foreground: #0B1020;
+  --rc-sidebar-accent: #1A2238;
+  --rc-sidebar-accent-foreground: #E8EDF5;
+  --rc-sidebar-border: rgba(232,237,245,0.07);
+  --rc-sidebar-ring: #5EEAD4;
+
+  --rc-shadow-color: rgba(0,0,0,0.04);
+  --rc-shadow-2xs: 0 1px 2px 0 rgba(0,0,0,0.04);
+  --rc-shadow-xs: 0 1px 2px 0 rgba(0,0,0,0.04);
+  --rc-shadow-sm: 0 1px 3px 0 rgba(0,0,0,0.04), 0 1px 2px -1px rgba(0,0,0,0.04);
+  --rc-shadow: 0 2px 4px -1px rgba(0,0,0,0.04), 0 1px 3px -1px rgba(0,0,0,0.04);
+  --rc-shadow-md: 0 4px 8px -2px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05);
+  --rc-shadow-lg: 0 8px 16px -4px rgba(0,0,0,0.10), 0 4px 8px -4px rgba(0,0,0,0.08);
+  --rc-shadow-xl: 0 16px 32px -8px rgba(0,0,0,0.14), 0 8px 16px -8px rgba(0,0,0,0.10);
+  --rc-shadow-2xl: 0 24px 48px -12px rgba(0,0,0,0.18);
+
+  --rc-orb-glow: 0 0 28px rgba(94,234,212,0.50), 0 0 56px rgba(94,234,212,0.22);
+  --rc-logo-glow: 0 0 14px rgba(94,234,212,0.38);
+  --rc-orb-highlight: #A7F3D0;
+  --rc-orb-shadow: #0F4A45;
+
+  --rc-ambient-dawn:  linear-gradient(90deg, transparent 0%, rgba(94,234,212,0.07) 50%, transparent 100%);
+  --rc-ambient-noon:  linear-gradient(180deg, rgba(11,16,32,0) 0%, rgba(11,16,32,0) 100%);
+  --rc-ambient-dusk:  linear-gradient(90deg, transparent 0%, rgba(34,211,238,0.06) 50%, transparent 100%);
+  --rc-ambient-night: radial-gradient(circle at 20% 30%, rgba(94,234,212,0.07) 0%, transparent 60%);
+}
+
+.font-display { font-family: var(--rc-font-display); }
+.tnum { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+
+/* ===== coach orb — warm by day, cool by night (token-driven) ===== */
+.coach-orb {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--rc-radius-full);
+  background: radial-gradient(circle at 35% 30%, var(--rc-orb-highlight) 0%, var(--rc-primary) 45%, var(--rc-orb-shadow) 100%);
+  box-shadow: var(--rc-orb-glow);
+  animation: orb-breathe 3.6s ease-in-out infinite;
+}
+.coach-orb::after {
+  content: ''; position: absolute; inset: -6px; border-radius: var(--rc-radius-full);
+  border: 1px solid var(--rc-primary); opacity: 0.4; animation: orb-ripple 3.6s ease-out infinite;
+}
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 24px color-mix(in srgb, var(--rc-primary) 40%, transparent); }
+  50%      { transform: scale(1.04); box-shadow: 0 0 36px color-mix(in srgb, var(--rc-primary) 65%, transparent); }
+}
+@keyframes orb-ripple { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(1.35); opacity: 0; } }
+.coach-orb.is-thinking { animation-duration: 1.6s; }
+.coach-orb.is-thinking::after { animation-duration: 1.2s; }
+.coach-orb.is-speaking { animation: orb-speak 0.9s ease-in-out infinite; }
+@keyframes orb-speak { 0%,100%{transform:scale(1);} 25%{transform:scale(1.06);} 50%{transform:scale(0.98);} 75%{transform:scale(1.05);} }
+.coach-orb.is-alert { animation: orb-alert 0.7s ease-in-out infinite; }
+@keyframes orb-alert {
+  0%,100% { box-shadow: 0 0 24px color-mix(in srgb, var(--rc-destructive) 45%, transparent); }
+  50%     { box-shadow: 0 0 40px color-mix(in srgb, var(--rc-destructive) 85%, transparent); }
+}
+
+/* ===== ambient atmosphere layer (physically isolated, z-index 0) ===== */
+.ambient-layer {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: var(--rc-ambient-night); transition: background 1.2s ease; will-change: background-position;
+}
+.ambient-layer.is-dawn  { background: var(--rc-ambient-dawn);  animation: ambient-drift-x 14s ease-in-out infinite; }
+.ambient-layer.is-noon  { background: var(--rc-ambient-noon); }
+.ambient-layer.is-dusk  { background: var(--rc-ambient-dusk);  animation: ambient-drift-x 14s ease-in-out infinite; }
+.ambient-layer.is-night { background: var(--rc-ambient-night); animation: ambient-drift-y 18s ease-in-out infinite; }
+@keyframes ambient-drift-x { 0%,100%{background-position:0% 50%;} 50%{background-position:20% 50%;} }
+@keyframes ambient-drift-y { 0%,100%{background-position:50% 30%;opacity:0.9;} 50%{background-position:50% 35%;opacity:1;} }
+@media (prefers-reduced-motion: reduce) {
+  .ambient-layer, .ambient-layer.is-dawn, .ambient-layer.is-dusk, .ambient-layer.is-night { animation: none; }
+}
+
+/* ===== accent glow utilities (token-driven; renamed from glow-lime-*) ===== */
+.glow-accent-sm { box-shadow: 0 0 8px color-mix(in srgb, var(--rc-primary) 30%, transparent); }
+.glow-accent-md { box-shadow: 0 0 12px color-mix(in srgb, var(--rc-primary) 35%, transparent), 0 0 24px color-mix(in srgb, var(--rc-primary) 15%, transparent); }
+
+/* ===== theme toggle ===== */
+.theme-toggle {
+  width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--rc-radius-md); color: var(--rc-muted-foreground);
+  background: transparent; border: 1px solid transparent; cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.theme-toggle:hover { background: var(--rc-muted); color: var(--rc-foreground); }
+.theme-toggle:focus-visible { outline: 2px solid var(--rc-ring); outline-offset: 2px; }
+</style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--rc-background);
+    --color-foreground: var(--rc-foreground);
+    --color-card: var(--rc-card);
+    --color-card-foreground: var(--rc-card-foreground);
+    --color-popover: var(--rc-popover);
+    --color-popover-foreground: var(--rc-popover-foreground);
+    --color-primary: var(--rc-primary);
+    --color-primary-foreground: var(--rc-primary-foreground);
+    --color-muted: var(--rc-muted);
+    --color-muted-foreground: var(--rc-muted-foreground);
+    --color-destructive: var(--rc-destructive);
+    --color-destructive-foreground: var(--rc-destructive-foreground);
+    --color-border: var(--rc-border);
+    --color-input: var(--rc-input);
+    --color-ring: var(--rc-ring);
+    --color-chart-1: var(--rc-chart-1);
+    --color-chart-2: var(--rc-chart-2);
+    --color-chart-3: var(--rc-chart-3);
+    --color-chart-4: var(--rc-chart-4);
+    --color-chart-5: var(--rc-chart-5);
+    --color-sidebar: var(--rc-sidebar);
+    --color-sidebar-foreground: var(--rc-sidebar-foreground);
+    --color-sidebar-primary: var(--rc-sidebar-primary);
+    --color-sidebar-primary-foreground: var(--rc-sidebar-primary-foreground);
+    --color-sidebar-accent: var(--rc-sidebar-accent);
+    --color-sidebar-accent-foreground: var(--rc-sidebar-accent-foreground);
+    --radius-sm: var(--rc-radius-sm);
+    --radius-md: var(--rc-radius-md);
+    --radius-lg: var(--rc-radius-lg);
+  }
+  @layer base {
+    body { background: var(--rc-background); color: var(--rc-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--rc-background); }
+      .text-background { color: var(--rc-background); }
+      .border-background { border-color: var(--rc-background); }
+      .ring-background { --tw-ring-color: var(--rc-background); }
+      .bg-foreground { background-color: var(--rc-foreground); }
+      .text-foreground { color: var(--rc-foreground); }
+      .border-foreground { border-color: var(--rc-foreground); }
+      .ring-foreground { --tw-ring-color: var(--rc-foreground); }
+      .bg-card { background-color: var(--rc-card); }
+      .text-card { color: var(--rc-card); }
+      .border-card { border-color: var(--rc-card); }
+      .ring-card { --tw-ring-color: var(--rc-card); }
+      .bg-card-foreground { background-color: var(--rc-card-foreground); }
+      .text-card-foreground { color: var(--rc-card-foreground); }
+      .border-card-foreground { border-color: var(--rc-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--rc-card-foreground); }
+      .bg-popover { background-color: var(--rc-popover); }
+      .text-popover { color: var(--rc-popover); }
+      .border-popover { border-color: var(--rc-popover); }
+      .ring-popover { --tw-ring-color: var(--rc-popover); }
+      .bg-popover-foreground { background-color: var(--rc-popover-foreground); }
+      .text-popover-foreground { color: var(--rc-popover-foreground); }
+      .border-popover-foreground { border-color: var(--rc-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--rc-popover-foreground); }
+      .bg-primary { background-color: var(--rc-primary); }
+      .text-primary { color: var(--rc-primary); }
+      .border-primary { border-color: var(--rc-primary); }
+      .ring-primary { --tw-ring-color: var(--rc-primary); }
+      .bg-primary-foreground { background-color: var(--rc-primary-foreground); }
+      .text-primary-foreground { color: var(--rc-primary-foreground); }
+      .border-primary-foreground { border-color: var(--rc-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--rc-primary-foreground); }
+      .bg-muted { background-color: var(--rc-muted); }
+      .text-muted { color: var(--rc-muted); }
+      .border-muted { border-color: var(--rc-muted); }
+      .ring-muted { --tw-ring-color: var(--rc-muted); }
+      .bg-muted-foreground { background-color: var(--rc-muted-foreground); }
+      .text-muted-foreground { color: var(--rc-muted-foreground); }
+      .border-muted-foreground { border-color: var(--rc-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--rc-muted-foreground); }
+      .bg-destructive { background-color: var(--rc-destructive); }
+      .text-destructive { color: var(--rc-destructive); }
+      .border-destructive { border-color: var(--rc-destructive); }
+      .ring-destructive { --tw-ring-color: var(--rc-destructive); }
+      .bg-destructive-foreground { background-color: var(--rc-destructive-foreground); }
+      .text-destructive-foreground { color: var(--rc-destructive-foreground); }
+      .border-destructive-foreground { border-color: var(--rc-destructive-foreground); }
+      .ring-destructive-foreground { --tw-ring-color: var(--rc-destructive-foreground); }
+      .bg-border { background-color: var(--rc-border); }
+      .text-border { color: var(--rc-border); }
+      .border-border { border-color: var(--rc-border); }
+      .ring-border { --tw-ring-color: var(--rc-border); }
+      .bg-input { background-color: var(--rc-input); }
+      .text-input { color: var(--rc-input); }
+      .border-input { border-color: var(--rc-input); }
+      .ring-input { --tw-ring-color: var(--rc-input); }
+      .bg-ring { background-color: var(--rc-ring); }
+      .text-ring { color: var(--rc-ring); }
+      .border-ring { border-color: var(--rc-ring); }
+      .ring-ring { --tw-ring-color: var(--rc-ring); }
+      .bg-chart-1 { background-color: var(--rc-chart-1); }
+      .text-chart-1 { color: var(--rc-chart-1); }
+      .border-chart-1 { border-color: var(--rc-chart-1); }
+      .ring-chart-1 { --tw-ring-color: var(--rc-chart-1); }
+      .bg-chart-2 { background-color: var(--rc-chart-2); }
+      .text-chart-2 { color: var(--rc-chart-2); }
+      .border-chart-2 { border-color: var(--rc-chart-2); }
+      .ring-chart-2 { --tw-ring-color: var(--rc-chart-2); }
+      .bg-chart-3 { background-color: var(--rc-chart-3); }
+      .text-chart-3 { color: var(--rc-chart-3); }
+      .border-chart-3 { border-color: var(--rc-chart-3); }
+      .ring-chart-3 { --tw-ring-color: var(--rc-chart-3); }
+      .bg-chart-4 { background-color: var(--rc-chart-4); }
+      .text-chart-4 { color: var(--rc-chart-4); }
+      .border-chart-4 { border-color: var(--rc-chart-4); }
+      .ring-chart-4 { --tw-ring-color: var(--rc-chart-4); }
+      .bg-chart-5 { background-color: var(--rc-chart-5); }
+      .text-chart-5 { color: var(--rc-chart-5); }
+      .border-chart-5 { border-color: var(--rc-chart-5); }
+      .ring-chart-5 { --tw-ring-color: var(--rc-chart-5); }
+      .bg-sidebar { background-color: var(--rc-sidebar); }
+      .text-sidebar { color: var(--rc-sidebar); }
+      .border-sidebar { border-color: var(--rc-sidebar); }
+      .ring-sidebar { --tw-ring-color: var(--rc-sidebar); }
+      .bg-sidebar-foreground { background-color: var(--rc-sidebar-foreground); }
+      .text-sidebar-foreground { color: var(--rc-sidebar-foreground); }
+      .border-sidebar-foreground { border-color: var(--rc-sidebar-foreground); }
+      .ring-sidebar-foreground { --tw-ring-color: var(--rc-sidebar-foreground); }
+      .bg-sidebar-primary { background-color: var(--rc-sidebar-primary); }
+      .text-sidebar-primary { color: var(--rc-sidebar-primary); }
+      .border-sidebar-primary { border-color: var(--rc-sidebar-primary); }
+      .ring-sidebar-primary { --tw-ring-color: var(--rc-sidebar-primary); }
+      .bg-sidebar-primary-foreground { background-color: var(--rc-sidebar-primary-foreground); }
+      .text-sidebar-primary-foreground { color: var(--rc-sidebar-primary-foreground); }
+      .border-sidebar-primary-foreground { border-color: var(--rc-sidebar-primary-foreground); }
+      .ring-sidebar-primary-foreground { --tw-ring-color: var(--rc-sidebar-primary-foreground); }
+      .bg-sidebar-accent { background-color: var(--rc-sidebar-accent); }
+      .text-sidebar-accent { color: var(--rc-sidebar-accent); }
+      .border-sidebar-accent { border-color: var(--rc-sidebar-accent); }
+      .ring-sidebar-accent { --tw-ring-color: var(--rc-sidebar-accent); }
+      .bg-sidebar-accent-foreground { background-color: var(--rc-sidebar-accent-foreground); }
+      .text-sidebar-accent-foreground { color: var(--rc-sidebar-accent-foreground); }
+      .border-sidebar-accent-foreground { border-color: var(--rc-sidebar-accent-foreground); }
+      .ring-sidebar-accent-foreground { --tw-ring-color: var(--rc-sidebar-accent-foreground); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <!-- ambient atmosphere layer — 时段氛围层（z-index 0，物理隔离功能层）-->
+    <div class="ambient-layer is-night" data-ambient="auto"></div>
+    <main class="relative z-10">
+      <!-- ============ TOP NAV ============ -->
+            <header class="sticky top-0 z-40 h-14 border-b border-[color:var(--rc-border)] bg-[color:var(--rc-background)]">
+        <div class="flex items-center justify-between h-full px-6">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-[color:var(--rc-primary)] flex items-center justify-center" style="box-shadow:var(--rc-logo-glow)">
+              <i data-lucide="activity" class="w-[18px] h-[18px]" style="color:var(--rc-primary-foreground)"></i>
+            </div>
+            <span class="font-display text-[15px] font-semibold tracking-tight text-[color:var(--rc-foreground)]">跑步教练</span>
+            <span class="text-[11px] tnum text-[color:var(--rc-muted-foreground)] border border-[color:var(--rc-border)] rounded px-1.5 py-0.5">Web</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button class="theme-toggle" data-theme-toggle aria-label="切换明暗模式">
+              <i data-lucide="sun" class="w-[18px] h-[18px] hidden dark:inline-block"></i>
+              <i data-lucide="moon" class="w-[18px] h-[18px] inline-block dark:hidden"></i>
+            </button>
+            <div data-search-wrap class="flex items-center">
+              <input data-search-input type="text" placeholder="搜索跑步数据…" class="h-9 rounded-lg bg-[color:var(--rc-muted)] border border-[color:var(--rc-border)] text-[13px] text-[color:var(--rc-foreground)] placeholder:text-[color:var(--rc-muted-foreground)] px-3 w-0 opacity-0 overflow-hidden transition-all duration-200 outline-none" />
+              <button data-search-btn class="w-9 h-9 rounded-lg flex items-center justify-center text-[color:var(--rc-muted-foreground)] hover:bg-[color:var(--rc-muted)] hover:text-[color:var(--rc-foreground)] transition-colors shrink-0">
+                <i data-lucide="search" class="w-[18px] h-[18px]"></i>
+              </button>
+            </div>
+            <button class="relative w-9 h-9 rounded-lg flex items-center justify-center text-[color:var(--rc-muted-foreground)] hover:bg-[color:var(--rc-muted)] hover:text-[color:var(--rc-foreground)] transition-colors">
+              <i data-lucide="bell" class="w-[18px] h-[18px]"></i>
+              <span class="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-[color:var(--rc-primary)]"></span>
+            </button>
+            <div class="w-px h-6 bg-[color:var(--rc-border)] mx-1"></div>
+            <div class="flex items-center gap-2.5 pl-1 pr-2.5 py-1 rounded-lg hover:bg-[color:var(--rc-muted)] cursor-pointer transition-colors">
+              <div class="w-7 h-7 rounded-full bg-[color:var(--rc-muted)] flex items-center justify-center text-[12px] font-semibold text-[color:var(--rc-foreground)]">林</div>
+              <span class="text-[13px] font-medium text-[color:var(--rc-foreground)]">林深</span>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-[color:var(--rc-muted-foreground)]"></i>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- ============ SHELL: SIDEBAR + MAIN ============ -->
+      <div class="flex">
+        <aside class="w-60 shrink-0 border-r border-[color:var(--rc-sidebar-border)] bg-[color:var(--rc-sidebar)] h-[calc(100vh-3.5rem)] sticky top-14"><nav class="p-3 space-y-4">
+          <div>
+            <div class="px-3 mb-1 text-[11px] font-medium uppercase tracking-wider text-[color:var(--rc-muted-foreground)]">数据</div>
+            <div class="space-y-1">
+              <a data-nav-key="dashboard" data-dom-id="nav-dashboard" class="flex items-center gap-3 px-3 h-10 rounded-lg text-[color:var(--rc-sidebar-foreground)] hover:bg-[color:var(--rc-sidebar-accent)] text-sm"><i data-lucide="layout-dashboard" class="w-[18px] h-[18px] shrink-0"></i><span>总览</span></a><a data-nav-key="analysis" data-dom-id="nav-analysis" class="flex items-center gap-3 px-3 h-10 rounded-lg text-[color:var(--rc-sidebar-foreground)] hover:bg-[color:var(--rc-sidebar-accent)] text-sm"><i data-lucide="bar-chart-3" class="w-[18px] h-[18px] shrink-0"></i><span>分析</span></a><a data-nav-key="trends" data-active="true" data-dom-id="nav-trends" class="relative before:content-[''] before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[2px] before:rounded-full before:bg-[color:var(--rc-primary)] flex items-center gap-3 px-3 h-10 rounded-lg bg-[color:var(--rc-sidebar-accent)] text-[color:var(--rc-primary)] font-medium text-sm"><i data-lucide="trending-up" class="w-[18px] h-[18px] shrink-0"></i><span>趋势</span></a>
+            </div>
+          </div>
+          <div>
+            <div class="px-3 mb-1 text-[11px] font-medium uppercase tracking-wider text-[color:var(--rc-muted-foreground)]">规划</div>
+            <div class="space-y-1">
+              <a data-nav-key="training" data-dom-id="nav-training" class="flex items-center gap-3 px-3 h-10 rounded-lg text-[color:var(--rc-sidebar-foreground)] hover:bg-[color:var(--rc-sidebar-accent)] text-sm"><i data-lucide="calendar-days" class="w-[18px] h-[18px] shrink-0"></i><span>计划</span></a><a data-nav-key="coach" data-dom-id="nav-coach" class="flex items-center gap-3 px-3 h-10 rounded-lg text-[color:var(--rc-sidebar-foreground)] hover:bg-[color:var(--rc-sidebar-accent)] text-sm"><i data-lucide="message-circle" class="w-[18px] h-[18px] shrink-0"></i><span>教练</span></a>
+            </div>
+          </div>
+        </nav>
+          <div class="absolute bottom-0 left-0 right-0 p-3">
+            <div class="rounded-lg border border-[color:var(--rc-sidebar-border)] bg-[color:var(--rc-card)] p-3">
+              <div class="flex items-center gap-2.5">
+                <div class="coach-orb w-8 h-8"></div>
+                <div class="min-w-0 flex-1">
+                  <div class="text-[12px] font-medium text-[color:var(--rc-foreground)] truncate">教练在线</div>
+                  <div class="text-[11px] text-[color:var(--rc-muted-foreground)] truncate">趋势异常时主动提醒</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- ===== MAIN CONTENT ===== -->
+        <div class="flex-1 min-w-0">
+          <div class="max-w-7xl mx-auto px-6 py-8">
+
+            <!-- page header + period switch -->
+            <div class="flex items-end justify-between gap-4 mb-6">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 mb-1.5">
+                  <i data-lucide="trending-up" class="w-4 h-4 text-[color:var(--rc-primary)]"></i>
+                  <span class="text-[12px] font-medium tnum text-[color:var(--rc-muted-foreground)]">长期视角 · 数据驱动 · 对比清晰</span>
+                </div>
+                <h1 class="font-display text-[32px] font-bold leading-tight tracking-tight text-[color:var(--rc-foreground)]" style="text-wrap:balance;word-break:keep-all;overflow-wrap:break-word;">长期趋势</h1>
+                <p class="text-[13px] text-[color:var(--rc-muted-foreground)] mt-1 truncate">配速 / 跑量 / VO2max / 训练负荷 长期走势与周期对比</p>
+              </div>
+              <div class="flex items-center gap-1 p-1 rounded-lg bg-[color:var(--rc-muted)] border border-[color:var(--rc-border)] shrink-0">
+                <button class="px-3 h-8 rounded-md text-[13px] font-medium text-[color:var(--rc-muted-foreground)] hover:text-[color:var(--rc-foreground)] transition-colors tnum">7天</button>
+                <button class="px-3 h-8 rounded-md text-[13px] font-medium bg-[color:var(--rc-primary)] text-[color:var(--rc-primary-foreground)] transition-colors tnum">30天</button>
+                <button class="px-3 h-8 rounded-md text-[13px] font-medium text-[color:var(--rc-muted-foreground)] hover:text-[color:var(--rc-foreground)] transition-colors tnum">90天</button>
+                <button class="px-3 h-8 rounded-md text-[13px] font-medium text-[color:var(--rc-muted-foreground)] hover:text-[color:var(--rc-foreground)] transition-colors tnum">1年</button>
+              </div>
+            </div>
+
+            <!-- comparison insight strip -->
+            <div class="flex items-center gap-3 rounded-xl border border-[color:var(--rc-border)] bg-[color:var(--rc-card)] px-5 py-3.5 mb-5">
+              <i data-lucide="bar-chart-3" class="w-4 h-4 text-[color:var(--rc-primary)] shrink-0"></i>
+              <p class="text-[13px] text-[color:var(--rc-muted-foreground)] truncate">
+                <span class="text-[color:var(--rc-foreground)] font-medium">本期 30 天 vs 上期</span>
+                <span class="mx-2 text-[color:var(--rc-border)]">|</span>
+                配速 <span class="tnum font-medium" style="color:var(--state-success)">↓3.2%</span>
+                <span class="mx-1.5 text-[color:var(--rc-border)]">·</span>
+                跑量 <span class="tnum font-medium" style="color:var(--state-success)">↑8.4%</span>
+                <span class="mx-1.5 text-[color:var(--rc-border)]">·</span>
+                VO2max <span class="tnum font-medium" style="color:var(--state-success)">+1.6</span>
+                <span class="mx-1.5 text-[color:var(--rc-border)]">·</span>
+                训练负荷 <span class="tnum font-medium" style="color:var(--state-warning)">↑12%</span>
+              </p>
+            </div>
+
+            <!-- trends grid 2x2 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+
+              <!-- card 1: pace trend (line) -->
+              <div class="rounded-xl border border-[color:var(--rc-border)] bg-[color:var(--rc-card)] p-5">
+                <div class="flex items-start justify-between gap-3 mb-3">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <i data-lucide="gauge" class="w-4 h-4 text-[color:var(--rc-muted-foreground)]"></i>
+                      <span class="text-[13px] font-medium text-[color:var(--rc-muted-foreground)]">配速</span>
+                    </div>
+                    <div class="flex items-baseline gap-1.5 mt-2">
+                      <span class="font-display text-[34px] font-semibold tnum leading-none text-[color:var(--rc-foreground)]">5:18</span>
+                      <span class="text-[12px] text-[color:var(--rc-muted-foreground)] tnum">min/km</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1 px-2 py-1 rounded-md bg-[color:var(--rc-muted)] shrink-0">
+                    <i data-lucide="trending-down" class="w-3.5 h-3.5" style="color:var(--state-success)"></i>
+                    <span class="text-[12px] font-medium tnum" style="color:var(--state-success)">3.2%</span>
+                  </div>
+                </div>
+                <div class="h-[150px] relative">
+                  <canvas id="paceChart"></canvas>
+                </div>
+                <div class="flex items-center justify-between mt-3 pt-3 border-t border-[color:var(--rc-border)]">
+                  <span class="text-[11px] text-[color:var(--rc-muted-foreground)]">越低越好</span>
+                  <div class="flex items-center gap-3 text-[11px] tnum">
+                    <span class="flex items-center gap-1 text-[color:var(--rc-muted-foreground)]"><span class="w-2 h-2 rounded-sm bg-[color:var(--rc-chart-1)]"></span>本期</span>
+                    <span class="flex items-center gap-1 text-[color:var(--rc-muted-foreground)]"><span class="w-2 h-2 rounded-sm" style="background:var(--rc-chart-2)"></span>上期</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- card 2: volume trend (bar) -->
+              <div class="rounded-xl border border-[color:var(--rc-border)] bg-[color:var(--rc-card)] p-5">
+                <div class="flex items-start justify-between gap-3 mb-3">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <i data-lucide="footprints" class="w-4 h-4 text-[color:var(--rc-muted-foreground)]"></i>
+                      <span class="text-[13px] font-medium text-[color:var(--rc-muted-foreground)]">跑量</span>
+                    </div>
+                    <div class="flex items-baseline gap-1.5 mt-2">
+                      <span class="font-display text-[34px] font-semibold tnum leading-none text-[color:var(--rc-foreground)]">187</span>
+                      <span class="text-[12px] text-[color:var(--rc-muted-foreground)] tnum">km / 4周</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1 px-2 py-1 rounded-md bg-[color:var(--rc-muted)] shrink-0">
+                    <i data-lucide="trending-up" class="w-3.5 h-3.5" style="color:var(--state-success)"></i>
+                    <span class="text-[12px] font-medium tnum" style="color:var(--state-success)">8.4%</span>
+                  </div>
+                </div>
+                <div class="h-[150px] relative">
+                  <canvas id="volumeChart"></canvas>
+                </div>
+                <div class="flex items-center justify-between mt-3 pt-3 border-t border-[color:var(--rc-border)]">
+                  <span class="text-[11px] text-[color:var(--rc-muted-foreground)]">周累计</span>
+                  <div class="flex items-center gap-3 text-[11px] tnum">
+                    <span class="flex items-center gap-1 text-[color:var(--rc-muted-foreground)]"><span class="w-2 h-2 rounded-sm bg-[color:var(--rc-chart-1)]"></span>本期</span>
+                    <span class="flex items-center gap-1 text-[color:var(--rc-muted-foreground)]"><span class="w-2 h-2 rounded-sm" style="background:var(--rc-chart-2)"></span>上期</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- card 3: VO2max trend (line) -->
+              <div class="rounded-xl border border-[color:var(--rc-border)] bg-[color:var(--rc-card)] p-5">
+                <div class="flex items-start justify-between gap-3 mb-3">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <i data-lucide="heart-pulse" class="w-4 h-4 text-[color:var(--rc-muted-foreground)]"></i>
+                      <span class="text-[13px] font-medium text-[color:var(--rc-muted-foreground)]">VO2max</span>
+                    </div>
+                    <div class="flex items-baseline gap-1.5 mt-2">
+                      <span class="font-display text-[34px] font-semibold tnum leading-none text-[color:var(--rc-foreground)]">52.8</span>
+                      <span class="text-[12px] text-[color:var(--rc-muted-foreground)] tnum">ml/kg/min</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1 px-2 py-1 rounded-md bg-[color:var(--rc-muted)] shrink-0">
+                    <i data-lucide="trending-up" class="w-3.5 h-3.5" style="color:var(--state-success)"></i>
+                    <span class="text-[12px] font-medium tnum" style="color:var(--state-success)">+1.6</span>
+                  </div>
+                </div>
+                <div class="h-[150px] relative">
+                  <canvas id="vo2Chart"></canvas>
+                </div>
+                <div class="flex items-center justify-between mt-3 pt-3 border-t border-[color:var(--rc-border)]">
+                  <span class="text-[11px] text-[color:var(--rc-muted-foreground)]">越高越好</span>
+                  <div class="flex items-center gap-3 text-[11px] tnum">
+                    <span class="flex items-center gap-1 text-[color:var(--rc-muted-foreground)]"><span class="w-2 h-2 rounded-sm bg-[color:var(--rc-chart-1)]"></span>本期</span>
+                    <span class="flex items-center gap-1 text-[color:var(--rc-muted-foreground)]"><span class="w-2 h-2 rounded-sm" style="background:var(--rc-chart-2)"></span>上期</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- card 4: training load trend (bar) -->
+              <div class="rounded-xl border border-[color:var(--rc-border)] bg-[color:var(--rc-card)] p-5">
+                <div class="flex items-start justify-between gap-3 mb-3">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <i data-lucide="zap" class="w-4 h-4 text-[color:var(--rc-muted-foreground)]"></i>
+                      <span class="text-[13px] font-medium text-[color:var(--rc-muted-foreground)]">训练负荷</span>
+                    </div>
+                    <div class="flex items-baseline gap-1.5 mt-2">
+                      <span class="font-display text-[34px] font-semibold tnum leading-none text-[color:var(--rc-foreground)]">86</span>
+                      <span class="text-[12px] text-[color:var(--rc-muted-foreground)] tnum">今日 ATL</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1 px-2 py-1 rounded-md bg-[color:var(--rc-muted)] shrink-0">
+                    <i data-lucide="trending-up" class="w-3.5 h-3.5" style="color:var(--state-warning)"></i>
+                    <span class="text-[12px] font-medium tnum" style="color:var(--state-warning)">12%</span>
+                  </div>
+                </div>
+                <!-- legend row above canvas: ATL/CTL/TSB end-labels -->
+                <div class="flex items-center gap-4 mb-3 text-[12px] tnum">
+                  <span class="flex items-center gap-1.5 text-[color:var(--rc-foreground)] font-medium"><span class="w-2 h-2 rounded-sm bg-[color:var(--rc-chart-1)]"></span>ATL 86</span>
+                  <span class="flex items-center gap-1.5 text-[color:var(--rc-muted-foreground)]"><span class="w-2 h-2 rounded-sm" style="background:var(--rc-chart-2)"></span>CTL 76</span>
+                  <span class="flex items-center gap-1.5 text-[color:var(--rc-muted-foreground)]"><span class="w-2 h-2 rounded-sm" style="background:var(--rc-chart-4)"></span>TSB −10</span>
+                </div>
+                <div class="h-[150px] relative">
+                  <!-- TSB best-zone band 0..+15 (y1 axis) -->
+                  <div class="absolute left-0 right-0 pointer-events-none" style="top:16%;height:33%;background:color-mix(in srgb, var(--rc-chart-1) 7%, transparent);border-top:1px dashed var(--rc-chart-4);border-bottom:1px dashed var(--rc-chart-4)"></div>
+                  <div class="absolute right-0 text-[10px] tnum" style="top:12%;color:var(--rc-chart-4)">最佳 0–+15</div>
+                  <canvas id="loadChart"></canvas>
+                </div>
+                <div class="flex items-center justify-between mt-3 pt-3 border-t border-[color:var(--rc-border)]">
+                  <span class="text-[11px] text-[color:var(--rc-muted-foreground)]">TSB 连续负值，注意恢复</span>
+                  <div class="flex items-center gap-3 text-[11px] tnum">
+                    <span class="flex items-center gap-1 text-[color:var(--rc-muted-foreground)]"><span class="w-2 h-2 rounded-sm bg-[color:var(--rc-chart-1)]"></span>ATL</span>
+                    <span class="flex items-center gap-1 text-[color:var(--rc-muted-foreground)]"><span class="w-2 h-2 rounded-sm" style="background:var(--rc-chart-2)"></span>CTL</span>
+                    <span class="flex items-center gap-1 text-[color:var(--rc-muted-foreground)]"><span class="w-3 h-px" style="background:var(--rc-chart-4)"></span>TSB</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- bottom row: 7-day load bars + recovery trend -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
+
+              <!-- 7-day training load bars -->
+              <div class="lg:col-span-2 rounded-xl border border-[color:var(--rc-border)] bg-[color:var(--rc-card)] p-5">
+                <div class="flex items-start justify-between gap-3 mb-5">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <i data-lucide="zap" class="w-4 h-4 text-[color:var(--rc-muted-foreground)]"></i>
+                      <span class="text-[13px] font-medium text-[color:var(--rc-muted-foreground)]">训练负荷条</span>
+                    </div>
+                    <div class="flex items-baseline gap-1.5 mt-1.5">
+                      <span class="font-display text-[22px] font-semibold tnum text-[color:var(--rc-foreground)]">近 7 天</span>
+                      <span class="text-[12px] text-[color:var(--rc-muted-foreground)] tnum">日均 246 负荷 · 累计 1720</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3 text-[11px] tnum text-[color:var(--rc-muted-foreground)] shrink-0">
+                    <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-[color:var(--rc-chart-1)]"></span>负荷</span>
+                    <span class="flex items-center gap-1.5"><span class="w-4 h-px" style="background:var(--rc-chart-4)"></span>最佳区间</span>
+                  </div>
+                </div>
+                <div class="relative h-[190px]">
+                  <!-- optimal zone band (220-280 of 340 max → 65%-82% from bottom) -->
+                  <div class="absolute left-0 right-0 pointer-events-none" style="top:18%;height:17%;background:color-mix(in srgb, var(--rc-chart-1) 7%, transparent);border-top:1px dashed var(--rc-chart-4);border-bottom:1px dashed var(--rc-chart-4)"></div>
+                  <div class="absolute right-0 text-[10px] tnum" style="top:14%;color:var(--rc-chart-4)">最佳 220–280</div>
+                  <div class="flex items-end justify-between h-full gap-2.5 pt-1">
+                    <div class="flex-1 flex flex-col items-center justify-end h-full gap-1.5">
+                      <span class="text-[11px] tnum text-[color:var(--rc-muted-foreground)]">210</span>
+                      <div class="w-full max-w-[36px] rounded-t-md" style="height:62%;background:var(--rc-chart-1);opacity:0.9"></div>
+                      <span class="text-[11px] text-[color:var(--rc-muted-foreground)]">周一</span>
+                    </div>
+                    <div class="flex-1 flex flex-col items-center justify-end h-full gap-1.5">
+                      <span class="text-[11px] tnum text-[color:var(--rc-muted-foreground)]">休</span>
+                      <div class="w-full max-w-[36px] rounded-t-md" style="height:5%;background:var(--rc-muted)"></div>
+                      <span class="text-[11px] text-[color:var(--rc-muted-foreground)]">周二</span>
+                    </div>
+                    <div class="flex-1 flex flex-col items-center justify-end h-full gap-1.5">
+                      <span class="text-[11px] tnum text-[color:var(--rc-foreground)] font-medium">265</span>
+                      <div class="w-full max-w-[36px] rounded-t-md" style="height:78%;background:var(--rc-chart-1)"></div>
+                      <span class="text-[11px] text-[color:var(--rc-muted-foreground)]">周三</span>
+                    </div>
+                    <div class="flex-1 flex flex-col items-center justify-end h-full gap-1.5">
+                      <span class="text-[11px] tnum text-[color:var(--rc-muted-foreground)]">180</span>
+                      <div class="w-full max-w-[36px] rounded-t-md" style="height:53%;background:var(--rc-chart-1);opacity:0.85"></div>
+                      <span class="text-[11px] text-[color:var(--rc-muted-foreground)]">周四</span>
+                    </div>
+                    <div class="flex-1 flex flex-col items-center justify-end h-full gap-1.5">
+                      <span class="text-[11px] tnum text-[color:var(--rc-muted-foreground)]">休</span>
+                      <div class="w-full max-w-[36px] rounded-t-md" style="height:5%;background:var(--rc-muted)"></div>
+                      <span class="text-[11px] text-[color:var(--rc-muted-foreground)]">周五</span>
+                    </div>
+                    <div class="flex-1 flex flex-col items-center justify-end h-full gap-1.5">
+                      <span class="text-[11px] tnum font-semibold" style="color:var(--state-warning)">320</span>
+                      <div class="w-full max-w-[36px] rounded-t-md" style="height:94%;background:var(--rc-chart-1)"></div>
+                      <span class="text-[11px] text-[color:var(--rc-muted-foreground)]">周六</span>
+                    </div>
+                    <div class="flex-1 flex flex-col items-center justify-end h-full gap-1.5">
+                      <span class="text-[11px] tnum text-[color:var(--rc-foreground)] font-medium">245</span>
+                      <div class="w-full max-w-[36px] rounded-t-md" style="height:72%;background:var(--rc-chart-1)"></div>
+                      <span class="text-[11px] text-[color:var(--rc-muted-foreground)]">周日</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 mt-4 pt-3 border-t border-[color:var(--rc-border)]">
+                  <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0" style="color:var(--state-warning)"></i>
+                  <span class="text-[12px] text-[color:var(--rc-muted-foreground)] truncate">周六负荷 320 超出最佳区间，建议周日降配恢复</span>
+                </div>
+              </div>
+
+              <!-- recovery trend small chart -->
+              <div class="rounded-xl border border-[color:var(--rc-border)] bg-[color:var(--rc-card)] p-5">
+                <div class="flex items-start justify-between gap-3 mb-3">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                      <i data-lucide="battery-charging" class="w-4 h-4 text-[color:var(--rc-muted-foreground)]"></i>
+                      <span class="text-[13px] font-medium text-[color:var(--rc-muted-foreground)]">恢复趋势</span>
+                    </div>
+                    <div class="flex items-baseline gap-1.5 mt-2">
+                      <span class="font-display text-[34px] font-semibold tnum leading-none text-[color:var(--rc-foreground)]">82</span>
+                      <span class="text-[12px] tnum" style="color:var(--state-success)">良好</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1 px-2 py-1 rounded-md bg-[color:var(--rc-muted)] shrink-0">
+                    <i data-lucide="trending-up" class="w-3.5 h-3.5" style="color:var(--state-success)"></i>
+                    <span class="text-[12px] font-medium tnum" style="color:var(--state-success)">+6</span>
+                  </div>
+                </div>
+                <div class="h-[150px] relative">
+                  <canvas id="recoveryChart"></canvas>
+                </div>
+                <div class="flex items-center justify-between mt-3 pt-3 border-t border-[color:var(--rc-border)]">
+                  <span class="text-[11px] text-[color:var(--rc-muted-foreground)]">14 天恢复分</span>
+                  <span class="text-[11px] tnum text-[color:var(--rc-muted-foreground)]">均值 81</span>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- CTA coach -->
+            <div class="rounded-xl border border-[color:var(--rc-border)] border-l-4 border-l-[color:var(--rc-primary)] bg-[color:var(--rc-card)] p-5 flex items-center justify-between gap-4">
+              <div class="flex items-center gap-3.5 min-w-0">
+                <div class="coach-orb w-10 h-10 shrink-0"></div>
+                <div class="min-w-0">
+                  <div class="text-[15px] font-semibold text-[color:var(--rc-foreground)] truncate">想深入解读这些趋势？</div>
+                  <div class="text-[13px] text-[color:var(--rc-muted-foreground)] truncate">教练可基于长期数据给出个性化训练调整建议</div>
+                </div>
+              </div>
+              <button data-dom-id="cta-coach" class="shrink-0 inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-[color:var(--rc-primary)] text-[color:var(--rc-primary-foreground)] text-[14px] font-semibold hover:opacity-90 transition-opacity">
+                <i data-lucide="message-circle" class="w-[18px] h-[18px]"></i>
+                <span>问教练</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </main>
+    <script>
+      // 明暗模式切换 + 持久化（优先 localStorage，其次系统偏好）
+      (function() {
+        const saved = localStorage.getItem('rc-theme');
+        if (saved === 'light') document.documentElement.classList.remove('dark');
+        else if (saved === 'dark') document.documentElement.classList.add('dark');
+      })();
+      document.querySelector('[data-theme-toggle]')?.addEventListener('click', function() {
+        document.documentElement.classList.toggle('dark');
+        localStorage.setItem('rc-theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+        window.dispatchEvent(new CustomEvent('rc-theme-change', {detail:{isDark:document.documentElement.classList.contains('dark')}}));
+      });
+
+      // search 展开/收起
+      document.querySelector('[data-search-btn]')?.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      document.querySelector('[data-search-btn]')?.addEventListener('click', function () {
+        var i = document.querySelector('[data-search-input]');
+        if (!i) return;
+        i.style.width = '14rem'; i.style.opacity = '1'; i.focus();
+      });
+      document.querySelector('[data-search-input]')?.addEventListener('blur', function () {
+        this.style.width = '0'; this.style.opacity = '0';
+      });
+
+      // 时段氛围层自动切换（本地时间 4 档：晨5-10/午10-16/黄昏16-19/夜19-5）
+      (function() {
+        const layer = document.querySelector('.ambient-layer');
+        if (!layer || layer.dataset.ambient !== 'auto') return;
+        const h = new Date().getHours();
+        let mode = 'is-night';
+        if (h >= 5 && h < 10) mode = 'is-dawn';
+        else if (h >= 10 && h < 16) mode = 'is-noon';
+        else if (h >= 16 && h < 19) mode = 'is-dusk';
+        else mode = 'is-night';
+        layer.classList.remove('is-dawn','is-noon','is-dusk','is-night');
+        layer.classList.add(mode);
+      })();
+    </script>
+    <script>lucide.createIcons();</script>
+    <script>
+      function buildCharts() {
+        var root = document.documentElement;
+        var css = function (n) { return getComputedStyle(root).getPropertyValue(n).trim(); };
+        var lime = css('--rc-chart-1') || '#5EEAD4';
+        var blue = css('--rc-chart-2') || '#22D3EE';
+        var muted = css('--rc-muted-foreground') || '#8B97B0';
+        var cardBg = css('--rc-card') || '#131A2E';
+        var fg = css('--rc-card-foreground') || '#E8EDF5';
+        var border = css('--rc-border') || 'rgba(232,237,245,0.08)';
+        var grid = css('--rc-chart-grid') || border;
+        var tipBorder = border;
+
+        Chart.defaults.font.family = 'Inter, -apple-system, sans-serif';
+        Chart.defaults.color = muted;
+        Chart.defaults.font.size = 11;
+
+        function dateLabels(n) {
+          var arr = [];
+          for (var i = n - 1; i >= 0; i--) {
+            var d = new Date();
+            d.setDate(d.getDate() - i);
+            arr.push((d.getMonth() + 1) + '/' + d.getDate());
+          }
+          return arr;
+        }
+        function weekStartLabels(n) {
+          var arr = [];
+          for (var i = n - 1; i >= 0; i--) {
+            var d = new Date();
+            d.setDate(d.getDate() - i * 7 - d.getDay());
+            arr.push((d.getMonth() + 1) + '/' + d.getDate());
+          }
+          return arr;
+        }
+
+        function baseOpts(yCb) {
+          return {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: cardBg,
+                borderColor: tipBorder,
+                borderWidth: 1,
+                titleColor: fg,
+                bodyColor: fg,
+                padding: 10,
+                cornerRadius: 8,
+                displayColors: true,
+                boxWidth: 8,
+                boxHeight: 8,
+                callbacks: yCb ? { label: function (ctx) { return (ctx.dataset.label || '') + ' ' + yCb(ctx.parsed.y); } } : {}
+              }
+            },
+            scales: {
+              x: { grid: { display: false }, border: { display: false }, ticks: { color: muted, maxRotation: 0, autoSkipPadding: 18 } },
+              y: { grid: { color: grid }, border: { display: false }, ticks: { color: muted, maxTicksLimit: 4, callback: yCb ? function (v) { return yCb(v); } : undefined } }
+            }
+          };
+        }
+        function lineGrad(ctx, color) {
+          var c = ctx.chart.ctx;
+          var h = ctx.chart.height || 160;
+          var g = c.createLinearGradient(0, 0, 0, h);
+          g.addColorStop(0, color + '40');
+          g.addColorStop(1, color + '00');
+          return g;
+        }
+        function fmtPace(s) {
+          var m = Math.floor(s / 60);
+          var sec = Math.round(s % 60);
+          return m + ':' + String(sec).padStart(2, '0');
+        }
+
+        // ---- 1. Pace trend (line) ----
+        var paceLabels = dateLabels(30);
+        new Chart(document.getElementById('paceChart'), {
+          type: 'line',
+          data: {
+            labels: paceLabels,
+            datasets: [
+              {
+                label: '上期', data: [338,337,338,336,338,337,338,336,337,336,337,336,337,336,337,336,337,336,337,336,337,336,337,336,337,337,338,338,338,338],
+                borderColor: blue, borderWidth: 1.5, borderDash: [4,4], pointRadius: 0, tension: 0.3, fill: false, opacity: 0.6
+              },
+              {
+                label: '本期', data: [332,330,335,328,333,329,326,330,327,324,328,325,322,326,323,321,324,320,322,319,321,318,320,317,319,316,318,315,317,318],
+                borderColor: lime, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: lime, tension: 0.35,
+                fill: true, backgroundColor: function (ctx) { return lineGrad(ctx, lime); }
+              }
+            ]
+          },
+          options: baseOpts(function (v) { return fmtPace(v) + ' /km'; })
+        });
+
+        // ---- 2. Volume trend (bar) ----
+        new Chart(document.getElementById('volumeChart'), {
+          type: 'bar',
+          data: {
+            labels: weekStartLabels(4),
+            datasets: [
+              { label: '本期', data: [42, 48, 45, 52], backgroundColor: lime, borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.6 },
+              { label: '上期', data: [38, 40, 44, 41], backgroundColor: blue, borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.6 }
+            ]
+          },
+          options: baseOpts(function (v) { return v + ' km'; })
+        });
+
+        // ---- 3. VO2max trend (line) ----
+        var vo2Prev = []; for (var i = 0; i < 30; i++) vo2Prev.push(50.8);
+        new Chart(document.getElementById('vo2Chart'), {
+          type: 'line',
+          data: {
+            labels: dateLabels(30),
+            datasets: [
+              {
+                label: '上期', data: vo2Prev,
+                borderColor: blue, borderWidth: 1.5, borderDash: [4,4], pointRadius: 0, tension: 0.3, fill: false
+              },
+              {
+                label: '本期', data: [51.2,51.0,51.3,51.1,51.4,51.2,51.5,51.3,51.6,51.4,51.7,51.5,51.8,51.6,51.9,51.7,52.0,51.8,52.1,51.9,52.2,52.0,52.3,52.1,52.4,52.2,52.5,52.3,52.6,52.8],
+                borderColor: lime, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: lime, tension: 0.35,
+                fill: true, backgroundColor: function (ctx) { return lineGrad(ctx, lime); }
+              }
+            ]
+          },
+          options: baseOpts(function (v) { return Number(v).toFixed(1) + ' ml/kg'; })
+        });
+
+        // ---- 4. Training load trend (ATL/CTL/TSB 3-line overlay, 7-day) ----
+        var orange = css('--rc-chart-4') || '#38BDF8';
+        var tsbSuccess = css('--state-success') || '#4ADE80';
+        var tsbWarning = css('--state-warning') || '#38BDF8';
+        new Chart(document.getElementById('loadChart'), {
+          type: 'line',
+          data: {
+            labels: dateLabels(7),
+            datasets: [
+              {
+                label: 'ATL 短期负荷',
+                data: [62, 70, 75, 80, 86, 84, 86],
+                borderColor: lime, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4,
+                pointHoverBackgroundColor: lime, tension: 0.35, fill: false, yAxisID: 'y'
+              },
+              {
+                label: 'CTL 长期负荷',
+                data: [70, 71, 72, 73, 74, 75, 76],
+                borderColor: blue, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4,
+                pointHoverBackgroundColor: blue, tension: 0.35, fill: false, yAxisID: 'y'
+              },
+              {
+                label: 'TSB 疲劳差值',
+                data: [8, 1, -3, -7, -12, -9, -10],
+                borderColor: orange, borderWidth: 2, borderDash: [4, 4], pointRadius: 0, pointHoverRadius: 4,
+                pointHoverBackgroundColor: orange, tension: 0.3, yAxisID: 'y1',
+                fill: { target: 0, above: tsbSuccess + '22', below: tsbWarning + '22' }
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: cardBg, borderColor: tipBorder, borderWidth: 1,
+                titleColor: fg, bodyColor: fg, padding: 10, cornerRadius: 8,
+                displayColors: true, boxWidth: 8, boxHeight: 8,
+                callbacks: { label: function (ctx) { return ctx.dataset.label + ' ' + ctx.parsed.y; } }
+              }
+            },
+            scales: {
+              x: { grid: { display: false }, border: { display: false }, ticks: { color: muted, maxRotation: 0, autoSkipPadding: 18 } },
+              y: { position: 'left', grid: { color: grid }, border: { display: false }, ticks: { color: muted, maxTicksLimit: 4 }, min: 55, max: 90 },
+              y1: { position: 'right', grid: { display: false }, border: { display: false }, ticks: { color: muted, maxTicksLimit: 5 }, min: -15, max: 20 }
+            }
+          }
+        });
+
+        // ---- 5. Recovery trend (small line) ----
+        new Chart(document.getElementById('recoveryChart'), {
+          type: 'line',
+          data: {
+            labels: dateLabels(14),
+            datasets: [{
+              label: '恢复分',
+              data: [72,78,75,82,79,85,81,76,83,88,84,80,86,82],
+              borderColor: lime, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, pointHoverBackgroundColor: lime, tension: 0.4,
+              fill: true, backgroundColor: function (ctx) { return lineGrad(ctx, lime); }
+            }]
+          },
+          options: baseOpts(function (v) { return v + ' 分'; })
+        });
+      }
+      buildCharts();
+      window.addEventListener('rc-theme-change', function () {
+        Object.keys(Chart.instances).forEach(function (k) { Chart.instances[k].destroy(); });
+        buildCharts();
+      });
+    </script>
+</body>
+</html>

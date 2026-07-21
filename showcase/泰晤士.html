@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>泰晤士 · 伦敦的母亲河</title>
+<style>
+  :root{
+    --ink:#0c2b33;
+    --teal:#0e4d5c;
+    --teal-light:#1b7a8c;
+    --river:#2a9db5;
+    --gold:#e0a458;
+    --gold-soft:#f0c98a;
+    --paper:#f4f1e8;
+    --paper-2:#eae5d8;
+    --text:#1d2b30;
+    --muted:#5d6b70;
+    --white:#ffffff;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    color:var(--text);
+    background:var(--paper);
+    line-height:1.7;
+  }
+  h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:600;letter-spacing:.02em;}
+
+  /* ===== 导航栏 ===== */
+  header{
+    position:sticky;top:0;z-index:50;
+    background:rgba(12,43,51,.88);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid rgba(224,164,88,.25);
+  }
+  .nav{
+    max-width:1160px;margin:0 auto;padding:.9rem 1.5rem;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .brand{color:var(--gold-soft);font-family:Georgia,serif;font-size:1.4rem;font-weight:700;letter-spacing:.08em;}
+  .nav-links{display:flex;gap:1.8rem;list-style:none;}
+  .nav-links a{
+    color:var(--paper);text-decoration:none;font-size:.95rem;position:relative;padding:.3rem 0;
+    transition:color .25s ease;
+  }
+  .nav-links a::after{
+    content:"";position:absolute;left:0;bottom:0;height:2px;width:0;background:var(--gold);
+    transition:width .3s ease;
+  }
+  .nav-links a:hover{color:var(--gold-soft);}
+  .nav-links a:hover::after{width:100%;}
+
+  /* ===== Hero ===== */
+  .hero{
+    min-height:78vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;
+    padding:4rem 1.5rem;color:var(--paper);
+    background:
+      radial-gradient(1200px 500px at 50% -10%,rgba(42,157,181,.35),transparent 60%),
+      linear-gradient(180deg,var(--ink) 0%,var(--teal) 55%,#0a3742 100%);
+    position:relative;overflow:hidden;
+  }
+  .hero::before{
+    content:"";position:absolute;left:0;right:0;bottom:0;height:120px;
+    background:repeating-linear-gradient(90deg,rgba(42,157,181,.18) 0 40px,transparent 40px 80px);
+    animation:flow 9s linear infinite;opacity:.6;
+  }
+  @keyframes flow{from{background-position:0 0;}to{background-position:80px 0;}}
+  .hero h1{font-size:clamp(2.8rem,8vw,5.5rem);color:var(--gold-soft);text-shadow:0 4px 24px rgba(0,0,0,.35);}
+  .hero p{margin:1.2rem 0 2rem;font-size:clamp(1rem,2.5vw,1.3rem);max-width:620px;color:#dbe7ea;}
+  .btn{
+    display:inline-block;padding:.85rem 2.2rem;border-radius:50px;
+    background:linear-gradient(135deg,var(--gold),var(--gold-soft));
+    color:var(--ink);font-weight:700;text-decoration:none;letter-spacing:.05em;
+    transition:transform .25s ease,box-shadow .25s ease;
+    box-shadow:0 8px 24px rgba(224,164,88,.35);
+  }
+  .btn:hover{transform:translateY(-4px);box-shadow:0 14px 32px rgba(224,164,88,.5);}
+
+  /* ===== 通用区块 ===== */
+  section{max-width:1160px;margin:0 auto;padding:5rem 1.5rem;}
+  .eyebrow{color:var(--teal-light);font-weight:700;letter-spacing:.18em;text-transform:uppercase;font-size:.8rem;}
+  h2{font-size:clamp(1.8rem,4vw,2.6rem);color:var(--ink);margin:.4rem 0 1rem;}
+  .lead{max-width:680px;color:var(--muted);font-size:1.05rem;}
+
+  /* ===== 数据条 ===== */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1.5rem;margin-top:2.5rem;}
+  .stat{background:var(--white);border-radius:14px;padding:1.6rem;text-align:center;box-shadow:0 6px 20px rgba(12,43,51,.06);}
+  .stat .num{font-family:Georgia,serif;font-size:2.2rem;color:var(--teal);font-weight:700;}
+  .stat .lbl{color:var(--muted);font-size:.9rem;margin-top:.3rem;}
+
+  /* ===== 地标卡片 ===== */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.6rem;margin-top:2.5rem;}
+  .card{
+    background:var(--white);border-radius:16px;overflow:hidden;
+    box-shadow:0 8px 24px rgba(12,43,51,.08);
+    transition:transform .3s ease,box-shadow .3s ease;
+  }
+  .card:hover{transform:translateY(-8px);box-shadow:0 18px 40px rgba(12,43,51,.18);}
+  .card .thumb{height:150px;display:flex;align-items:flex-end;padding:1rem;color:var(--paper);font-family:Georgia,serif;font-size:1.15rem;}
+  .t1{background:linear-gradient(135deg,#0e4d5c,#2a9db5);}
+  .t2{background:linear-gradient(135deg,#7a3b2e,#e0a458);}
+  .t3{background:linear-gradient(135deg,#1b3a4b,#4a7c8c);}
+  .t4{background:linear-gradient(135deg,#234d3a,#7bbf9b);}
+  .t5{background:linear-gradient(135deg,#3a2b4b,#9b7bbf);}
+  .t6{background:linear-gradient(135deg,#4b3a1b,#d9b25a);}
+  .card .body{padding:1.2rem 1.4rem 1.6rem;}
+  .card h3{color:var(--ink);font-size:1.2rem;margin-bottom:.4rem;}
+  .card p{color:var(--muted);font-size:.92rem;}
+
+  /* ===== 画廊 ===== */
+  .gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.2rem;margin-top:2.5rem;}
+  .shot{height:200px;border-radius:14px;position:relative;overflow:hidden;transition:transform .35s ease;}
+  .shot:hover{transform:scale(1.04);}
+  .shot span{position:absolute;left:1rem;bottom:1rem;color:var(--paper);font-weight:600;text-shadow:0 2px 8px rgba(0,0,0,.4);}
+  .g1{background:linear-gradient(160deg,#0a3742,#2a9db5);}
+  .g2{background:linear-gradient(160deg,#5b2b3a,#e0a458);}
+  .g3{background:linear-gradient(160deg,#1b3a4b,#9b7bbf);}
+  .g4{background:linear-gradient(160deg,#234d3a,#7bbf9b);}
+
+  /* ===== 滚动渐显 ===== */
+  .reveal{opacity:0;transform:translateY(28px);transition:opacity .7s ease,transform .7s ease;}
+  .reveal.show{opacity:1;transform:none;}
+  @media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none;}.hero::before{animation:none;}}
+
+  /* ===== 页脚 ===== */
+  footer{background:var(--ink);color:#cdd9dc;padding:3rem 1.5rem 2rem;}
+  .foot{max-width:1160px;margin:0 auto;display:flex;flex-wrap:wrap;gap:2rem;justify-content:space-between;}
+  .foot h3{color:var(--gold-soft);font-size:1.2rem;margin-bottom:.6rem;}
+  .foot a{color:#cdd9dc;text-decoration:none;transition:color .25s ease;}
+  .foot a:hover{color:var(--gold-soft);}
+  .copy{text-align:center;margin-top:2rem;color:#7e9097;font-size:.85rem;}
+
+  /* ===== 响应式 ===== */
+  @media(max-width:720px){
+    .nav-links{gap:1rem;}
+    .nav-links a{font-size:.85rem;}
+    .brand{font-size:1.15rem;}
+    section{padding:3.2rem 1.2rem;}
+    .hero{min-height:68vh;}
+  }
+  @media(max-width:480px){
+    .nav{flex-direction:column;gap:.6rem;}
+    .nav-links{flex-wrap:wrap;justify-content:center;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <nav class="nav">
+    <div class="brand">泰晤士</div>
+    <ul class="nav-links">
+      <li><a href="#intro">简介</a></li>
+      <li><a href="#landmarks">河畔地标</a></li>
+      <li><a href="#gallery">风光</a></li>
+      <li><a href="#stats">数字</a></li>
+      <li><a href="#contact">联系</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <h1>泰晤士</h1>
+    <p>一条河，串起伦敦千年的钟声、桥梁与故事。从源头的清泉到入海的潮汐，它始终是这座城市的脉搏。</p>
+    <a class="btn" href="#intro">探索河畔 ↓</a>
+  </section>
+
+  <section id="intro" class="reveal">
+    <span class="eyebrow">About the River</span>
+    <h2>关于泰晤士河</h2>
+    <p class="lead">泰晤士河（River Thames）全长约 346 公里，是英国最长的河流之一，也是伦敦的母亲河。它自科茨沃尔德丘陵发源，蜿蜒向东穿过牛津、温莎、伦敦，最终汇入北海。河面上横跨着超过 200 座桥梁，每一座都承载着一段历史。</p>
+  </section>
+
+  <section id="landmarks" class="reveal">
+    <span class="eyebrow">Along the Bank</span>
+    <h2>河畔地标</h2>
+    <p class="lead">从哥特式的塔桥到现代感的伦敦眼，泰晤士两岸是建筑与时光的展览馆。</p>
+    <div class="grid">
+      <article class="card"><div class="thumb t1">塔桥 Tower Bridge</div><div class="body"><h3>塔桥</h3><p>维多利亚哥特式双塔开启桥，伦敦最具标志性的天际线符号。</p></div></article>
+      <article class="card"><div class="thumb t2">伦敦桥 London Bridge</div><div class="body"><h3>伦敦桥</h3><p>历史上多次重建，如今是连接南北岸最繁忙的通勤要道。</p></div></article>
+      <article class="card"><div class="thumb t3">大本钟 Big Ben</div><div class="body"><h3>大本钟</h3><p>威斯敏斯特宫的钟楼，泰晤士畔最准时的心跳。</p></div></article>
+      <article class="card"><div class="thumb t4">伦敦眼 London Eye</div><div class="body"><h3>伦敦眼</h3><p>135 米高的摩天轮，换个高度看整条河流与城市。</p></div></article>
+      <article class="card"><div class="thumb t5">千禧桥 Millennium Bridge</div><div class="body"><h3>千禧桥</h3><p>专为步行设计的悬索桥， steel 的优雅弧线横卧河面。</p></div></article>
+      <article class="card"><div class="thumb t6">格林威治 Greenwich</div><div class="body"><h3>格林威治</h3><p>本初子午线所在地，河湾处望着时间与海洋的起点。</p></div></article>
+    </div>
+  </section>
+
+  <section id="gallery" class="reveal">
+    <span class="eyebrow">River Scenes</span>
+    <h2>河畔风光</h2>
+    <p class="lead">晨雾、黄昏与夜灯，同一段河水在不同时刻有不同的情绪。</p>
+    <div class="gallery">
+      <div class="shot g1"><span>晨雾中的西敏寺</span></div>
+      <div class="shot g2"><span>落日染红的桥拱</span></div>
+      <div class="shot g3"><span>雨天里的霓虹倒影</span></div>
+      <div class="shot g4"><span>绿意盎然的南岸</span></div>
+    </div>
+  </section>
+
+  <section id="stats" class="reveal">
+    <span class="eyebrow">By the Numbers</span>
+    <h2>泰晤士的数字</h2>
+    <div class="stats">
+      <div class="stat"><div class="num">346</div><div class="lbl">公里全长</div></div>
+      <div class="stat"><div class="num">200+</div><div class="lbl">跨河桥梁</div></div>
+      <div class="stat"><div class="num">5</div><div class="lbl">流经郡县</div></div>
+      <div class="stat"><div class="num">1894</div><div class="lbl">塔桥建成年</div></div>
+    </div>
+  </section>
+</main>
+
+<footer id="contact">
+  <div class="foot">
+    <div>
+      <h3>泰晤士</h3>
+      <p>一条河，一座城。<br>本页面为静态演示 Demo，所有内容均为示例。</p>
+    </div>
+    <div>
+      <h3>快速链接</h3>
+      <p><a href="#intro">简介</a> · <a href="#landmarks">地标</a> · <a href="#gallery">风光</a> · <a href="#stats">数字</a></p>
+    </div>
+    <div>
+      <h3>联系</h3>
+      <p><a href="mailto:hello@example.com">hello@example.com</a><br>伦敦 · 英国</p>
+    </div>
+  </div>
+  <p class="copy">© 2026 泰晤士 Demo · 仅供展示之用</p>
+</footer>
+
+<script>
+  // 滚动渐显
+  const io=new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('show');io.unobserve(e.target);}});
+  },{threshold:.15});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+
+</body>
+</html>

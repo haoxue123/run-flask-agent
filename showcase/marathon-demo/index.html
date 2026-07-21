@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据总览 · 马拉松训练计划 Agent</title>
+<link rel="stylesheet" href="assets/styles.css">
+</head>
+<body data-page="index">
+<header>
+  <nav class="nav">
+    <div class="brand">马拉松训练计划 Agent</div>
+    <ul class="nav-links">
+      <li><a href="index.html" data-page="index">数据总览</a></li>
+      <li><a href="analysis.html" data-page="analysis">深度分析</a></li>
+      <li><a href="training.html" data-page="training">训练计划</a></li>
+      <li><a href="trends.html" data-page="trends">长期趋势</a></li>
+      <li><a href="coach.html" data-page="coach">教练对话</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <div class="page-head">
+    <h1>数据总览</h1>
+    <p>从真实跑步数据出发，一眼看清你的训练状态。点击任意一次跑步可查看深度分析。</p>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="card">
+    <h2>最近跑步</h2>
+    <input class="search" id="searchInput" placeholder="搜索路线或类型，如「滨江」「间歇」…">
+    <ul class="run-list" id="runList"></ul>
+  </div>
+
+  <div class="card">
+    <h2>教练洞察</h2>
+    <ul id="insights" style="padding-left:1.2rem;line-height:2;"></ul>
+  </div>
+</main>
+
+<footer>
+  <div class="foot">
+    <div><h3>马拉松训练计划 Agent</h3><p>第一性原理驱动的跑步 AI 教练 · 静态演示 Demo</p></div>
+    <div><h3>页面</h3><p><a href="index.html">总览</a> · <a href="analysis.html">分析</a> · <a href="training.html">计划</a> · <a href="trends.html">趋势</a> · <a href="coach.html">教练</a></p></div>
+  </div>
+  <p class="copy">© 2026 Demo · 数据均为模拟示例</p>
+</footer>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+# ===== 与 .gitignore 保持一致，避免把敏感/运行数据打进镜像 =====
+
+# 密钥/凭证（绝不进镜像）
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+
+# Git / 编辑器 / 系统
+.git/
+.gitignore
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 本地临时/缓存
+.chrome-tmp/
+.trae-html-share-packages/
+
+# 部署运行时（容器内由 volume 提供）
+deploy/certs/
+deploy/logs/
+deploy/.dockerignore
+
+# 用户运动数据（隐私，容器内由 volume 挂载，不入镜像）
+data/_rag_temp/
+data/charts/
+data/chroma_db/
+data/eval/
+data/uploads/
+data/*.json
+data/*.csv
+data/*.png
+data/*.bin
+data/*.bak
+data/*.gpx
+data/*.tcx
+data/*.fit
+data/*.md
+# 但保留 RAG 知识库与示例模板（运行时需要）
+!data/knowledge/
+!data/knowledge/**
+!data/manual_input.example.json
+
+# 工作区记忆
+.workbuddy/
+
+# 前端无需打包产物（本项目用原生 JS，无 node_modules；保险起见排除）
+node_modules/

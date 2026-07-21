@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>马拉松训练计划 Agent · 交互演示</title>
+<style>
+  :root{
+    --ink:#0c2530; --teal:#0e7c8a; --teal-l:#1ba0b3; --river:#2a9db5;
+    --amber:#e8833a; --amber-l:#f0a85c; --ink-2:#13333d;
+    --bg:#f5f8f9; --card:#ffffff; --muted:#5d6f74; --line:#e2eaec; --ok:#2f9e6b;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:var(--ink);background:var(--bg);line-height:1.7;}
+  h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:600;letter-spacing:.02em;}
+  a{color:var(--teal);text-decoration:none;}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 1.5rem;}
+  .btn{display:inline-block;padding:.7rem 1.6rem;border:none;border-radius:50px;background:linear-gradient(135deg,var(--amber),var(--amber-l));color:#fff;font-weight:700;cursor:pointer;transition:transform .2s,box-shadow .2s;box-shadow:0 8px 20px rgba(232,131,58,.32);}
+  .btn:hover{transform:translateY(-3px);box-shadow:0 12px 26px rgba(232,131,58,.45);}
+  .btn.ghost{background:transparent;color:var(--river);border:1.5px solid var(--river);box-shadow:none;}
+  .btn.ghost:hover{background:rgba(42,157,181,.1);}
+
+  /* 导航 */
+  header{position:sticky;top:0;z-index:60;background:rgba(12,37,48,.94);backdrop-filter:blur(8px);border-bottom:1px solid rgba(232,131,58,.3);}
+  .nav{display:flex;align-items:center;justify-content:space-between;padding:.8rem 1.5rem;flex-wrap:wrap;gap:.6rem;max-width:1120px;margin:0 auto;}
+  .brand{color:var(--amber-l);font-family:Georgia,serif;font-weight:700;font-size:1.05rem;}
+  .nav-links{display:flex;gap:1.3rem;list-style:none;flex-wrap:wrap;}
+  .nav-links a{color:#dce8ea;font-size:.9rem;transition:color .2s;}
+  .nav-links a:hover{color:var(--amber-l);}
+
+  /* Hero */
+  .hero{position:relative;overflow:hidden;color:#eaf3f5;padding:5.5rem 1.5rem 4.5rem;text-align:center;
+    background:radial-gradient(1000px 460px at 50% -15%,rgba(42,157,181,.4),transparent 60%),linear-gradient(180deg,var(--ink) 0%,var(--ink-2) 60%,#0a313b 100%);}
+  .hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:90px;background:repeating-linear-gradient(90deg,rgba(42,157,181,.16) 0 36px,transparent 36px 72px);animation:flow 8s linear infinite;}
+  @keyframes flow{to{background-position:72px 0;}}
+  .hero h1{font-size:clamp(2.3rem,6vw,4rem);color:var(--amber-l);text-shadow:0 4px 22px rgba(0,0,0,.3);}
+  .hero p{max-width:640px;margin:1.1rem auto 2rem;color:#cfe0e4;font-size:clamp(1rem,2.4vw,1.2rem);}
+  .hero .stats{display:flex;gap:2.2rem;justify-content:center;flex-wrap:wrap;margin-top:2.4rem;}
+  .hero .stats div{text-align:center;}
+  .hero .stats .n{font-family:Georgia,serif;font-size:1.7rem;color:#fff;font-weight:700;}
+  .hero .stats .l{color:#9fb6bb;font-size:.82rem;}
+
+  section{padding:4.5rem 1.5rem;max-width:1120px;margin:0 auto;}
+  .eyebrow{color:var(--teal-l);font-weight:700;letter-spacing:.16em;text-transform:uppercase;font-size:.78rem;}
+  h2.sec{font-size:clamp(1.7rem,4vw,2.4rem);margin:.3rem 0 .4rem;color:var(--ink);}
+  .sec-sub{color:var(--muted);max-width:640px;margin-bottom:2.2rem;}
+
+  /* 能力卡片 */
+  .caps{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1.4rem;}
+  .cap{background:var(--card);border-radius:16px;padding:1.5rem;box-shadow:0 8px 22px rgba(12,37,48,.06);border-top:3px solid var(--teal);transition:transform .25s,box-shadow .25s;}
+  .cap:hover{transform:translateY(-6px);box-shadow:0 16px 34px rgba(12,37,48,.14);}
+  .cap .ic{font-size:1.6rem;}
+  .cap h3{margin:.6rem 0 .4rem;color:var(--ink);font-size:1.15rem;}
+  .cap p{color:var(--muted);font-size:.9rem;}
+
+  /* Demo 区块 */
+  .panel{background:var(--card);border-radius:18px;padding:2rem;box-shadow:0 10px 28px rgba(12,37,48,.08);margin-bottom:1.8rem;}
+  .panel h3{color:var(--ink);font-size:1.25rem;margin-bottom:.4rem;}
+  .panel .hint{color:var(--muted);font-size:.88rem;margin-bottom:1.2rem;}
+
+  /* 生成计划 */
+  #genBtn{margin-bottom:1.2rem;}
+  .spinner{display:none;color:var(--teal);font-size:.9rem;margin-bottom:1rem;}
+  .spinner.show{display:block;}
+  .plan{display:none;opacity:0;transition:opacity .6s;}
+  .plan.show{display:block;opacity:1;}
+  .day{display:flex;align-items:center;gap:1rem;padding:.7rem 0;border-bottom:1px solid var(--line);}
+  .day:last-child{border-bottom:none;}
+  .day .d{font-weight:700;color:var(--teal-d,#0b5560);min-width:64px;}
+  .day .t{font-weight:600;}
+  .day .m{color:var(--muted);font-size:.85rem;margin-left:auto;}
+  .pill{font-size:.72rem;padding:.15rem .6rem;border-radius:20px;color:#fff;background:var(--teal);}
+  .pill.rest{background:var(--muted);}
+  .pill.hard{background:var(--amber);}
+
+  /* 反思对比 */
+  .rf-toggle{display:flex;gap:.6rem;margin-bottom:1.2rem;}
+  .rf-wrap{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;transition:all .4s;}
+  .rf{border-radius:14px;padding:1.2rem;border:1px solid var(--line);background:#fafcfc;transition:all .4s;}
+  .rf h4{color:var(--ink);margin-bottom:.6rem;font-size:1rem;}
+  .rf ul{list-style:none;}
+  .rf li{padding:.35rem 0;font-size:.9rem;color:#33484e;border-left:3px solid var(--line);padding-left:.7rem;margin-bottom:.4rem;}
+  .rf.after{border-color:var(--teal);background:#eef7f8;}
+  .rf.after li{border-left-color:var(--teal);}
+  .rf .fix{color:var(--ok);font-weight:600;}
+  .improve{display:none;margin-top:1rem;padding:.9rem 1.1rem;background:#eaf6ee;border-left:4px solid var(--ok);border-radius:10px;color:#1f5b3c;font-size:.9rem;}
+  .improve.show{display:block;}
+
+  /* 图表 */
+  .chart-box{position:relative;}
+  #pctip{position:absolute;background:var(--ink);color:#fff;padding:.35rem .6rem;border-radius:8px;font-size:.78rem;pointer-events:none;opacity:0;transition:opacity .15s;transform:translate(-50%,-120%);white-space:nowrap;}
+  .legend{display:flex;gap:1.4rem;margin-top:.8rem;color:var(--muted);font-size:.85rem;flex-wrap:wrap;}
+
+  /* 架构图 */
+  .arch{display:flex;align-items:stretch;gap:.6rem;flex-wrap:wrap;}
+  .node{flex:1;min-width:120px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1rem;text-align:center;box-shadow:0 6px 16px rgba(12,37,48,.05);}
+  .node .t{font-weight:700;color:var(--teal-d,#0b5560);}
+  .node .s{font-size:.78rem;color:var(--muted);margin-top:.3rem;}
+  .arrow{display:flex;align-items:center;color:var(--amber);font-size:1.4rem;font-weight:700;}
+
+  /* 部署亮点 */
+  .deploy-card{background:linear-gradient(135deg,var(--ink),var(--ink-2));color:#eaf3f5;border-radius:18px;padding:2rem;box-shadow:0 12px 30px rgba(12,37,48,.18);}
+  .deploy-card h3{color:var(--amber-l);margin-bottom:.6rem;}
+  .deploy-card p{color:#cfe0e4;font-size:.95rem;}
+  .deploy-card .tag{display:inline-block;margin-top:1rem;background:rgba(232,131,58,.18);color:var(--amber-l);padding:.3rem .8rem;border-radius:20px;font-size:.82rem;}
+
+  footer{background:var(--ink);color:#cdd9dc;padding:2.5rem 1.5rem;text-align:center;font-size:.85rem;}
+  footer a{color:var(--amber-l);}
+
+  .reveal{opacity:0;transform:translateY(26px);transition:opacity .7s,transform .7s;}
+  .reveal.show{opacity:1;transform:none;}
+  @media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;}.hero::after{animation:none;}}
+
+  @media(max-width:720px){
+    .rf-wrap{grid-template-columns:1fr;}
+    .arrow{transform:rotate(90deg);}
+    section{padding:3.2rem 1.2rem;}
+    .nav-links{gap:.9rem;}
+  }
+</style>
+</head>
+<body data-page="showcase">
+
+<header>
+  <nav class="nav">
+    <div class="brand">马拉松训练计划 Agent</div>
+    <ul class="nav-links">
+      <li><a href="#hero">首页</a></li>
+      <li><a href="#capabilities">核心能力</a></li>
+      <li><a href="#demo">功能演示</a></li>
+      <li><a href="#arch">技术架构</a></li>
+      <li><a href="#deploy">部署亮点</a></li>
+    </ul>
+  </nav>
+</header>
+
+<section class="hero" id="hero">
+  <h1>马拉松训练计划 Agent</h1>
+  <p>第一性原理驱动的跑步 AI 教练：把真实运动数据，变成可执行的训练计划，并自我审查、自我修正。</p>
+  <a class="btn" href="#demo">▾ 看 AI 如何生成计划</a>
+  <div class="stats">
+    <div><div class="n">双模型</div><div class="l">生成 + 反思</div></div>
+    <div><div class="n">GPX/TCX/FIT</div><div class="l">真实数据感知</div></div>
+    <div><div class="n">闭环</div><div class="l">感知→推理→行动→反馈</div></div>
+  </div>
+</section>
+
+<section id="capabilities" class="reveal">
+  <span class="eyebrow">Core Capabilities</span>
+  <h2 class="sec">核心能力</h2>
+  <p class="sec-sub">围绕"Agent = 工具使用 + 反思"的第一性原理，构建四个可验证的能力支点。</p>
+  <div class="caps">
+    <div class="cap"><div class="ic">🧠</div><h3>双模型架构</h3><p>deepseek-chat 负责生成初版计划，deepseek-reasoner 带思维链审查并修正，弱模型组合超越强模型。</p></div>
+    <div class="cap"><div class="ic">📡</div><h3>真实数据感知</h3><p>解析 Garmin 导出的 GPX/TCX/FIT，无需注册任何 API 即可读取真实跑步数据。</p></div>
+    <div class="cap"><div class="ic">🔍</div><h3>反思审查闭环</h3><p>生成后自检：识别负荷失衡、恢复不足等问题，输出调整后的计划，形成自我修正闭环。</p></div>
+    <div class="cap"><div class="ic">✅</div><h3>端到端可验证</h3><p>从数据导入到计划输出全链路可跑通，每个环节都有真实产物，而非概念演示。</p></div>
+  </div>
+</section>
+
+<section id="demo">
+  <span class="eyebrow">Live Demo</span>
+  <h2 class="sec">功能演示</h2>
+  <p class="sec-sub">以下均为纯前端交互（预录数据驱动），点击即可体验核心闭环。</p>
+
+  <div class="panel reveal">
+    <h3>① 一键生成训练计划</h3>
+    <p class="hint">点击按钮，模拟 Agent 读取你的近期数据并生成下周计划（含生成过程动画）。</p>
+    <button class="btn" id="genBtn">生成我的周计划</button>
+    <div class="spinner" id="spinner">⏳ 正在读取数据并生成计划…</div>
+    <div class="plan" id="plan"></div>
+  </div>
+
+  <div class="panel reveal">
+    <h3>② 反思审查：初版 vs 反思后</h3>
+    <p class="hint">展示同一份计划的"初版"与经反思模型修正后的"优化版"，高亮关键改进。</p>
+    <div class="rf-toggle">
+      <button class="btn ghost" id="rfBefore">查看初版</button>
+      <button class="btn" id="rfAfter">查看反思优化</button>
+    </div>
+    <div class="rf-wrap" id="rfWrap">
+      <div class="rf before">
+        <h4>初版计划（生成模型）</h4>
+        <ul>
+          <li>周一 10km 节奏跑</li>
+          <li>周二 15km 长距离</li>
+          <li>周三 间歇 12×400m</li>
+          <li>周四 休息</li>
+          <li>周五 18km 长距离</li>
+          <li>周末 半马测试</li>
+        </ul>
+      </div>
+      <div class="rf after">
+        <h4>反思后（生成 + 反思）</h4>
+        <ul>
+          <li>周一 10km 节奏跑</li>
+          <li class="fix">周二 调整为 12km 有氧（避免连续高强度）</li>
+          <li>周三 间歇 10×400m</li>
+          <li class="fix">周四 加 8km 恢复跑（补足恢复日）</li>
+          <li class="fix">周五 降为 14km（周跑量已达标）</li>
+          <li>周末 半马测试</li>
+        </ul>
+      </div>
+    </div>
+    <div class="improve" id="improve">💡 反思模型识别：原方案连续两天高强度（周二长距离 + 周三间歇）且恢复日缺失，易致过度训练。优化后插入恢复跑、下调周五负荷，使周强度曲线更平滑、完成率更高。</div>
+  </div>
+
+  <div class="panel reveal">
+    <h3>③ 数据洞察：配速长期趋势</h3>
+    <p class="hint">鼠标悬停折线节点查看每月平均配速（越低越快），直观呈现有氧能力提升。</p>
+    <div class="chart-box">
+      <div id="pctip"></div>
+      <svg id="pcChart" viewBox="0 0 600 200" width="100%" height="200" style="background:linear-gradient(180deg,#fafcfc,#eef4f5);border-radius:12px;border:1px solid var(--line);"></svg>
+    </div>
+    <div class="legend"><span><i style="background:#0e7c8a;display:inline-block;width:12px;height:12px;border-radius:3px;"></i> 平均配速 (s/km，越低越快)</span></div>
+  </div>
+</section>
+
+<section id="arch" class="reveal">
+  <span class="eyebrow">Architecture</span>
+  <h2 class="sec">技术架构（Agentic 双模式）</h2>
+  <p class="sec-sub">对应吴恩达对 Agentic 工作流的洞察：工具使用 + 反思。</p>
+  <div class="arch">
+    <div class="node"><div class="t">真实跑步数据</div><div class="s">GPX / TCX / FIT<br>或手动输入</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="t">工具使用</div><div class="s">解析文件<br>感知真实世界</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="t">生成模型</div><div class="s">deepseek-chat<br>产出初版计划</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="t">反思模型</div><div class="s">deepseek-reasoner<br>带思维链审查</div></div>
+    <div class="arrow">→</div>
+    <div class="node"><div class="t">最终计划</div><div class="s">自适应调整<br>输出给用户</div></div>
+  </div>
+</section>
+
+<section id="deploy" class="reveal">
+  <span class="eyebrow">Product Judgment</span>
+  <h2 class="sec">部署亮点（产品判断）</h2>
+  <p class="sec-sub">展示不仅在于功能，也在于对"如何上线"的工程与成本权衡。</p>
+  <div class="deploy-card">
+    <h3>第一性原理的部署决策</h3>
+    <p>从"代码运行 / 公网可访问 / 数据持久化 / 持续运行"四要素拆解，结合国内用户、小流量、低运维三项条件，识别出应用"有状态（本地文件 + 向量库）"的关键约束，据此选定轻量云服务器方案而非临时磁盘的 Serverless，并在六维度（环境一致性 / CI·CD / 扩缩容 / 安全 / 监控 / 成本）给出落地设计。</p>
+    <span class="tag">有状态识别 · 单卷持久化 · 零成本可展示</span>
+  </div>
+</section>
+
+<footer>
+  马拉松训练计划 Agent · 静态交互演示 Demo &nbsp;|&nbsp; 数据均为模拟示例，用于作品集展示 &nbsp;|&nbsp; <a href="#hero">回到顶部 ↑</a>
+</footer>
+
+<script>
+// 导航平滑（CSS 已处理），这里仅作占位
+// ① 生成计划
+const planData = [
+  {d:"周一", t:"10km 节奏跑", m:"配速 5:20", k:"hard"},
+  {d:"周二", t:"12km 有氧慢跑", m:"配速 6:00", k:""},
+  {d:"周三", t:"间歇 10×400m", m:"配速 4:55", k:"hard"},
+  {d:"周四", t:"8km 恢复跑", m:"配速 6:15", k:"rest"},
+  {d:"周五", t:"14km 长距离", m:"配速 5:45", k:""},
+  {d:"周六", t:"休息 / 拉伸", m:"—", k:"rest"},
+  {d:"周日", t:"半马测试跑", m:"目标 Sub-2", k:"hard"}
+];
+const genBtn=document.getElementById('genBtn'),
+      spinner=document.getElementById('spinner'),
+      planEl=document.getElementById('plan');
+genBtn.addEventListener('click',()=>{
+  genBtn.disabled=true; spinner.classList.add('show'); planEl.classList.remove('show');
+  setTimeout(()=>{
+    spinner.classList.remove('show');
+    planEl.innerHTML=planData.map(p=>
+      '<div class="day"><span class="d">'+p.d+'</span>'+
+      '<span class="t">'+p.t+'</span>'+
+      '<span class="pill '+p.k+'">'+p.m+'</span></div>').join('');
+    planEl.classList.add('show'); genBtn.disabled=false;
+  },1200);
+});
+
+// ② 反思对比
+const rfWrap=document.getElementById('rfWrap'),
+      improve=document.getElementById('improve'),
+      rfBefore=document.getElementById('rfBefore'),
+      rfAfter=document.getElementById('rfAfter');
+function setRF(after){
+  if(after){rfWrap.style.opacity=.4; rfWrap.style.filter='blur(1px)';
+    setTimeout(()=>{rfWrap.style.opacity=1;rfWrap.style.filter='none';},180);
+    rfWrap.querySelector('.before').style.opacity=.45;
+    rfWrap.querySelector('.after').style.transform='scale(1.03)';
+    rfWrap.querySelector('.after').style.boxShadow='0 12px 30px rgba(14,124,138,.25)';
+    improve.classList.add('show'); rfAfter.classList.add('btn'); rfAfter.classList.remove('ghost');
+    rfBefore.classList.add('ghost'); rfBefore.classList.remove('btn');
+  }else{
+    rfWrap.querySelector('.before').style.opacity=1;
+    rfWrap.querySelector('.after').style.transform='none';
+    rfWrap.querySelector('.after').style.boxShadow='none';
+    improve.classList.remove('show'); rfBefore.classList.add('btn'); rfBefore.classList.remove('ghost');
+    rfAfter.classList.add('ghost'); rfAfter.classList.remove('btn');
+  }
+}
+rfBefore.addEventListener('click',()=>setRF(false));
+rfAfter.addEventListener('click',()=>setRF(true));
+setRF(false);
+
+// ③ 配速趋势图 + 悬停提示
+const months=["2月","3月","4月","5月","6月","7月"];
+const pace=[355,350,344,338,333,328];
+const svg=document.getElementById('pcChart'), tip=document.getElementById('pctip');
+const W=600,H=200,pad=34;
+const max=Math.max(...pace),min=Math.min(...pace),rng=(max-min)||1;
+const pts=pace.map((v,i)=>({x:pad+i*(W-2*pad)/(pace.length-1),y:H-pad-((v-min)/rng)*(H-2*pad),v,m:months[i]}));
+let path=pts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+let area=pad+','+(H-pad)+' '+path+' '+(W-pad)+','+(H-pad);
+svg.innerHTML='<polygon points="'+area+'" fill="#0e7c8a22"/>'+
+  '<polyline points="'+path+'" fill="none" stroke="#0e7c8a" stroke-width="2.5" stroke-linejoin="round"/>'+
+  pts.map(p=>'<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="4" fill="#0e7c8a" style="cursor:pointer"/>').join('');
+pts.forEach((p,i)=>{
+  const c=svg.querySelectorAll('circle')[i];
+  c.addEventListener('mousemove',e=>{
+    const r=svg.getBoundingClientRect();
+    tip.style.left=(e.clientX-r.left)+'px';
+    tip.style.top=(e.clientY-r.top)+'px';
+    tip.textContent=p.m+' · '+(p.v/60|0)+':'+('0'+(p.v%60)).slice(-2)+' /km';
+    tip.style.opacity=1;
+  });
+  c.addEventListener('mouseleave',()=>tip.style.opacity=0);
+});
+
+// 滚动渐显
+const io=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('show');io.unobserve(e.target);}});},{threshold:.12});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>
