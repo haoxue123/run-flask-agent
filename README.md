@@ -4,6 +4,36 @@
 
 **无需注册任何 API 账号**——从手表 App 导出运动文件或手动填写数据即可。
 
+## 项目结构
+
+```
+马拉松训练计划 Agent/
+├── app.py                 # Flask 入口：注册路由、初始化 RAG 与记忆
+├── llm_agent.py           # DeepSeek 双模型封装（生成 chat + 反思 reasoner）
+├── rag.py                 # RAG 检索（ChromaDB + data/knowledge 知识库）
+├── memory.py              # 长期记忆：用户画像与记忆增删 / 否定
+├── physiology.py          # 确定性科学内核：生理指标与配速计算
+├── plan_science.py        # 训练计划科学内核（计划生成与校验）
+├── training_science.py    # 训练负荷 / 长期趋势科学内核
+├── workflow.py            # 教练对话流程编排（被 routes/coach 调用）
+├── visualize.py           # 图表生成（配速曲线等）
+├── data_tool.py           # 数据接入（运动文件 / 手动输入双模式）
+├── routes/                # Web 路由：pages · data · plan · coach · eval · onboarding
+├── skills/                # 工具执行器：data_query（双引擎）· chart_generate
+├── parsers/               # GPX / TCX / FIT 解析
+├── data/
+│   ├── knowledge/         # RAG 知识库（25 篇 Markdown，部署必需）
+│   └── manual_input.example.json  # 手动输入模板
+├── prompts/               # LLM 提示词模板
+├── templates/ static/     # 前端页面与静态资源
+├── tests/                 # 测试套件（test_rag_cache.py）
+├── deploy/                # Docker / Nginx / Compose 部署配置
+├── docs/                  # GitHub Pages 架构文档（index.html）
+├── eval*.py offline_eval.py gen_eval_data.py skill_eval.py  # 离线评测 harness
+├── requirements.txt · .env.example · .gitignore · .dockerignore
+└── ARCHITECTURE.md · DEPLOY_CHECKLIST.md   # 架构文档 / 部署清单
+```
+
 ## 核心闭环
 
 ```
@@ -65,33 +95,6 @@ python app.py
 ```
 
 打开浏览器访问 http://127.0.0.1:5000 即可使用。
-
-## 文件结构
-
-```
-├── app.py                            # Flask Web 应用主入口
-├── data_tool.py                      # 数据接入（文件导入 + 手动输入双模式）
-├── llm_agent.py                      # DeepSeek 调用封装（生成 + 反思）
-├── visualize.py                      # 数据可视化（matplotlib 图表）
-├── templates/
-│   ├── base.html                     # 公共布局骨架（顶部导航 + 侧边栏）
-│   ├── index.html                    # 数据总览页面
-│   ├── training.html                 # 训练计划管理页
-│   ├── analysis.html                 # 单次跑步深度分析
-│   ├── trends.html                   # 长期趋势
-│   └── coach.html                    # 教练对话
-├── static/
-│   ├── theme.css                     # 品牌主题样式
-│   └── plan_calendar.js              # 训练计划月历交互
-├── data/
-│   ├── manual_input.example.json     # 手动输入模板（可复制为 manual_input.json）
-│   └── *.gpx / *.tcx / *.fit         # 你的运动文件（放入即可）
-├── garmin_tool.py                    # [可选/已停用] Garmin API 接入，保留作未来扩展
-├── marathon_coach_agent.ipynb        # [原始] Jupyter Notebook 版本（Web 应用前身）
-├── requirements.txt                  # Python 依赖
-├── .env.example                      # 配置模板
-└── .gitignore                        # 忽略敏感文件
-```
 
 ## 页面功能说明
 

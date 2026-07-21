@@ -4,6 +4,10 @@ import json
 
 SKILL_REGISTRY = {}
 
+# render_tool_prompt() 输出缓存：SKILL_REGISTRY 在导入后基本不变（仅 register_skill 可能热插拔），
+# 每次教练请求都会调用 render_tool_prompt()，缓存可省去重复的排序+拼接开销（性能优化）。
+_TOOL_PROMPT_CACHE = None
+
 
 def _default_parse_args(raw):
     """默认参数解析：尝试 JSON，失败返回空 dict。"""
@@ -25,6 +29,8 @@ def register_skill(name: str, description: str, fn: callable, args: list = None,
         parse_args:  将 LLM 传来的原始字符串解析为参数字典的函数；
                      内聚到各 skill，router 无需感知具体参数长相（消除泄漏抽象）
     """
+    global _TOOL_PROMPT_CACHE
+    _TOOL_PROMPT_CACHE = None  # 注册变更（含热插拔）使工具声明缓存失效
     SKILL_REGISTRY[name] = {
         "name": name,
         "description": description,
@@ -85,6 +91,9 @@ def render_tool_prompt() -> str:
     作为「热插拔」落地的关键：新增/删除 skill 只需改注册中心，
     LLM 可见的工具声明会自动同步，无需手工维护 prompts/coach_chat_system.md。
     """
+    global _TOOL_PROMPT_CACHE
+    if _TOOL_PROMPT_CACHE is not None:
+        return _TOOL_PROMPT_CACHE
     lines = [
         "## 可用工具（Skill）",
         "",
@@ -106,7 +115,9 @@ def render_tool_prompt() -> str:
         "- 调用工具时，回答中只需包含 TOOL 标记，不要添加其他内容",
         "- 工具执行后你会收到结果，再基于结果生成最终回答",
     ]
-    return "\n".join(lines)
+    rendered = "\n".join(lines)
+    _TOOL_PROMPT_CACHE = rendered
+    return rendered
 
 
 def _parse_data_query(raw):
