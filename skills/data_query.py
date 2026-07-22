@@ -74,11 +74,20 @@ def _rag_fallback(question: str, profile: dict):
         return None
     try:
         results = rag.retrieve_knowledge(question, top_k=3)
-        if not results:
-            return None
-        return rag.format_knowledge_context(results)
+        ctx = rag.format_knowledge_context(results) if results else ""
     except Exception:
-        return None
+        ctx = ""
+
+    # Path A+：因果/解释类 query 额外注入靶向关系层（结构化推理辅助），不破坏既有 RAG
+    try:
+        import relation_layer
+        rel_ctx = relation_layer.retrieve_relations(question)
+    except Exception:
+        rel_ctx = ""
+    if rel_ctx:
+        ctx = (ctx + "\n\n" + rel_ctx) if ctx else rel_ctx
+
+    return ctx or None
 
 
 def query_runner_data(question: str) -> str:

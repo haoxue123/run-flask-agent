@@ -384,6 +384,16 @@ def api_coach_chat():
     except Exception as e:
         print(f"[RAG] 检索失败，跳过知识增强：{e}")
 
+    # Path A+：因果/解释类问题额外注入靶向关系层（词法匹配，零 LLM 成本；事实类问题不变）
+    try:
+        import relation_layer
+        if relation_layer.classify_intent_relation(message):
+            rel_ctx = relation_layer.retrieve_relations(message)
+            if rel_ctx:
+                context = context + "\n\n" + rel_ctx
+    except Exception:
+        pass
+
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": context},

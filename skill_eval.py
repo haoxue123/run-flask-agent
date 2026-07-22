@@ -48,6 +48,7 @@ from skills import (
 )
 from skills import data_query
 import data_tool
+import relation_layer
 
 # ---------------------------------------------------------------------------
 # 结果收集
@@ -197,6 +198,59 @@ def check_p3_2():
 
 
 # ---------------------------------------------------------------------------
+# P4：Path A+ 关系层 + 意图路由（新增）
+# ---------------------------------------------------------------------------
+def check_p4_1():
+    rel = relation_layer.retrieve_relations("为什么跑步会膝盖疼")
+    ok = isinstance(rel, str) and "跑步膝" in rel and "成因" in rel
+    return ok, f"relation_context 含跑步膝/成因: {ok}"
+
+
+def check_p4_2():
+    f = relation_layer.classify_intent_relation("我最近跑了多少公里")
+    t = relation_layer.classify_intent_relation("为什么配速上不去")
+    ok = (f is False) and (t is True)
+    return ok, f"量化=False({f});为什么=True({t})"
+
+
+def check_p4_3():
+    rel = relation_layer.retrieve_relations("我最近跑了多少公里")
+    ok = rel == ""
+    return ok, f"非因果 query 返回空串: {rel!r}"
+
+
+def check_p4_4():
+    # 注入 fake rag，使 _rag_fallback 走 RAG 分支；验证 RAG + 关系层同时注入
+    fake_rag = types.ModuleType("rag")
+    fake_rag.retrieve_knowledge = lambda q, top_k=3, category=None, authority_boost=0.2: [
+        {"source": "book_training_theory.md", "content": "知识片段ABC", "score": 0.9}
+    ]
+    fake_rag.format_knowledge_context = lambda results: "【相关知识库补充】\n知识片段ABC"
+    sys.modules["rag"] = fake_rag
+
+    orig_get = data_query._get_profile
+    data_query._get_profile = lambda: {
+        "近期跑步数据": [], "目标": {}, "基本信息": {},
+        "健康指标": {}, "体能指标": {},
+    }
+    _LLM_CALLS.clear()
+    try:
+        data_query.query_runner_data("为什么跑步会膝盖疼")
+    finally:
+        data_query._get_profile = orig_get
+        sys.modules.pop("rag", None)
+
+    if not _LLM_CALLS:
+        return False, "未触发 LLM 调用"
+    last_user = ""
+    for m in _LLM_CALLS[-1]:
+        if m.get("role") == "user":
+            last_user = m.get("content", "")
+    ok = ("知识片段ABC" in last_user) and ("跑步膝" in last_user)
+    return ok, "RAG 与关系层同时注入" if ok else f"缺失: rag={'知识片段ABC' in last_user}, rel={'跑步膝' in last_user}"
+
+
+# ---------------------------------------------------------------------------
 # 执行
 # ---------------------------------------------------------------------------
 run_check("P0", "P0-1a", "工具声明无漂移", "render_tool_prompt() 声明集合 == registry 键集合", check_p0_1a)
@@ -208,6 +262,10 @@ run_check("P2", "P2-1", "profile 会话缓存", "同会话 profile 仅构建 1 �
 run_check("P2", "P2-2", "router 无专属解析", "coach.py 不含 skill_name == 按名分支", check_p2_2)
 run_check("P3", "P3-1", "注册中心错误分型", "tool_call/parse_and_call 错误带 kind", check_p3_1)
 run_check("P3", "P3-2", "RAG↔Skill 协同", "数据无、知识有时 data_query 回退 RAG 并注入", check_p3_2)
+run_check("P4", "P4-1", "关系层因果检索", "retrieve_relations(因果query) 返回含跑步膝/成因", check_p4_1)
+run_check("P4", "P4-2", "意图路由判定", "量化=False；为什么=True", check_p4_2)
+run_check("P4", "P4-3", "非因果不注入", "非因果 query retrieve_relations 返回空串", check_p4_3)
+run_check("P4", "P4-4", "RAG+关系双注入", "_rag_fallback causal 同时注入 RAG 与关系", check_p4_4)
 
 # ---------------------------------------------------------------------------
 # 汇总 + 落盘

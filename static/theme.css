@@ -33,115 +33,113 @@
   --gray-850: #151A1F;  --gray-900: #1B2127;  --gray-950: #232C34;
 }
 
-/* 2) SEMANTIC 语义层 - 日间模式 */
+/* 2) SEMANTIC 语义层 - 日间模式（Pulse Green 优化 v3） */
 :root {
-  --rc-background: #F6F9F7;   --rc-surface: #FFFFFF;   --rc-surface-elevated: #EEF3F0;
+  --rc-background: #F6FAF7;   --rc-surface: #FFFFFF;   --rc-surface-elevated: #EEF3F0;   --rc-surface-raised: #EEF3F0;   --rc-surface-sunken: #EAF1ED;
   --rc-surface-alt: #F1F5F3;  --rc-popover: #FFFFFF;   --rc-popover-foreground: #16201C;
 
-  --rc-text: #16201C;  --rc-text-secondary: #445049;  --rc-text-muted: #6A746D;
-  --rc-text-on-brand: #05291D;  --rc-text-on-energy: #3A1500;
+  --rc-text: #16201C;  --rc-text-secondary: #445049;  --rc-text-muted: #5E6862;
+  --rc-text-on-brand: #04140D;  --rc-text-on-energy: #1A2400;
 
-  --rc-border: rgba(22,32,28,0.12);  --rc-border-strong: rgba(22,32,28,0.20);
-  --rc-border-light: rgba(22,32,28,0.08);  --rc-chart-grid: rgba(22,32,28,0.08);
+  --rc-border: rgba(16,32,28,0.12);  --rc-border-strong: rgba(16,32,28,0.20);  --rc-border-light: rgba(16,32,28,0.08);  --rc-border-faint: rgba(16,32,28,0.07);  --rc-chart-grid: rgba(16,32,28,0.08);
 
-  --rc-brand: var(--green-500);  --rc-brand-hover: var(--green-600);  --rc-brand-active: var(--green-700);
-  --rc-on-brand: var(--rc-text-on-brand);  --rc-brand-soft: var(--green-50);
-  --rc-brand-border: rgba(22,199,132,0.22);
-  --rc-data: var(--teal-500);  --rc-data-hover: var(--teal-600);  --rc-on-data: #FFFFFF;  --rc-data-soft: var(--teal-50);
-  --rc-energy: var(--orange-500);  --rc-energy-hover: var(--orange-600);  --rc-on-energy: var(--rc-text-on-energy);  --rc-energy-soft: var(--orange-50);
+  --rc-brand: #10E08A;  --rc-brand-hover: #0FCB7E;  --rc-brand-active: #0A9A63;
+  --rc-on-brand: #04140D;  --rc-brand-soft: rgba(16,224,138,0.12);  --rc-brand-border: rgba(16,224,138,0.30);
+  --rc-data: #0B7FA0;  --rc-data-hover: #0A6E8C;  --rc-on-data: #FFFFFF;  --rc-data-soft: rgba(11,127,160,0.12);
+  --rc-energy: #C6F000;  --rc-energy-hover: #D6FF1A;  --rc-energy-active: #B2DA00;  --rc-on-energy: #1A2400;  --rc-energy-soft: rgba(198,240,0,0.12);  --rc-glow-energy: 0 0 18px rgba(198,240,0,0.22);
 
-  --state-success: #16C784;  --state-info: #0EA5E9;  --state-warning: #F5A623;  --state-error: #FF3B30;
-  --rc-success: var(--state-success);  --rc-info: var(--state-info);  --rc-warning: var(--state-warning);  --rc-danger: var(--state-error);
+  --state-success: #2BD493;  --state-info: #38BDF8;  --state-warning: #FFB02E;  --state-error: #FF5C5C;
+  --rc-success: #2BD493;  --rc-info: #38BDF8;  --rc-info-fg: #0369A1;  --rc-warning: #FFB02E;  --rc-warning-fg: #92560A;  --rc-danger: #FF5C5C;  --rc-danger-fg: #B91C1C;
 
-  --rc-ring: var(--green-500);  --rc-ring-offset: #FFFFFF;
+  --rc-ring: #0A9A63;  --rc-ring-offset: #FFFFFF;
 
-  --rc-zone-1: #E7F9F0;  --rc-zone-2: #B8EED3;  --rc-zone-3: #6FD9A6;  --rc-zone-4: #16C784;  --rc-zone-5: #0B8F5A;
-  --rc-chart-1: #16C784;  --rc-chart-2: #0EA5E9;  --rc-chart-3: #FF6A1A;  --rc-chart-4: #F5A623;  --rc-chart-5: #FF3B30;
+  --rc-zone-1: #0369A1;  --rc-zone-2: #047857;  --rc-zone-3: #B45309;  --rc-zone-4: #C2410C;  --rc-zone-5: #B91C1C;
+  --rc-chart-1: #10E08A;  --rc-chart-2: #2BC4E6;  --rc-chart-3: #FFB02E;  --rc-chart-4: #C6F000;  --rc-chart-5: #FF5C5C;
 
   --rc-shadow-sm: 0 1px 2px rgba(16,32,28,0.06);  --rc-shadow-md: 0 6px 16px -6px rgba(16,32,28,0.12);
-  --rc-shadow-lg: 0 16px 32px -12px rgba(16,32,28,0.18);  --rc-glow-brand: none;
+  --rc-shadow-lg: 0 16px 32px -12px rgba(16,32,28,0.18);  --rc-glow-brand: 0 0 18px rgba(16,224,138,0.25);
 
-  --rc-radius-sm: 4px; --rc-radius-md: 8px; --rc-radius-lg: 12px; --rc-radius-xl: 16px; --rc-radius-full: 9999px;
+  --rc-radius-sm: 6px; --rc-radius-md: 10px; --rc-radius-lg: 14px; --rc-radius-xl: 20px; --rc-radius-2xl: 28px; --rc-radius-full: 9999px;
   --rc-font-display: 'Inter Tight','Inter',-apple-system,sans-serif;
   --rc-font-body: 'Inter',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
   --rc-font-mono: 'JetBrains Mono','Consolas',monospace;
   --rc-text-xs: 0.75rem; --rc-text-sm: 0.8125rem; --rc-text-base: 0.9375rem; --rc-text-lg: 1.125rem;
-  --rc-text-xl: 1.375rem; --rc-text-2xl: 1.75rem; --rc-text-3xl: 2.25rem;
+  --rc-text-xl: 1.375rem; --rc-text-2xl: 1.75rem; --rc-text-3xl: 2.25rem; --rc-text-4xl: 3rem; --rc-text-5xl: 3.75rem;
   --rc-space-1: 4px; --rc-space-2: 8px; --rc-space-3: 12px; --rc-space-4: 16px; --rc-space-5: 20px;
-  --rc-space-6: 24px; --rc-space-8: 32px; --rc-space-10: 40px; --rc-space-12: 48px;
+  --rc-space-6: 24px; --rc-space-8: 32px; --rc-space-10: 40px; --rc-space-12: 48px; --rc-space-16: 64px; --rc-space-20: 80px; --rc-space-24: 96px;
   --rc-transition: 0.2s cubic-bezier(0.4,0,0.2,1);
 
-  /* 兼容别名（映射至绿青橙三角色） */
+  /* 兼容别名（保持不变，避免破坏现有模板） */
   --rc-primary: var(--rc-brand);  --rc-primary-strong: var(--rc-brand-active);  --rc-primary-foreground: var(--rc-on-brand);
-  --rc-primary-light: var(--green-400);  --rc-primary-dark: var(--green-600);  --rc-primary-bg: var(--rc-brand-soft);
+  --rc-primary-light: #0FCB7E;  --rc-primary-dark: #0A9A63;  --rc-primary-bg: var(--rc-brand-soft);
   --rc-primary-border: var(--rc-brand-border);  --rc-text-on-primary: var(--rc-on-brand);  --rc-destructive: var(--state-error);
   --rc-destructive-foreground: #FFFFFF;
   --rc-foreground: var(--rc-text);  --rc-card: var(--rc-surface);  --rc-card-foreground: var(--rc-text);
   --rc-card-hover: var(--rc-surface-elevated);  --rc-card-alt: var(--rc-surface-alt);
-  --rc-muted: var(--rc-surface-elevated);  --rc-muted-foreground: var(--rc-text-secondary);  --rc-input: var(--rc-surface-elevated);
+  --rc-muted: var(--rc-surface-elevated);  --rc-muted-foreground: var(--rc-text-secondary);  --rc-input: var(--rc-surface-sunken);
   --rc-sidebar: var(--gray-25);  --rc-sidebar-foreground: var(--rc-text);  --rc-sidebar-primary: var(--rc-brand);
   --rc-sidebar-primary-foreground: var(--rc-on-brand);  --rc-sidebar-accent: var(--rc-surface-elevated);
   --rc-sidebar-accent-foreground: var(--rc-text);  --rc-sidebar-border: var(--rc-border);  --rc-sidebar-ring: var(--rc-ring);
   --rc-sidebar-bg: var(--rc-sidebar);  --rc-sidebar-text: var(--rc-sidebar-foreground);
   --rc-sidebar-active: var(--rc-sidebar-primary);  --rc-sidebar-hover: var(--rc-sidebar-accent);
 
-  /* Orb 辉光（绿系，I1 身份统一） */
+  /* Orb 辉光 */
   --rc-orb-highlight: #93E9C4;  --rc-orb-shadow: #0A6F47;
-  --rc-orb-glow: 0 0 16px rgba(22,199,132,0.35);
-  --rc-orb-glow-strong: 0 0 28px rgba(22,199,132,0.55), 0 0 56px rgba(22,199,132,0.25);
-  --rc-logo-glow: 0 0 12px rgba(22,199,132,0.30);
+  --rc-orb-glow: 0 0 16px rgba(16,224,138,0.35);
+  --rc-orb-glow-strong: 0 0 28px rgba(16,224,138,0.55), 0 0 56px rgba(16,224,138,0.25);
+  --rc-logo-glow: 0 0 12px rgba(16,224,138,0.30);
 
-  /* 氛围层渐变（I7 静态绿系） */
-  --rc-ambient-dawn:  linear-gradient(90deg, transparent, rgba(22,199,132,0.06), transparent);
+  /* 氛围层渐变 */
+  --rc-ambient-dawn:  linear-gradient(90deg, transparent, rgba(16,224,138,0.06), transparent);
   --rc-ambient-noon:  linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,0));
-  --rc-ambient-dusk:  linear-gradient(90deg, transparent, rgba(14,165,233,0.05), transparent);
-  --rc-ambient-night: radial-gradient(circle at 20% 30%, rgba(22,199,132,0.06), transparent 60%);
+  --rc-ambient-dusk:  linear-gradient(90deg, transparent, rgba(43,196,230,0.05), transparent);
+  --rc-ambient-night: radial-gradient(circle at 20% 30%, rgba(16,224,138,0.06), transparent 60%);
 }
 
 /* 3) SEMANTIC 语义层 - 夜间模式 */
 [data-theme="dark"], .dark {
-  --rc-background: #0E1216;  --rc-surface: #151A1F;  --rc-surface-elevated: #1B2127;
-  --rc-surface-alt: #10151A;  --rc-popover: #151A1F;  --rc-popover-foreground: #EAF0EE;
+  --rc-background: #0B0F0E;  --rc-surface: #141A18;  --rc-surface-elevated: #1A221F;  --rc-surface-raised: #1A221F;  --rc-surface-sunken: #0E1311;
+  --rc-surface-alt: #10151A;  --rc-popover: #141A18;  --rc-popover-foreground: #ECF3EF;
 
-  --rc-text: #EAF0EE;  --rc-text-secondary: #A9B4AE;  --rc-text-muted: #828C86;
-  --rc-text-on-brand: #05291D;  --rc-text-on-energy: #3A1500;
+  --rc-text: #ECF3EF;  --rc-text-secondary: #9FAAA4;  --rc-text-muted: #7C887F;
+  --rc-text-on-brand: #04140D;  --rc-text-on-energy: #1A2400;
 
-  --rc-border: rgba(255,255,255,0.09);  --rc-border-strong: rgba(255,255,255,0.14);
+  --rc-border: rgba(255,255,255,0.08);  --rc-border-strong: rgba(255,255,255,0.14);  --rc-border-faint: rgba(255,255,255,0.05);
   --rc-border-light: rgba(255,255,255,0.05);  --rc-chart-grid: rgba(255,255,255,0.06);
 
-  --rc-brand: #2BD493;  --rc-brand-hover: #54E0A6;  --rc-brand-active: #2BD493;  --rc-on-brand: var(--rc-text-on-brand);
-  --rc-brand-soft: rgba(43,212,147,0.10);  --rc-brand-border: rgba(43,212,147,0.28);
-  --rc-data: #38BDF8;  --rc-data-hover: #6FCFF6;  --rc-on-data: #06283A;  --rc-data-soft: rgba(56,189,248,0.10);
-  --rc-energy: #FF8A47;  --rc-energy-hover: #FFA468;  --rc-on-energy: var(--rc-text-on-energy);  --rc-energy-soft: rgba(255,138,71,0.12);
+  --rc-brand: #10E08A;  --rc-brand-hover: #0FCB7E;  --rc-brand-active: #0A9A63;  --rc-on-brand: #04140D;
+  --rc-brand-soft: rgba(16,224,138,0.12);  --rc-brand-border: rgba(16,224,138,0.30);
+  --rc-data: #2BC4E6;  --rc-data-hover: #5FD4EE;  --rc-on-data: #04222B;  --rc-data-soft: rgba(43,196,230,0.12);
+  --rc-energy: #C6F000;  --rc-energy-hover: #D6FF1A;  --rc-energy-active: #B2DA00;  --rc-on-energy: #1A2400;  --rc-energy-soft: rgba(198,240,0,0.12);  --rc-glow-energy: 0 0 24px rgba(198,240,0,0.28);
 
-  --state-success: #2BD493;  --state-info: #38BDF8;  --state-warning: #FBBF4D;  --state-error: #FF6A60;
-  --rc-success: var(--state-success);  --rc-info: var(--state-info);  --rc-warning: var(--state-warning);  --rc-danger: var(--state-error);
+  --state-success: #2BD493;  --state-info: #38BDF8;  --state-warning: #FFB02E;  --state-error: #FF5C5C;
+  --rc-success: #2BD493;  --rc-info: #38BDF8;  --rc-info-fg: #0369A1;  --rc-warning: #FFB02E;  --rc-warning-fg: #92560A;  --rc-danger: #FF5C5C;  --rc-danger-fg: #B91C1C;
 
-  --rc-ring: #2BD493;  --rc-ring-offset: #0E1216;
+  --rc-ring: #10E08A;  --rc-ring-offset: #0B0F0E;
 
-  --rc-zone-1: #0E2A1F;  --rc-zone-2: #155043;  --rc-zone-3: #1E8C63;  --rc-zone-4: #2BD493;  --rc-zone-5: #7DF0B8;
-  --rc-chart-1: #2BD493;  --rc-chart-2: #38BDF8;  --rc-chart-3: #FF8A47;  --rc-chart-4: #FBBF4D;  --rc-chart-5: #FF6A60;
+  --rc-zone-1: #38BDF8;  --rc-zone-2: #34D399;  --rc-zone-3: #FBBF24;  --rc-zone-4: #FB923C;  --rc-zone-5: #FF5C5C;
+  --rc-chart-1: #10E08A;  --rc-chart-2: #2BC4E6;  --rc-chart-3: #FFB02E;  --rc-chart-4: #C6F000;  --rc-chart-5: #FF5C5C;
 
   --rc-shadow-sm: 0 1px 2px rgba(0,0,0,0.30);  --rc-shadow-md: 0 8px 24px -8px rgba(0,0,0,0.45);
-  --rc-shadow-lg: 0 20px 40px -12px rgba(0,0,0,0.55);  --rc-glow-brand: 0 0 20px rgba(43,212,147,0.35);
+  --rc-shadow-lg: 0 20px 40px -12px rgba(0,0,0,0.55);  --rc-glow-brand: 0 0 24px rgba(16,224,138,0.35);
 
-  --rc-radius-sm: 4px; --rc-radius-md: 8px; --rc-radius-lg: 12px; --rc-radius-xl: 16px; --rc-radius-full: 9999px;
+  --rc-radius-sm: 6px; --rc-radius-md: 10px; --rc-radius-lg: 14px; --rc-radius-xl: 20px; --rc-radius-2xl: 28px; --rc-radius-full: 9999px;
   --rc-font-display: 'Inter Tight','Inter',-apple-system,sans-serif;
   --rc-font-body: 'Inter',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
   --rc-font-mono: 'JetBrains Mono','Consolas',monospace;
   --rc-text-xs: 0.75rem; --rc-text-sm: 0.8125rem; --rc-text-base: 0.9375rem; --rc-text-lg: 1.125rem;
-  --rc-text-xl: 1.375rem; --rc-text-2xl: 1.75rem; --rc-text-3xl: 2.25rem;
+  --rc-text-xl: 1.375rem; --rc-text-2xl: 1.75rem; --rc-text-3xl: 2.25rem; --rc-text-4xl: 3rem; --rc-text-5xl: 3.75rem;
   --rc-space-1: 4px; --rc-space-2: 8px; --rc-space-3: 12px; --rc-space-4: 16px; --rc-space-5: 20px;
-  --rc-space-6: 24px; --rc-space-8: 32px; --rc-space-10: 40px; --rc-space-12: 48px;
+  --rc-space-6: 24px; --rc-space-8: 32px; --rc-space-10: 40px; --rc-space-12: 48px; --rc-space-16: 64px; --rc-space-20: 80px; --rc-space-24: 96px;
   --rc-transition: 0.2s cubic-bezier(0.4,0,0.2,1);
 
-  --rc-primary: var(--rc-brand);  --rc-primary-strong: var(--rc-brand);  --rc-primary-foreground: var(--rc-on-brand);
-  --rc-primary-light: #54E0A6;  --rc-primary-dark: #2BD493;  --rc-primary-bg: var(--rc-brand-soft);
+  --rc-primary: var(--rc-brand);  --rc-primary-strong: var(--rc-brand-active);  --rc-primary-foreground: var(--rc-on-brand);
+  --rc-primary-light: #0FCB7E;  --rc-primary-dark: #10E08A;  --rc-primary-bg: var(--rc-brand-soft);
   --rc-primary-border: var(--rc-brand-border);  --rc-text-on-primary: var(--rc-on-brand);  --rc-destructive: var(--state-error);
-  --rc-destructive-foreground: #06283A;
+  --rc-destructive-foreground: #04222B;
   --rc-foreground: var(--rc-text);  --rc-card: var(--rc-surface);  --rc-card-foreground: var(--rc-text);
   --rc-card-hover: var(--rc-surface-elevated);  --rc-card-alt: var(--rc-surface-alt);
-  --rc-muted: var(--rc-surface-elevated);  --rc-muted-foreground: var(--rc-text-secondary);  --rc-input: var(--rc-surface-elevated);
+  --rc-muted: var(--rc-surface-elevated);  --rc-muted-foreground: var(--rc-text-secondary);  --rc-input: var(--rc-surface-sunken);
   --rc-sidebar: #0C1014;  --rc-sidebar-foreground: var(--rc-text);  --rc-sidebar-primary: var(--rc-brand);
   --rc-sidebar-primary-foreground: var(--rc-on-brand);  --rc-sidebar-accent: var(--rc-surface-elevated);
   --rc-sidebar-accent-foreground: var(--rc-text);  --rc-sidebar-border: var(--rc-border);  --rc-sidebar-ring: var(--rc-ring);
@@ -149,14 +147,14 @@
   --rc-sidebar-active: var(--rc-sidebar-primary);  --rc-sidebar-hover: var(--rc-sidebar-accent);
 
   --rc-orb-highlight: #93E9C4;  --rc-orb-shadow: #0A6F47;
-  --rc-orb-glow: 0 0 22px rgba(43,212,147,0.45), 0 0 44px rgba(43,212,147,0.20);
-  --rc-orb-glow-strong: 0 0 32px rgba(43,212,147,0.60), 0 0 72px rgba(43,212,147,0.28);
-  --rc-logo-glow: 0 0 14px rgba(43,212,147,0.40);
+  --rc-orb-glow: 0 0 22px rgba(16,224,138,0.45), 0 0 44px rgba(16,224,138,0.20);
+  --rc-orb-glow-strong: 0 0 32px rgba(16,224,138,0.60), 0 0 72px rgba(16,224,138,0.28);
+  --rc-logo-glow: 0 0 14px rgba(16,224,138,0.40);
 
-  --rc-ambient-dawn:  linear-gradient(90deg, transparent, rgba(43,212,147,0.06), transparent);
-  --rc-ambient-noon:  linear-gradient(180deg, rgba(14,18,22,0), rgba(14,18,22,0));
-  --rc-ambient-dusk:  linear-gradient(90deg, transparent, rgba(56,189,248,0.05), transparent);
-  --rc-ambient-night: radial-gradient(circle at 20% 30%, rgba(43,212,147,0.06), transparent 60%);
+  --rc-ambient-dawn:  linear-gradient(90deg, transparent, rgba(16,224,138,0.06), transparent);
+  --rc-ambient-noon:  linear-gradient(180deg, rgba(11,15,14,0), rgba(11,15,14,0));
+  --rc-ambient-dusk:  linear-gradient(90deg, transparent, rgba(43,196,230,0.05), transparent);
+  --rc-ambient-night: radial-gradient(circle at 20% 30%, rgba(16,224,138,0.06), transparent 60%);
 }
 
 

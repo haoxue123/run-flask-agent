@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+{% block title %}设计令牌 | COACH{% endblock %}
+{% block head %}
+<style>
+/* ============================================================
+   设计令牌配置页 —— Pulse Green v3
+   核心：textarea 预填当前 --rc-* 令牌（回填），一键换肤
+   ============================================================ */
+.tokens-wrap {
+    max-width: 960px;
+    margin: 0 auto;
+    position: relative;
+}
+
+/* 跑道弧线装饰（≤6% 透明度，单一图层） */
+.tokens-track {
+    position: absolute;
+    top: -8px;
+    right: -24px;
+    width: 280px;
+    height: 280px;
+    pointer-events: none;
+    opacity: 0.06;
+    color: var(--rc-brand);
+    z-index: 0;
+}
+
+.tokens-header {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--rc-space-4);
+    margin-bottom: var(--rc-space-5);
+}
+.tokens-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--rc-space-2);
+    font-size: var(--rc-text-xs);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--rc-data);
+    margin-bottom: var(--rc-space-2);
+}
+.tokens-title {
+    font-family: var(--rc-font-display);
+    font-size: var(--rc-text-3xl);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0;
+    line-height: 1.15;
+}
+.tokens-title .accent {
+    color: var(--rc-brand);
+}
+.tokens-sub {
+    font-size: var(--rc-text-sm);
+    color: var(--rc-text-muted);
+    margin: var(--rc-space-2) 0 0;
+    max-width: 52ch;
+}
+.tokens-badge {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--rc-text-xs);
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: var(--rc-radius-full);
+    background: var(--rc-energy-soft);
+    color: var(--rc-energy);
+    border: 1px solid color-mix(in srgb, var(--rc-energy) 30%, transparent);
+}
+
+/* 工作方式说明 */
+.tokens-info {
+    position: relative;
+    z-index: 1;
+    margin-bottom: var(--rc-space-4);
+    border-left: 3px solid var(--rc-data);
+}
+.tokens-info-title {
+    display: flex;
+    align-items: center;
+    gap: var(--rc-space-2);
+    font-size: var(--rc-text-sm);
+    font-weight: 600;
+    color: var(--rc-text-secondary);
+    margin-bottom: var(--rc-space-3);
+}
+.tokens-info ol {
+    margin: 0;
+    padding-left: var(--rc-space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--rc-space-2);
+}
+.tokens-info li {
+    font-size: var(--rc-text-sm);
+    color: var(--rc-text-secondary);
+    line-height: 1.6;
+}
+.tokens-info code {
+    font-family: var(--rc-font-mono);
+    font-size: 0.85em;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: var(--rc-surface-sunken);
+    color: var(--rc-text);
+}
+
+/* 编辑器 */
+.tokens-editor {
+    position: relative;
+    z-index: 1;
+    margin-bottom: var(--rc-space-4);
+}
+.tokens-editor-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--rc-space-3);
+    margin-bottom: var(--rc-space-3);
+    flex-wrap: wrap;
+}
+.tokens-editor-head .h {
+    font-family: var(--rc-font-display);
+    font-weight: 600;
+    font-size: var(--rc-text-lg);
+}
+.tokens-editor-head .hint {
+    font-size: var(--rc-text-xs);
+    color: var(--rc-text-muted);
+}
+.tokens-textarea {
+    width: 100%;
+    min-height: 300px;
+    resize: vertical;
+    font-family: var(--rc-font-mono);
+    font-size: 12.5px;
+    line-height: 1.65;
+    tab-size: 2;
+    background: var(--rc-surface-sunken);
+    color: var(--rc-text);
+    border: 1px solid var(--rc-border);
+    border-radius: var(--rc-radius-md);
+    padding: var(--rc-space-4);
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+}
+.tokens-textarea:focus {
+    border-color: var(--rc-brand);
+    box-shadow: 0 0 0 3px var(--rc-brand-soft);
+    outline: none;
+}
+.tokens-actions {
+    display: flex;
+    gap: var(--rc-space-3);
+    margin-top: var(--rc-space-4);
+    flex-wrap: wrap;
+}
+.tokens-actions .btn {
+    min-width: 132px;
+    justify-content: center;
+}
+.tokens-msg {
+    margin-top: var(--rc-space-3);
+    padding: var(--rc-space-3) var(--rc-space-4);
+    border-radius: var(--rc-radius-md);
+    font-size: var(--rc-text-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--rc-space-2);
+}
+.tokens-msg[hidden] { display: none; }
+.tokens-msg--success {
+    background: color-mix(in srgb, var(--rc-success) 14%, transparent);
+    color: var(--rc-success);
+    border: 1px solid color-mix(in srgb, var(--rc-success) 30%, transparent);
+}
+.tokens-msg--error {
+    background: color-mix(in srgb, var(--rc-danger) 14%, transparent);
+    color: var(--rc-danger);
+    border: 1px solid color-mix(in srgb, var(--rc-danger) 30%, transparent);
+}
+
+/* 当前调色板 */
+.tokens-palette-card {
+    position: relative;
+    z-index: 1;
+}
+.tokens-palette-label {
+    font-size: var(--rc-text-xs);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--rc-text-muted);
+    margin-bottom: var(--rc-space-3);
+}
+.tokens-palette {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: var(--rc-space-3);
+}
+.palette-item {
+    display: flex;
+    align-items: center;
+    gap: var(--rc-space-2);
+    font-size: var(--rc-text-xs);
+    color: var(--rc-text-secondary);
+}
+.palette-swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 7px;
+    flex-shrink: 0;
+    border: 1px solid var(--rc-border);
+}
+.palette-name {
+    font-family: var(--rc-font-mono);
+}
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="tokens-wrap">
+    <!-- 跑道弧线装饰 -->
+    <svg class="tokens-track" viewBox="0 0 200 200" fill="none" aria-hidden="true">
+        <path d="M20 160 A80 80 0 0 1 180 160" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+        <path d="M40 160 A60 60 0 0 1 160 160" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+        <path d="M60 160 A40 40 0 0 1 140 160" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+    </svg>
+
+    <!-- 标题 -->
+    <div class="tokens-header">
+        <div>
+            <span class="tokens-eyebrow"><i data-lucide="palette" style="width:14px;height:14px;"></i> 外观调校</span>
+            <h1 class="tokens-title">设计<span class="accent">令牌</span></h1>
+            <p class="tokens-sub">这里是 COACH 的视觉身份证。修改下方 <code style="font-family:var(--rc-font-mono);font-size:0.85em;padding:1px 6px;border-radius:6px;background:var(--rc-surface-sunken);">--rc-*</code> 值即可实时换肤，无需改动任何页面代码。</p>
+        </div>
+        <span class="tokens-badge"><i data-lucide="zap" style="width:13px;height:13px;"></i> Pulse Green v3</span>
+    </div>
+
+    <!-- 工作方式 -->
+    <div class="card tokens-info">
+        <div class="tokens-info-title"><i data-lucide="info" style="width:16px;height:16px;color:var(--rc-data);"></i> 工作方式</div>
+        <ol>
+            <li>下方文本框已<b>回填当前生效的令牌值</b>（<code>:root</code> 日间块 + <code>[data-theme="dark"]</code> 夜间块），直接编辑即可。</li>
+            <li>点击「应用令牌」→ 写入 <code>static/theme.css</code>，整站立即换肤。</li>
+            <li>改错了？点「重置默认」恢复 Pulse Green 优化方案。</li>
+        </ol>
+    </div>
+
+    <!-- 编辑器 -->
+    <div class="card tokens-editor">
+        <div class="tokens-editor-head">
+            <span class="h">令牌编辑器</span>
+            <span class="hint">仅识别 <code style="font-family:var(--rc-font-mono);">--rc-*</code> 变量；禁止 @import / url() / javascript</span>
+        </div>
+        <textarea id="token-css" class="tokens-textarea" spellcheck="false" autocomplete="off">{{ token_css }}</textarea>
+        <div class="tokens-actions">
+            <button id="apply-btn" class="btn btn-primary" onclick="applyTokens()">
+                <i data-lucide="check" style="width:16px;height:16px;"></i>
+                <span>应用令牌</span>
+            </button>
+            <button id="reset-btn" class="btn btn-secondary" onclick="resetTokens()">
+                <i data-lucide="rotate-ccw" style="width:16px;height:16px;"></i>
+                <span>重置默认</span>
+            </button>
+        </div>
+        <div id="token-msg" class="tokens-msg" hidden></div>
+    </div>
+
+    <!-- 当前调色板 -->
+    <div class="card tokens-palette-card">
+        <div class="tokens-palette-label">当前调色板</div>
+        <div class="tokens-palette">
+            <div class="palette-item"><span class="palette-swatch" style="background:var(--rc-brand)"></span><span class="palette-name">brand</span></div>
+            <div class="palette-item"><span class="palette-swatch" style="background:var(--rc-data)"></span><span class="palette-name">data</span></div>
+            <div class="palette-item"><span class="palette-swatch" style="background:var(--rc-energy)"></span><span class="palette-name">energy</span></div>
+            <div class="palette-item"><span class="palette-swatch" style="background:var(--rc-zone-1)"></span><span class="palette-name">zone-1</span></div>
+            <div class="palette-item"><span class="palette-swatch" style="background:var(--rc-zone-2)"></span><span class="palette-name">zone-2</span></div>
+            <div class="palette-item"><span class="palette-swatch" style="background:var(--rc-zone-3)"></span><span class="palette-name">zone-3</span></div>
+            <div class="palette-item"><span class="palette-swatch" style="background:var(--rc-zone-4)"></span><span class="palette-name">zone-4</span></div>
+            <div class="palette-item"><span class="palette-swatch" style="background:var(--rc-zone-5)"></span><span class="palette-name">zone-5</span></div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showMsg(type, text) {
+    var msg = document.getElementById('token-msg');
+    if (!msg) return;
+    msg.hidden = false;
+    msg.className = 'tokens-msg tokens-msg--' + type;
+    msg.textContent = (type === 'success' ? '✓ ' : '⚠ ') + text;
+}
+
+function applyTokens() {
+    var ta = document.getElementById('token-css');
+    var btn = document.getElementById('apply-btn');
+    if (!ta || !btn) return;
+    btn.disabled = true;
+    fetch('/api/tokens/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ css: ta.value })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.success) {
+            showMsg('success', d.message || '已应用，正在刷新…');
+            setTimeout(function() { location.reload(); }, 700);
+        } else {
+            showMsg('error', d.error || '应用失败');
+        }
+    })
+    .catch(function(e) {
+        showMsg('error', '请求失败：' + e.message);
+    })
+    .finally(function() { btn.disabled = false; });
+}
+
+function resetTokens() {
+    var btn = document.getElementById('reset-btn');
+    if (!btn) return;
+    btn.disabled = true;
+    fetch('/api/tokens/reset', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.success) {
+            showMsg('success', d.message || '已重置，正在刷新…');
+            setTimeout(function() { location.reload(); }, 700);
+        } else {
+            showMsg('error', d.error || '重置失败');
+        }
+    })
+    .catch(function(e) {
+        showMsg('error', '请求失败：' + e.message);
+    })
+    .finally(function() { btn.disabled = false; });
+}
+</script>
+{% endblock %}

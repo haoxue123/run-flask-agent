@@ -15,6 +15,7 @@ from routes.data import data_bp
 from routes.plan import plan_bp
 from routes.coach import coach_bp
 from routes.eval import eval_bp
+from routes.tokens import tokens_bp
 import rag
 
 
@@ -96,6 +97,7 @@ def create_app():
     app.register_blueprint(plan_bp)
     app.register_blueprint(coach_bp)
     app.register_blueprint(eval_bp)
+    app.register_blueprint(tokens_bp)
 
     return app
 

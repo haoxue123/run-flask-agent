@@ -9,11 +9,36 @@
 
     /* ---- 页面标题 ---- */
     .page-header {
+        position: relative;
+        overflow: hidden;
         display: flex;
         align-items: flex-end;
         justify-content: space-between;
         margin-bottom: var(--rc-space-4);
     }
+    /* 跑道弧线装饰（≤6% 透明度，单一图层） */
+    .page-header-track {
+        position: absolute;
+        right: -30px;
+        top: -50px;
+        width: 240px;
+        height: 200px;
+        pointer-events: none;
+        opacity: 0.06;
+        color: var(--rc-brand);
+    }
+    /* 训练类型 → HR 区间冷→热 标签 */
+    .summary-tag { font-weight: 500; background: var(--rc-muted); color: var(--rc-muted-foreground); }
+    .summary-tag[data-zone] {
+        background: color-mix(in srgb, var(--rc-zone-3) 16%, transparent);
+        color: var(--rc-zone-3);
+    }
+    .summary-tag[data-zone="1"] { background: color-mix(in srgb, var(--rc-zone-1) 16%, transparent); color: var(--rc-zone-1); }
+    .summary-tag[data-zone="2"] { background: color-mix(in srgb, var(--rc-zone-2) 16%, transparent); color: var(--rc-zone-2); }
+    .summary-tag[data-zone="3"] { background: color-mix(in srgb, var(--rc-zone-3) 16%, transparent); color: var(--rc-zone-3); }
+    .summary-tag[data-zone="4"] { background: color-mix(in srgb, var(--rc-zone-4) 16%, transparent); color: var(--rc-zone-4); }
+    .summary-tag[data-zone="5"] { background: color-mix(in srgb, var(--rc-zone-5) 16%, transparent); color: var(--rc-zone-5); }
+    .summary-tag[data-zone="0"] { background: var(--rc-muted); color: var(--rc-muted-foreground); }
     .page-title {
         font-size: 32px;
         font-weight: 700;
@@ -576,6 +601,11 @@
 {% endblock %}
 {% block content %}
     <div class="page-header">
+        <svg class="page-header-track" viewBox="0 0 200 200" fill="none" aria-hidden="true">
+            <path d="M16 168 A88 88 0 0 1 184 168" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+            <path d="M40 168 A64 64 0 0 1 160 168" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+            <path d="M64 168 A40 40 0 0 1 136 168" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+        </svg>
         <div>
             <h1 class="page-title">训练计划</h1>
             <p class="page-subtitle">上传运动文件或填写数据，AI 教练为你生成个性化训练计划</p>
@@ -1226,11 +1256,16 @@
         }
         document.getElementById('summary-badge').textContent = days.length + ' 天计划';
         var tags = '';
-        var tagColors = { '节奏跑': 'rgba(198,255,31,0.15)', '间歇跑': 'rgba(255,140,0,0.15)', '长距离': 'rgba(100,149,237,0.15)', '轻松跑': 'rgba(144,238,144,0.15)', '慢跑': 'rgba(144,238,144,0.15)', '恢复跑': 'rgba(60,179,113,0.15)', '冲刺跑': 'rgba(255,69,0,0.15)', 'LSD': 'rgba(100,149,237,0.15)' };
+        // 训练类型 → HR 区间冷→热（zone 1 冷蓝 → zone 5 热红）
+        var typeZone = {
+            '休息': 0, '恢复跑': 1, '慢跑': 1, '轻松跑': 2, '长距离': 3, 'LSD': 3,
+            '节奏跑': 4, '间歇跑': 5, '冲刺跑': 5
+        };
         for (var t in typeCount) {
-            var bg = tagColors[t] || 'rgba(255,255,255,0.1)';
-            var label = tagColors[t] ? t : '未分类';
-            tags += '<span class="summary-tag" style="background:' + bg + '">' + label + ' ×' + typeCount[t] + '</span>';
+            var zone = typeZone[t];
+            var zoneAttr = (zone === undefined) ? '' : ' data-zone="' + zone + '"';
+            var label = (zone === undefined) ? ('未分类：' + t) : t;
+            tags += '<span class="summary-tag"' + zoneAttr + '>' + label + ' ×' + typeCount[t] + '</span>';
         }
         document.getElementById('sum-type-tags').innerHTML = tags || '<span style="font-size:var(--rc-text-xs);color:var(--rc-text-muted);">暂无训练安排</span>';
     }

@@ -50,6 +50,7 @@ meta:
 | book_special_populations.md | 特殊人群 | OWNED（购买副本，限研究 RAG） | 萃取要点+改写概述+标注出处 | 2026-07-21 新增；Sims《ROAR》/ Webb《Older, Faster, Stronger》2016；不整本照搬 |
 | ref_numeric_tables.md | 数据化 | OWNED（标准参考萃取） | 数值要点萃取+改写概述+标注出处 | 2026-07-21 新增（Path A / G7 数值查表缺口）；VDOT→配速、心率五区间、ACWR 阈值、功率区间；不整本照搬 |
 | book_sport_psychology.md | 运动心理 | OWNED（标准参考萃取） | 萃取要点+改写概述+标注出处 | 2026-07-21 新增（Path A / G1 运动心理缺口）；Weinberg&Gould《运动心理学基础》/ Buman&Marcus 行为改变；不整本照搬 |
+| data/relations.json | 数据资产(关系层) | 自编(策展) | Path A+ 靶向关系层 typed triples | 2026-07-22 新增（Path A+ 关系层+意图路由）；词法匹配用，非全库、非图数据库；来源见各 triple 的 source 字段 |
 
 ## 合规红线
 
