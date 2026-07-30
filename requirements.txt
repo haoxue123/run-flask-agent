@@ -34,3 +34,6 @@ APScheduler>=3.10.0
 
 # mem0 跨会话长期记忆层（自托管 OSS：DeepSeek 抽取 + 智谱 embedding-3 + Chroma 向量库）
 mem0ai>=2.0.0
+
+# 测试（smoke 测试：失败即阻断，区别于评测 harness）
+pytest>=8.0.0
