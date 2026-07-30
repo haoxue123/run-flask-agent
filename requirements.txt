@@ -25,3 +25,12 @@ flask>=3.0.0
 # RAG 知识库（启用语义检索时需安装；缺失时 rag 模块会静默降级）
 chromadb>=0.4.22
 sentence-transformers>=2.2.0
+
+# Garmin Connect 同步（garth-ng：OAuth 令牌持久化+中国区支持，根治反复登录 429 / DNS 不通）
+garth-ng>=1.1.0
+
+# 后台定时任务（自动同步 Garmin 数据：启动拉一次 + 定时刷新）
+APScheduler>=3.10.0
+
+# mem0 跨会话长期记忆层（自托管 OSS：DeepSeek 抽取 + 智谱 embedding-3 + Chroma 向量库）
+mem0ai>=2.0.0

@@ -64,7 +64,11 @@ def generate():
         source_info = data_tool.get_data_source_info()
 
         plan_duration = int(request.form.get("plan_duration", "7"))
-        plan_result = llm_agent.generate_training_plan(profile, plan_duration=plan_duration)
+        # 用户明确指令：训练页"指令"输入框传入，作为一等输入进入生成（修复"命令不被听从"）
+        user_instructions = (request.form.get("instructions") or "").strip()
+        plan_result = llm_agent.generate_training_plan(
+            profile, plan_duration=plan_duration, user_instructions=user_instructions
+        )
         plan_text = plan_result["plan_text"]
         structured = plan_result["structured"]
         science = plan_result.get("science", {})
@@ -107,6 +111,7 @@ def generate():
             "science": science,
             "chart_url": f"/chart/{chart_filename}",
             "source": source_info.get("模式", "未知"),
+            "instructions": user_instructions,
             "error": None,
         })
     except AuthenticationError:

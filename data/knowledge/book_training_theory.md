@@ -2,6 +2,7 @@
 
 <!--
 meta:
+  title: 跑步公式 / 高级马拉松训练（Daniels' Running Formula / Advanced Marathoning）
   category: 训练理论
   author: Jack Daniels / Pete Pfitzinger 等
   year: 2013

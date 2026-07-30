@@ -2,6 +2,7 @@
 
 <!--
 meta:
+  title: 运动心理学基础（Foundations of Sport and Exercise Psychology）
   category: 运动心理
   author: Weinberg & Gould（运动心理学）/ Buman & Marcus（行为改变）/ 通用共识
   year: 2019

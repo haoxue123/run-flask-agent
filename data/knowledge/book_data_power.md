@@ -2,6 +2,7 @@
 
 <!--
 meta:
+  title: Run with Power（跑步功率训练）
   category: 数据化
   author: Jim Vance 等
   year: 2016

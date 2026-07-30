@@ -26,4 +26,5 @@ EXPOSE 5000
 
 # 生产用 gunicorn；2核2G 内存建议 workers=2，调大需同步加内存
 # 若 app.py 中 Flask 实例变量名不是 app，请改为 "<module>:<var>"
-CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:5000", "--timeout", "120", "app:app"]
+# 监听 Railway 注入的 $PORT（带 5000 兜底：本地 docker-compose 不注入 PORT 时仍可用 5000）
+CMD ["sh", "-c", "gunicorn -w 2 -b 0.0.0.0:${PORT:-5000} --timeout 120 app:app"]

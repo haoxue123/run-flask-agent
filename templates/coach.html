@@ -341,6 +341,35 @@
         .panel-toggle { display: none; }
         .chat-column { height: auto; }
     }
+
+    /* ---- 知识来源引用卡片（可点击复制） ---- */
+    .ref-block {
+        margin-top: var(--rc-space-3);
+        padding-top: var(--rc-space-3);
+        border-top: 1px dashed var(--rc-border);
+    }
+    .ref-title-lg {
+        display: flex; align-items: center; gap: 6px;
+        font-size: var(--rc-text-xs); color: var(--rc-text-muted);
+        font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+        margin-bottom: var(--rc-space-2);
+    }
+    .ref-title-lg i { width: 14px; height: 14px; color: var(--rc-primary); }
+    .ref-card {
+        display: flex; align-items: flex-start; gap: 8px;
+        background: var(--rc-muted); border: 1px solid var(--rc-border);
+        border-radius: var(--rc-radius-md); padding: var(--rc-space-2) var(--rc-space-3);
+        margin-bottom: var(--rc-space-2); cursor: pointer;
+        transition: border-color .15s ease, background .15s ease;
+    }
+    .ref-card:hover { border-color: var(--rc-primary); background: var(--rc-card); }
+    .ref-card-icon { width: 16px; height: 16px; color: var(--rc-primary); flex-shrink: 0; margin-top: 2px; }
+    .ref-card-main { flex: 1; min-width: 0; }
+    .ref-card-book { font-size: var(--rc-text-sm); font-weight: 600; color: var(--rc-text); line-height: 1.4; }
+    .ref-card-meta { font-size: var(--rc-text-xs); color: var(--rc-text-muted); margin-top: 2px; }
+    .ref-card-file { font-size: var(--rc-text-xs); color: var(--rc-text-muted); margin-top: 2px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .ref-card-copy { font-size: var(--rc-text-xs); color: var(--rc-primary); flex-shrink: 0; opacity: 0; transition: opacity .15s ease; align-self: center; }
+    .ref-card:hover .ref-card-copy { opacity: 1; }
 </style>
 {% endblock %}
 {% block content %}
@@ -529,18 +558,89 @@
         return safe;
     }
 
-    // 添加消息气泡（timeIso 可选：用于重水合历史消息时显示真实时间）
-    function addMessage(role, content, timeIso) {
+    // 去掉回复末尾的「参考来源」段落（改为卡片展示）
+    function stripRefBlock(text) {
+        if (!text) return text;
+        var idx = text.indexOf('参考来源');
+        if (idx === -1) return text;
+        return text.slice(0, idx).replace(/\s+$/, '');
+    }
+
+    // 单张引用卡片
+    function renderRefCards(refs) {
+        if (!refs || !refs.length) return '';
+        return refs.map(function(r) {
+            var meta = [];
+            if (r.author) meta.push(r.author);
+            if (r.year) meta.push(r.year);
+            var metaStr = meta.length ? meta.join('，') : '';
+            var book = escapeHtml(r.title || '');
+            var metaHtml = metaStr ? '<div class="ref-card-meta">' + escapeHtml(metaStr) + '</div>' : '';
+            var fileHtml = r.file ? '<div class="ref-card-file">' + escapeHtml(r.file) + '</div>' : '';
+            var attr = escapeHtml(JSON.stringify(r));
+            return '<div class="ref-card" data-ref="' + attr + '" title="点击复制引用">' +
+                '<i data-lucide="book" class="ref-card-icon"></i>' +
+                '<div class="ref-card-main"><div class="ref-card-book">《' + book + '》</div>' + metaHtml + fileHtml + '</div>' +
+                '<span class="ref-card-copy">复制</span>' +
+                '</div>';
+        }).join('');
+    }
+
+    // 带标题的引用区块
+    function renderRefBlock(refs) {
+        if (!refs || !refs.length) return '';
+        return '<div class="ref-block"><div class="ref-title-lg"><i data-lucide="book-open"></i>知识来源</div>' +
+            renderRefCards(refs) + '</div>';
+    }
+
+    // 复制引用到剪贴板
+    function copyCitation(ref) {
+        var cite = '《' + (ref.title || '') + '》' +
+            ((ref.author || ref.year) ? '（' + [ref.author, ref.year].filter(Boolean).join('，') + '）' : '') +
+            ' · ' + (ref.file || '');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(cite).then(function() {
+                if (window.DS && DS.showToast) DS.showToast('引用已复制', 'success');
+            }).catch(function() {
+                if (window.DS && DS.showToast) DS.showToast('复制失败', 'error');
+            });
+        }
+    }
+
+    // 更新底部「知识来源」面板（让原本静态的占位区真正可用）
+    function updateRagPanel(refs) {
+        var panel = document.getElementById('rag-panel');
+        var count = document.getElementById('rag-count');
+        var body = document.getElementById('rag-body');
+        if (!body) return;
+        if (!refs || !refs.length) return;
+        if (count) count.textContent = 'RAG · ' + refs.length + ' 条引用';
+        body.innerHTML = renderRefCards(refs);
+        if (window.lucide) lucide.createIcons();
+    }
+
+    // 点击任意引用卡片 → 复制引用
+    document.addEventListener('click', function(e) {
+        var card = e.target.closest ? e.target.closest('.ref-card') : null;
+        if (card) {
+            try { copyCitation(JSON.parse(card.getAttribute('data-ref'))); } catch (_) {}
+        }
+    });
+
+    // 添加消息气泡（timeIso 可选：用于重水合历史消息时显示真实时间；references 可选：结构化引用卡片）
+    function addMessage(role, content, timeIso, references) {
         var t = timeIso ? relativeTime(new Date(timeIso)) : relativeTime(new Date());
         var div = document.createElement('div');
         div.className = 'chat-message ' + role;
 
         if (role === 'coach') {
+            var bodyText = (references && references.length) ? stripRefBlock(content) : content;
             div.innerHTML =
                 '<div class="chat-row">' +
                 '<div class="coach-orb coach-orb--chat" aria-hidden="true"></div>' +
                 '<div>' +
-                '<div class="chat-bubble-coach">' + renderMarkdown(content) + '</div>' +
+                '<div class="chat-bubble-coach">' + renderMarkdown(bodyText) + '</div>' +
+                renderRefBlock(references) +
                 '<div class="chat-time chat-time-left">' + t + '</div>' +
                 '</div>' +
                 '</div>';
@@ -570,9 +670,9 @@
     function saveMirror(arr) {
         try { localStorage.setItem(LS_KEY, JSON.stringify(arr.slice(-50))); } catch (e) {}
     }
-    function pushMirror(role, content) {
+    function pushMirror(role, content, refs) {
         var arr = loadMirror();
-        arr.push({ role: role, content: content, time: new Date().toISOString() });
+        arr.push({ role: role, content: content, time: new Date().toISOString(), references: refs || null });
         saveMirror(arr);
     }
     function loadChatHistory() {
@@ -582,13 +682,13 @@
                 var hist = (data && data.history) ? data.history : null;
                 if (!hist || !hist.length) hist = loadMirror();
                 if (hist && hist.length) {
-                    hist.forEach(function (e) { addMessage(e.role, e.content || '', e.time); });
+                    hist.forEach(function (e) { addMessage(e.role, e.content || '', e.time, e.references); });
                     if (data && data.history) saveMirror(data.history);
                 }
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             })
             .catch(function () {
-                loadMirror().forEach(function (e) { addMessage(e.role, e.content || '', e.time); });
+                loadMirror().forEach(function (e) { addMessage(e.role, e.content || '', e.time, e.references); });
             });
     }
     window.newChat = function () {
@@ -670,8 +770,11 @@
             var buffer = '';    // SSE 跨 chunk 缓冲区
             var rafId = null;   // RAF 批量更新 ID
             var hasStartedSpeaking = false;  // 首个 token 到达时切 is-speaking（仅一次）
+            var finalized = false;   // 收到 references 后锁定，避免流式刷新把卡片区覆盖回正文
+            var lastRefs = null;     // 最近一次结构化引用
 
             function flushStreamText() {
+                if (finalized) { rafId = null; return; }
                 if (coachDiv) {
                     var bubble = coachDiv.querySelector('.chat-bubble-coach');
                     if (bubble) bubble.innerHTML = renderMarkdown(fullText);
@@ -682,6 +785,23 @@
                 }
                 chatMessages.scrollTop = chatMessages.scrollHeight;
                 rafId = null;
+            }
+
+            // 收到结构化 references：把正文里的「参考来源」段替换成卡片，并刷新底部面板
+            function applyReferences(refs) {
+                finalized = true;
+                lastRefs = refs;
+                if (rafId) { clearTimeout(rafId); rafId = null; }
+                if (!coachDiv) coachDiv = addMessage('coach', '');
+                var inner = coachDiv.querySelector('.chat-row > div');
+                var bubble = coachDiv.querySelector('.chat-bubble-coach');
+                if (bubble) bubble.innerHTML = renderMarkdown(stripRefBlock(fullText));
+                var old = inner ? inner.querySelector('.ref-block') : null;
+                if (old) old.remove();
+                if (inner) inner.insertAdjacentHTML('beforeend', renderRefBlock(refs));
+                if (window.lucide) lucide.createIcons();
+                updateRagPanel(refs);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
             }
 
             function readStream() {
@@ -697,7 +817,7 @@
                         isSending = false;
                         sendBtn.disabled = !chatInput.value.trim();
                         setOrbState(null);
-                        if (fullText.trim()) pushMirror('assistant', fullText);
+                        if (fullText.trim()) pushMirror('assistant', fullText, lastRefs);
                         return;
                     }
 
@@ -738,6 +858,8 @@
                             if (!rafId) {
                                 rafId = setTimeout(flushStreamText, 0);
                             }
+                        } else if (data.references) {
+                            applyReferences(data.references);
                         } else if (data.error) {
                             addMessage('coach', '教练暂时无法回复：' + data.error);
                             DS.showToast('发送失败，请重试', 'error');

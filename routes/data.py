@@ -1,12 +1,15 @@
-"""数据管理路由 — 上传、刷新、画像"""
+"""数据管理路由 — 上传、刷新、画像、Garmin 同步"""
 import os
 import json
+import logging
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, current_app
 
 import data_tool
+import garmin_sync
 
 data_bp = Blueprint("data", __name__)
+logger = logging.getLogger(__name__)
 
 ALLOWED_EXTS = {".gpx", ".tcx", ".fit", ".csv"}
 
@@ -200,3 +203,36 @@ def api_data_profile():
             "stats": {"thirty_day_volume": 0, "avg_pace": 0, "weekly_frequency": 0},
             "target_race": "", "target_time": "",
         })
+
+
+@data_bp.route("/api/data/sync_garmin", methods=["POST"])
+def api_sync_garmin():
+    """从 Garmin Connect 同步最近跑步活动到 data/ 目录，并刷新画像缓存。"""
+    try:
+        data_dir = current_app.config.get("DATA_DIR", data_tool.DEFAULT_DATA_DIR)
+        count = int(request.args.get("count", 5))
+        fmt = request.args.get("fmt", "tcx").lower()
+        if fmt not in {"tcx", "gpx", "fit"}:
+            return jsonify({
+                "success": False,
+                "error": "fmt 仅支持 tcx、gpx、fit 三种格式",
+            }), 400
+
+        downloaded = garmin_sync.pull_recent_runs(
+            count=count,
+            output_dir=data_dir,
+            fmt=fmt,
+        )
+        data_tool.invalidate_profile_cache()
+
+        return jsonify({
+            "success": True,
+            "count": len(downloaded),
+            "files": [os.path.basename(p) for p in downloaded],
+        })
+    except RuntimeError as e:
+        logger.warning("Garmin sync runtime error: %s", e)
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.exception("Garmin sync failed")
+        return jsonify({"success": False, "error": str(e)}), 500

@@ -145,6 +145,125 @@ def _quick_intent_check(message):
     return None
 
 
+# 生成动词：出现且语义为"要生成计划"时触发直接生成
+_GEN_VERBS = ["生成", "制定", "做一", "出一个", "出个", "安排一", "给我", "帮我", "规划", "写一", "输出", "来一", "排一"]
+_PLAN_WORDS = ["计划", "训练表", "训练安排", "排个", "课表"]
+
+
+def _is_plan_generation_command(message):
+    """判断用户消息是否为"直接生成计划"命令（而非仅查看/讨论计划）。
+
+    触发条件（满足任一）：
+      1) 含计划类词 + 生成动词（如"生成计划""帮我制定训练表"）；
+      2) 含显式量化约束（"每周3次""周日20公里"）；
+      3) 含具体训练类型要求（"长跑""间歇跑"）。
+    否则视为普通计划讨论，走正常对话（STATE_PLAN 会引导去页面）。
+    """
+    s = message or ""
+    if any(w in s for w in _PLAN_WORDS) and any(v in s for v in _GEN_VERBS):
+        return True
+    if re.search(r"每周\s*\d+\s*次", s):
+        return True
+    if re.search(r"周[一二三四五六日].*?(\d+)\s*(公里|km)", s):
+        return True
+    if "长跑" in s or "间歇跑" in s or "lsd" in s.lower():
+        return True
+    return False
+
+
+def _infer_plan_duration(message):
+    """从用户消息推断计划周期（天）。默认 7。"""
+    if "月" in message:
+        return 30
+    if "季" in message or "90" in message or "三个月" in message:
+        return 90
+    return 7
+
+
+def _stream_generated_plan(message, data_dir, history):
+    """当用户给出明确计划指令时，直接调用生成并把结果流式返回。
+
+    关键修复：把用户的原始命令作为 user_instructions 传入 generate_training_plan，
+    使 LLM 严格落实用户指令，而非只按画像+科学约束生成（修复"命令不被听从"）。
+    """
+    full_reply = []
+
+    def gen():
+        nonlocal full_reply
+        try:
+            # mem0 跨会话长期记忆：计划生成命令路径也必须注入，
+            # 否则教练出的计划读不到用户的旧伤/周跑量限制等长期记忆。
+            # （计划生成只用 profile + instructions，不读聊天历史，故 mem0 是唯一来源）
+            try:
+                import uuid
+                from mem0_store import get_all_memories, format_mem0_context
+
+                _uid = session.get("mem0_uid") or session.setdefault(
+                    "mem0_uid", uuid.uuid4().hex
+                )
+                # 出计划要的是用户『全部』长期记忆（伤病/限制/偏好），
+                # 用 get_all 而非 query 检索，避免相关性阈值把关键事实过滤掉。
+                _mems = get_all_memories(_uid, limit=20)
+                _mem0_ctx = format_mem0_context(_mems)
+            except Exception:
+                _mem0_ctx = ""
+
+            profile = _get_cached_profile()
+            plan_duration = _infer_plan_duration(message)
+            effective_instructions = message
+            if _mem0_ctx:
+                effective_instructions = message + "\n\n" + _mem0_ctx
+            result = llm_agent.generate_training_plan(
+                profile, plan_duration=plan_duration, user_instructions=effective_instructions
+            )
+            plan_text = result.get("plan_text", "")
+            header = "📋 已根据你的指令生成训练计划：\n\n"
+            yield f"data: {json.dumps({'chunk': header})}\n\n"
+            full_reply.append(header)
+            # 按句切分推送，体验接近打字机
+            pieces = re.split(r'(?<=[。！？\n])', plan_text)
+            for c in pieces:
+                if c:
+                    full_reply.append(c)
+                    yield f"data: {json.dumps({'chunk': c})}\n\n"
+            note = "\n\n（本计划已根据你给出的指令生成；如需保存，可到「训练计划」页面点击保存。）"
+            full_reply.append(note)
+            yield f"data: {json.dumps({'chunk': note})}\n\n"
+        except Exception as e:
+            err = f"\n⚠️ 生成失败：{type(e).__name__}: {e}"
+            full_reply.append(err)
+            yield f"data: {json.dumps({'chunk': err})}\n\n"
+        finally:
+            # 与正常对话流程一致：保存历史 + 更新记忆
+            now = datetime.now().isoformat()
+            reply_text = "".join(full_reply)
+            history.append({"role": "user", "content": message, "time": now})
+            history.append({"role": "assistant", "content": reply_text, "time": now})
+            max_entries = MAX_HISTORY_ROUNDS * 2
+            if len(history) > max_entries:
+                history[:] = history[-max_entries:]
+            try:
+                _save_chat_history(data_dir, history)
+            except Exception:
+                pass
+            try:
+                memory.update_profile_summary_from_history(history)
+            except Exception:
+                pass
+            try:
+                memory.update_long_term_memory(message, reply_text)
+                session["memory_profile"] = memory.load_long_term_memory()
+            except Exception:
+                pass
+            yield "data: [DONE]\n\n"
+
+    return Response(
+        stream_with_context(gen()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 def _chat_history_path(data_dir):
     return os.path.join(data_dir, "chat_history.json")
 
@@ -202,6 +321,54 @@ def _build_history_summary(history, rounds=CONTEXT_ROUNDS):
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------------------
+# 参考来源解析：把教练回复末尾的「参考来源」段落解析成结构化卡片数据
+# ---------------------------------------------------------------------------
+_REF_TAIL_RE = re.compile(r'[（(]([^（）]+?)[,，]\s*(\d{4})\s*[)）]\s*[·•]\s*(.+?\.md)\s*$')
+_REF_SIMPLE_RE = re.compile(r'^《?(.+?)》?\s*[·•]\s*(.+?\.md)\s*$')
+
+
+def _parse_references(text):
+    """从教练回复中解析「参考来源」段落，返回结构化列表。
+
+    支持两种格式：
+      - 《书名》（作者，年份）· file.md   （书名自身可能含括号，如《运动营养学（Sport Nutrition）》）
+      - 《标题》· file.md  （自编文档，无作者/年份）
+    返回 [{"title", "author", "year", "file"}, ...]
+    """
+    if not text:
+        return []
+    idx = text.find('参考来源')
+    if idx == -1:
+        return []
+    block = text[idx:]
+    refs = []
+    for raw in block.splitlines():
+        line = raw.strip()
+        if not line.startswith('-'):
+            continue
+        item = line[1:].strip()
+        m = _REF_TAIL_RE.search(item)
+        if m:
+            title = item[:m.start()].strip().strip('《》').strip()
+            refs.append({
+                "title": title,
+                "author": m.group(1).strip(),
+                "year": m.group(2).strip(),
+                "file": m.group(3).strip(),
+            })
+            continue
+        m = _REF_SIMPLE_RE.match(item)
+        if m:
+            refs.append({
+                "title": m.group(1).strip().strip('《》').strip(),
+                "author": None,
+                "year": None,
+                "file": m.group(2).strip(),
+            })
+    return refs
+
+
 @coach_bp.route("/api/coach/chat", methods=["POST"])
 def api_coach_chat():
     """AI 教练对话端点（SSE 流式响应 + 对话记忆）。"""
@@ -211,6 +378,17 @@ def api_coach_chat():
         return jsonify({"reply": "请告诉我你的问题。"})
 
     data_dir = current_app.config["DATA_DIR"]
+
+    # mem0 跨会话长期记忆：本会话用户标识（首次访问生成，存 session）
+    import uuid
+    import threading
+    from mem0_store import (
+        search_memories,
+        format_mem0_context,
+        add_memories,
+        delete_all_memories,
+    )
+    uid = session.get("mem0_uid") or session.setdefault("mem0_uid", uuid.uuid4().hex)
 
     # ---- 轻量问候短路：纯问候/寒暄/致谢直接模板回复，跳过 RAG + LLM + profile 重算 ----
     light = _classify_lightweight(message)
@@ -236,6 +414,11 @@ def api_coach_chat():
         intent = llm_agent.classify_intent(message, history_summary, current_state=current_state)
     next_state = workflow.get_next_state(current_state, intent) if intent else current_state
     session["workflow_state"] = next_state
+
+    # ---- 计划生成命令拦截：用户给出明确指令时直接生成，而非仅引导去页面 ----
+    # 修复"我让他做命令生成计划，但他不听从"：把用户命令作为一等输入传入生成
+    if intent == "plan" and _is_plan_generation_command(message):
+        return _stream_generated_plan(message, data_dir, history)
 
     # ---- 长期记忆（session 缓存，避免每次对话读磁盘） ----
     user_profile = session.get("memory_profile")
@@ -276,6 +459,15 @@ def api_coach_chat():
     system_prompt = system_prompt + "\n\n" + state_prompt
     if memory_context:
         system_prompt = system_prompt + "\n\n" + memory_context
+
+    # mem0 跨会话长期记忆（自动抽取的用户事实/偏好），检索后注入 system prompt
+    try:
+        mem0_mems = search_memories(message, uid, limit=5)
+        mem0_ctx = format_mem0_context(mem0_mems)
+        if mem0_ctx:
+            system_prompt = system_prompt + "\n\n" + mem0_ctx
+    except Exception:
+        pass
 
     ts_context = ""
     if ts_summary:
@@ -460,8 +652,14 @@ def api_coach_chat():
         # 保存本轮对话到历史
         now = datetime.now().isoformat()
         reply_text = "".join(full_reply)
+        references = _parse_references(reply_text)
         history.append({"role": "user", "content": message, "time": now})
-        history.append({"role": "assistant", "content": reply_text, "time": now})
+        history.append({
+            "role": "assistant",
+            "content": reply_text,
+            "time": now,
+            "references": references,
+        })
         # 只保留最近 MAX_HISTORY_ROUNDS 轮（每轮 = user + assistant）
         max_entries = MAX_HISTORY_ROUNDS * 2
         if len(history) > max_entries:
@@ -484,6 +682,27 @@ def api_coach_chat():
             session["memory_profile"] = memory.load_long_term_memory()
         except Exception as e:
             print(f"[memory] 更新长期记忆失败：{e}", flush=True)
+
+        # mem0 跨会话长期记忆写入（后台抽取，不阻塞响应；尊重否定/撤销意图）
+        try:
+            neg = memory.detect_negation_intent(message)
+            if neg["type"] == "REVoke_ALL":
+                delete_all_memories(uid)
+            elif neg["type"] != "REVoke_LAST":
+                threading.Thread(
+                    target=add_memories,
+                    args=([{"role": "user", "content": message}, {"role": "assistant", "content": reply_text}], uid),
+                    daemon=True,
+                ).start()
+        except Exception as e:
+            print(f"[mem0] 写入失败：{e}", flush=True)
+
+        # 解析「参考来源」并作为结构化事件下发（前端渲染为可点击卡片）
+        try:
+            if references:
+                yield f"data: {json.dumps({'references': references}, ensure_ascii=False)}\n\n"
+        except Exception:
+            pass
 
         yield "data: [DONE]\n\n"
 

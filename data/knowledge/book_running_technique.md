@@ -2,6 +2,7 @@
 
 <!--
 meta:
+  title: 跑者解剖学（Anatomy for Runners）
   category: 跑步技术
   author: Jay Dicharry / Kelly Starrett 等
   year: 2019

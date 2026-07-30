@@ -17,6 +17,7 @@ from routes.coach import coach_bp
 from routes.eval import eval_bp
 from routes.tokens import tokens_bp
 import rag
+from scheduler import init_scheduler, shutdown_scheduler
 
 
 def _load_dotenv(path=None):
@@ -99,6 +100,46 @@ def create_app():
     app.register_blueprint(eval_bp)
     app.register_blueprint(tokens_bp)
 
+    # ---- 轻量访问口令（面试展示防 DeepSeek key 被刷）----
+    # 仅当环境变量 COACH_ACCESS_TOKEN 非空时启用。
+    # 用法：打开带 ?token=XXX 的链接，首屏验证后种会话 cookie，
+    # 后续所有请求（含 POST 发消息/生成计划）自动放行，前端 JS 无需改动。
+    import base64
+    from flask import request, abort, after_this_request
+
+    @app.before_request
+    def _require_access_token():
+        token = os.getenv("COACH_ACCESS_TOKEN")
+        if not token:
+            return  # 未启用口令保护，放行（本地/内测宽松）
+        path = request.path
+        if path.startswith("/static") or path in ("/healthz", "/health"):
+            return  # 放行静态资源与健康检查，避免页面样式/健康检测失败
+        if request.cookies.get("coach_token") == token:
+            return  # 已通过验证的会话
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer ") and auth[7:].strip() == token:
+            return
+        if auth.startswith("Basic "):
+            try:
+                _u, _p = base64.b64decode(auth[6:]).decode("utf-8", "ignore").split(":", 1)
+                if _p == token:
+                    return
+            except Exception:
+                pass
+        if request.args.get("token") == token:  # 首屏带 token 链接：种 cookie 后继续原请求
+            @after_this_request
+            def _set_cookie(resp):
+                resp.set_cookie("coach_token", token, httponly=True,
+                                samesite="Lax", max_age=60 * 60 * 24 * 7)
+            return
+        abort(401, "Access token required")
+
+    @app.errorhandler(401)
+    def _unauthorized(_e):
+        return ("<h2>需要访问口令</h2>"
+                "<p>这是面试展示专用部署，请使用主办方提供的带 <code>?token=</code> 的链接访问。</p>"), 401
+
     return app
 
 
@@ -116,6 +157,24 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"[WARN] RAG 索引预建失败（将在首次对话时自动重试）：{e}")
 
+    # 启动 Garmin 自动同步调度：立即拉一次最新数据 + 定时刷新
+    # （同步失败仅告警，不阻断应用；沙箱/无网络环境会优雅跳过）
+    try:
+        init_scheduler()
+    except Exception as e:
+        print(f"[WARN] Garmin 自动同步调度启动失败（不影响应用）：{e}")
+
+    # 初始化 mem0 跨会话长期记忆层（自托管 OSS：DeepSeek + 智谱embedding + Chroma）
+    # 缺 key / 未安装时优雅降级，不阻断应用
+    try:
+        import mem0_store
+        mem0_store.init_mem0()
+    except Exception as e:
+        print(f"[WARN] mem0 初始化失败（不影响应用）：{e}")
+
     # 生产/TRAE 环境切勿开启 debug：Werkzeug 调试器存在 RCE 风险。
     # 通过环境变量 FLASK_DEBUG=true 显式开启（默认 False）。
-    app.run(debug=os.getenv("FLASK_DEBUG", "False").lower() == "true", port=5000, use_reloader=False, threaded=True)
+    # host 默认 127.0.0.1；设为 0.0.0.0 可让容器/预览代理从外部网卡访问
+    host = os.getenv("FLASK_HOST", "127.0.0.1")
+    port = int(os.getenv("FLASK_PORT", "5000"))
+    app.run(host=host, debug=os.getenv("FLASK_DEBUG", "False").lower() == "true", port=port, use_reloader=False, threaded=True)

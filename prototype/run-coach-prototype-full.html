@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RunCoach · 核心界面原型（综合版）</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+/* ============ Pulse Green v3 设计令牌 ============ */
+:root, [data-theme="dark"] {
+  --rc-bg: #0B0F0C;
+  --rc-surface: #121A15;
+  --rc-surface-2: #18221B;
+  --rc-border: rgba(255,255,255,.08);
+  --rc-border-light: rgba(255,255,255,.05);
+  --rc-text: #E7F0EA;
+  --rc-text-soft: #B6C4BB;
+  --rc-text-muted: #8AA093;
+  --rc-brand: #10E08A;
+  --rc-brand-strong: #0CC878;
+  --rc-brand-soft: rgba(16,224,138,.14);
+  --rc-data: #2BC4E6;
+  --rc-data-strong: #18A8C8;
+  --rc-data-soft: rgba(43,196,230,.14);
+  --rc-energy: #C6F000;
+  --rc-energy-soft: rgba(198,240,0,.14);
+  --rc-text-on-primary: #04130C;
+  --rc-zone-1: #38BDF8; /* 冷 */
+  --rc-zone-2: #34D399;
+  --rc-zone-3: #C6F000;
+  --rc-zone-4: #FB923C;
+  --rc-zone-5: #FF5C5C; /* 热 */
+  --rc-radius: 16px;
+  --rc-radius-2xl: 22px;
+  --rc-radius-sm: 10px;
+  --rc-space-1: 4px; --rc-space-2: 8px; --rc-space-3: 12px;
+  --rc-space-4: 16px; --rc-space-5: 24px; --rc-space-6: 32px;
+  --rc-shadow: 0 18px 48px -24px rgba(0,0,0,.7);
+  --rc-glow-brand: 0 0 0 1px var(--rc-brand-soft), 0 12px 36px -16px rgba(16,224,138,.45);
+  --rc-text-xs: 11px; --rc-text-sm: 13px; --rc-text-base: 15px;
+  --rc-text-lg: 18px; --rc-text-xl: 22px; --rc-text-2xl: 28px;
+  --rc-text-3xl: 36px; --rc-text-4xl: 46px; --rc-text-5xl: 60px;
+  --rc-chart-grid: rgba(255,255,255,.06);
+  --rc-chart-axis: #8AA093;
+}
+[data-theme="light"] {
+  --rc-bg: #F4F8F5;
+  --rc-surface: #FFFFFF;
+  --rc-surface-2: #EEF4EF;
+  --rc-border: rgba(0,0,0,.10);
+  --rc-border-light: rgba(0,0,0,.06);
+  --rc-text: #0C1A12;
+  --rc-text-soft: #2E3D34;
+  --rc-text-muted: #5C6B62;
+  --rc-brand: #0A9A63;
+  --rc-brand-strong: #087A4E;
+  --rc-brand-soft: rgba(10,154,99,.12);
+  --rc-data: #0B7FA0;
+  --rc-data-strong: #0B7FA0;
+  --rc-data-soft: rgba(11,127,160,.12);
+  --rc-energy: #7A8A00;
+  --rc-energy-soft: rgba(122,138,0,.12);
+  --rc-text-on-primary: #FFFFFF;
+  --rc-zone-1: #2B9FD6; --rc-zone-2: #1FA97A; --rc-zone-3: #A8C400;
+  --rc-zone-4: #E0762A; --rc-zone-5: #E23B3B;
+  --rc-shadow: 0 18px 48px -28px rgba(0,40,20,.35);
+  --rc-glow-brand: 0 0 0 1px var(--rc-brand-soft), 0 12px 36px -16px rgba(10,154,99,.4);
+  --rc-chart-grid: rgba(0,0,0,.07);
+  --rc-chart-axis: #5C6B62;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: "Inter", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--rc-bg);
+  color: var(--rc-text);
+  font-size: var(--rc-text-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  transition: background .25s ease, color .25s ease;
+}
+.app-shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+
+/* ============ 侧边导航 ============ */
+.sidebar {
+  background: var(--rc-surface);
+  border-right: 1px solid var(--rc-border);
+  padding: var(--rc-space-5) var(--rc-space-4);
+  display: flex; flex-direction: column; gap: var(--rc-space-2);
+  position: sticky; top: 0; height: 100vh;
+}
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: var(--rc-space-5); padding: 0 var(--rc-space-2); }
+.brand .logo {
+  width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+  background: linear-gradient(135deg, var(--rc-brand), var(--rc-data)); color: var(--rc-text-on-primary);
+  box-shadow: var(--rc-glow-brand); font-weight: 700;
+}
+.brand .name { font-family: "Inter Tight", sans-serif; font-weight: 700; font-size: var(--rc-text-lg); letter-spacing: .2px; }
+.brand .sub { font-size: var(--rc-text-xs); color: var(--rc-text-muted); }
+.nav-link {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--rc-radius-sm);
+  color: var(--rc-text-soft); text-decoration: none; font-weight: 500; cursor: pointer;
+  border: 1px solid transparent; transition: all .15s ease;
+}
+.nav-link i { width: 18px; height: 18px; }
+.nav-link:hover { background: var(--rc-surface-2); color: var(--rc-text); }
+.nav-link.active {
+  background: var(--rc-brand-soft); color: var(--rc-brand); border-color: rgba(16,224,138,.28);
+}
+.sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: var(--rc-space-2); }
+.theme-toggle {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--rc-radius-sm);
+  border: 1px solid var(--rc-border); background: var(--rc-surface-2); color: var(--rc-text-soft);
+  cursor: pointer; font-size: var(--rc-text-sm); font-weight: 500;
+}
+.theme-toggle:hover { color: var(--rc-text); }
+.prototype-flag {
+  font-size: var(--rc-text-xs); color: var(--rc-text-muted); text-align: center;
+  border: 1px dashed var(--rc-border); border-radius: var(--rc-radius-sm); padding: 8px;
+}
+
+/* ============ 主区 ============ */
+.main { padding: var(--rc-space-6); max-width: 1180px; }
+.topbar { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: var(--rc-space-5); flex-wrap: wrap; gap: var(--rc-space-4); }
+.topbar h1 { font-family: "Inter Tight", sans-serif; font-size: var(--rc-text-3xl); font-weight: 700; letter-spacing: -.5px; }
+.topbar .crumb { color: var(--rc-text-muted); font-size: var(--rc-text-sm); margin-bottom: 4px; }
+.topbar .right { display: flex; gap: var(--rc-space-2); align-items: center; }
+.pill {
+  font-size: var(--rc-text-xs); font-weight: 600; padding: 6px 12px; border-radius: 999px;
+  background: var(--rc-surface-2); border: 1px solid var(--rc-border); color: var(--rc-text-soft);
+}
+.pill.brand { background: var(--rc-brand-soft); color: var(--rc-brand); border-color: rgba(16,224,138,.28); }
+
+.view { display: none; animation: fade .25s ease; }
+.view.active { display: block; }
+@keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.grid { display: grid; gap: var(--rc-space-4); }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 900px) { .app-shell { grid-template-columns: 1fr; } .sidebar { position: static; height: auto; } .grid-2,.grid-3,.grid-4 { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--rc-surface); border: 1px solid var(--rc-border); border-radius: var(--rc-radius);
+  padding: var(--rc-space-5); box-shadow: var(--rc-shadow); position: relative; overflow: hidden;
+}
+.card h3 { font-size: var(--rc-text-lg); font-weight: 600; margin-bottom: var(--rc-space-3); display: flex; align-items: center; gap: 8px; }
+.card .hint { color: var(--rc-text-muted); font-size: var(--rc-text-sm); }
+.section-title { font-family: "Inter Tight", sans-serif; font-size: var(--rc-text-xl); font-weight: 700; margin: var(--rc-space-5) 0 var(--rc-space-3); display: flex; align-items: center; gap: 8px; }
+
+/* Hero 前瞻卡 */
+.hero {
+  background: linear-gradient(135deg, var(--rc-surface), var(--rc-surface-2));
+  border: 1px solid var(--rc-border); border-radius: var(--rc-radius-2xl); padding: var(--rc-space-6);
+  position: relative; overflow: hidden; box-shadow: var(--rc-shadow);
+}
+.hero .eyebrow { color: var(--rc-brand); font-weight: 600; font-size: var(--rc-text-sm); letter-spacing: .4px; }
+.hero .big {
+  font-family: "Inter Tight", sans-serif; font-weight: 700; font-size: var(--rc-text-5xl); line-height: 1;
+  margin: var(--rc-space-3) 0; background: linear-gradient(120deg, var(--rc-brand), var(--rc-data));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.hero .big .unit { font-size: var(--rc-text-2xl); color: var(--rc-text-muted); -webkit-text-fill-color: var(--rc-text-muted); }
+.hero .desc { color: var(--rc-text-soft); max-width: 560px; }
+.hero .track-arc { position: absolute; right: -40px; top: -40px; width: 320px; height: 320px; opacity: .06; pointer-events: none; }
+.hero-row { display: flex; gap: var(--rc-space-5); align-items: flex-end; flex-wrap: wrap; }
+
+/* KPI */
+.kpi { display: flex; flex-direction: column; gap: 6px; }
+.kpi .top { display: flex; align-items: center; gap: 10px; color: var(--rc-text-muted); font-size: var(--rc-text-sm); }
+.kpi .ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; }
+.kpi .ic.brand { background: var(--rc-brand-soft); color: var(--rc-brand); }
+.kpi .ic.data { background: var(--rc-data-soft); color: var(--rc-data); }
+.kpi .ic.energy { background: var(--rc-energy-soft); color: var(--rc-energy); }
+.kpi .val { font-family: "Inter Tight", sans-serif; font-weight: 700; font-size: var(--rc-text-3xl); line-height: 1; }
+.kpi .val .u { font-size: var(--rc-text-base); color: var(--rc-text-muted); font-weight: 500; margin-left: 4px; }
+
+/* runlist 表 */
+.runlist-table { width: 100%; font-size: var(--rc-text-sm); border-collapse: collapse; }
+.runlist-table thead th { font-size: var(--rc-text-xs); color: var(--rc-text-muted); font-weight: 500; text-align: left; padding-bottom: var(--rc-space-2); border-bottom: 1px solid var(--rc-border); }
+.runlist-table thead th.r, .runlist-table td.r { text-align: right; }
+.runlist-table tbody td { padding: var(--rc-space-2) 0; }
+.runlist-table tbody tr + tr td { border-top: 1px solid var(--rc-border-light); }
+.run-date { color: var(--rc-text-muted); } .run-name { font-weight: 500; }
+.run-pace { color: var(--rc-data); font-variant-numeric: tabular-nums; }
+.run-hr { color: var(--rc-zone-4); font-variant-numeric: tabular-nums; }
+.zone-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+
+/* 教练卡 */
+.coach-card { display: grid; grid-template-columns: 200px 1fr; gap: var(--rc-space-4); }
+@media (max-width: 900px) { .coach-card { grid-template-columns: 1fr; } }
+.orb {
+  border-radius: var(--rc-radius); padding: var(--rc-space-4); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px; text-align: center;
+  background: radial-gradient(circle at 50% 35%, var(--rc-brand-soft), transparent 70%); border: 1px solid var(--rc-border);
+}
+.orb .ball { width: 86px; height: 86px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--rc-brand), var(--rc-data)); box-shadow: var(--rc-glow-brand); animation: pulse 3s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+.chat { display: flex; flex-direction: column; gap: var(--rc-space-3); min-height: 320px; }
+.msg { max-width: 78%; padding: 10px 14px; border-radius: 14px; font-size: var(--rc-text-sm); line-height: 1.5; }
+.msg.ai { background: var(--rc-surface-2); border: 1px solid var(--rc-border); align-self: flex-start; border-bottom-left-radius: 4px; }
+.msg.me { background: var(--rc-brand-soft); color: var(--rc-text); align-self: flex-end; border-bottom-right-radius: 4px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: var(--rc-space-2); }
+.chip { font-size: var(--rc-text-sm); padding: 7px 12px; border-radius: 999px; border: 1px solid var(--rc-border); background: var(--rc-surface-2); color: var(--rc-text-soft); cursor: pointer; }
+.chip:hover { border-color: var(--rc-brand); color: var(--rc-brand); }
+.chat-input { display: flex; gap: 8px; margin-top: var(--rc-space-2); }
+.chat-input input { flex: 1; background: var(--rc-surface-2); border: 1px solid var(--rc-border); border-radius: var(--rc-radius-sm); padding: 10px 12px; color: var(--rc-text); font-size: var(--rc-text-sm); }
+.chat-input input:focus { outline: none; border-color: var(--rc-brand); }
+.btn { border: 1px solid var(--rc-border); background: var(--rc-surface-2); color: var(--rc-text); padding: 10px 16px; border-radius: var(--rc-radius-sm); font-weight: 600; cursor: pointer; font-size: var(--rc-text-sm); }
+.btn:hover { border-color: var(--rc-brand); color: var(--rc-brand); }
+.btn.primary { background: var(--rc-brand); color: var(--rc-text-on-primary); border-color: transparent; }
+.btn.primary:hover { background: var(--rc-brand-strong); color: var(--rc-text-on-primary); }
+
+/* 步骤指示 */
+.steps { display: flex; gap: var(--rc-space-3); align-items: center; flex-wrap: wrap; }
+.step { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--rc-radius-sm); border: 1px solid var(--rc-border); background: var(--rc-surface-2); }
+.step .n { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--rc-brand-soft); color: var(--rc-brand); font-weight: 700; font-size: var(--rc-text-sm); }
+.step.done .n { background: var(--rc-brand); color: var(--rc-text-on-primary); }
+.step .t { font-size: var(--rc-text-sm); font-weight: 500; }
+.step-arrow { color: var(--rc-text-muted); }
+
+/* 上传卡 */
+.upload {
+  border: 1.5px dashed var(--rc-border); border-radius: var(--rc-radius); padding: var(--rc-space-5);
+  text-align: center; color: var(--rc-text-muted); background: var(--rc-surface-2);
+}
+.upload .ic { width: 40px; height: 40px; color: var(--rc-brand); margin-bottom: 8px; }
+
+/* 计划摘要 tag */
+.summary-tag { display: inline-flex; align-items: center; gap: 6px; font-size: var(--rc-text-xs); font-weight: 600; padding: 5px 10px; border-radius: 999px; margin: 3px; }
+.summary-tag[data-zone="1"] { background: color-mix(in srgb, var(--rc-zone-1) 16%, transparent); color: var(--rc-zone-1); }
+.summary-tag[data-zone="2"] { background: color-mix(in srgb, var(--rc-zone-2) 16%, transparent); color: var(--rc-zone-2); }
+.summary-tag[data-zone="3"] { background: color-mix(in srgb, var(--rc-zone-3) 16%, transparent); color: var(--rc-zone-3); }
+.summary-tag[data-zone="4"] { background: color-mix(in srgb, var(--rc-zone-4) 16%, transparent); color: var(--rc-zone-4); }
+.summary-tag[data-zone="5"] { background: color-mix(in srgb, var(--rc-zone-5) 16%, transparent); color: var(--rc-zone-5); }
+
+/* 周历 */
+.calendar { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+@media (max-width: 900px) { .calendar { grid-template-columns: repeat(3, 1fr); } }
+.cal-day { border: 1px solid var(--rc-border); border-left-width: 4px; border-radius: var(--rc-radius-sm); padding: 10px; background: var(--rc-surface-2); min-height: 72px; }
+.cal-day .d { font-size: var(--rc-text-xs); color: var(--rc-text-muted); }
+.cal-day .t { font-size: var(--rc-text-sm); font-weight: 600; margin-top: 4px; }
+.cal-day .meta { font-size: var(--rc-text-xs); color: var(--rc-text-soft); margin-top: 2px; }
+.cal-day[data-zone="1"] { border-left-color: var(--rc-zone-1); }
+.cal-day[data-zone="2"] { border-left-color: var(--rc-zone-2); }
+.cal-day[data-zone="3"] { border-left-color: var(--rc-zone-3); }
+.cal-day[data-zone="4"] { border-left-color: var(--rc-zone-4); }
+.cal-day[data-zone="5"] { border-left-color: var(--rc-zone-5); }
+.cal-day.rest { border-left-color: var(--rc-border); opacity: .65; }
+
+/* token 配置 */
+.token-area { width: 100%; min-height: 150px; background: var(--rc-surface-2); border: 1px solid var(--rc-border); border-radius: var(--rc-radius-sm); padding: 12px; color: var(--rc-text-soft); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: var(--rc-text-sm); resize: vertical; }
+.token-area:focus { outline: none; border-color: var(--rc-brand); }
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; margin-top: var(--rc-space-3); }
+.swatch { width: 84px; text-align: center; }
+.swatch .c { height: 46px; border-radius: var(--rc-radius-sm); border: 1px solid var(--rc-border); }
+.swatch .l { font-size: var(--rc-text-xs); color: var(--rc-text-muted); margin-top: 4px; }
+
+/* 洞察 */
+.metric-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--rc-space-4); }
+@media (max-width: 900px) { .metric-row { grid-template-columns: repeat(2, 1fr); } }
+.metric { padding: var(--rc-space-4); border-radius: var(--rc-radius); border: 1px solid var(--rc-border); background: var(--rc-surface-2); }
+.metric .l { font-size: var(--rc-text-xs); color: var(--rc-text-muted); }
+.metric .v { font-family: "Inter Tight", sans-serif; font-weight: 700; font-size: var(--rc-text-2xl); margin-top: 4px; }
+.metric .v.good { color: var(--rc-brand); } .metric .v.warn { color: var(--rc-energy); } .metric .v.bad { color: var(--rc-zone-5); }
+.chart-box { position: relative; height: 240px; }
+.chart-box.tall { height: 280px; }
+.legend { display: flex; gap: var(--rc-space-3); flex-wrap: wrap; font-size: var(--rc-text-xs); color: var(--rc-text-muted); margin-top: var(--rc-space-2); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.wave-bg { position: absolute; left: 0; right: 0; bottom: 0; height: 120px; opacity: .05; pointer-events: none; }
+</style>
+</head>
+<body data-theme="dark">
+<div class="app-shell">
+  <!-- 侧边导航 -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">R</div>
+      <div>
+        <div class="name">RunCoach</div>
+        <div class="sub">训练计划 Agent</div>
+      </div>
+    </div>
+    <a class="nav-link active" data-view="overview" onclick="switchView('overview');return false;"><i data-lucide="layout-dashboard"></i> 总览</a>
+    <a class="nav-link" data-view="training" onclick="switchView('training');return false;"><i data-lucide="calendar-days"></i> 训练计划</a>
+    <a class="nav-link" data-view="coach" onclick="switchView('coach');return false;"><i data-lucide="message-circle"></i> 教练</a>
+    <a class="nav-link" data-view="insights" onclick="switchView('insights');return false;"><i data-lucide="activity"></i> 洞察</a>
+    <a class="nav-link" data-view="tokens" onclick="switchView('tokens');return false;"><i data-lucide="palette"></i> 令牌配置</a>
+    <div class="sidebar-foot">
+      <div class="theme-toggle" onclick="toggleTheme()"><i data-lucide="moon" id="theme-ic"></i> <span id="theme-tx">深色</span></div>
+      <div class="prototype-flag">可点击原型 · 演示数据<br/>供开发落地参考</div>
+    </div>
+  </aside>
+
+  <!-- 主区 -->
+  <main class="main">
+    <!-- ============ 总览 ============ -->
+    <section class="view active" id="view-overview">
+      <div class="topbar">
+        <div>
+          <div class="crumb">RunCoach / 总览</div>
+          <h1>本周训练总览</h1>
+        </div>
+        <div class="right"><span class="pill brand">训练状态 · 峰值</span><span class="pill">第 12 周</span></div>
+      </div>
+
+      <div class="hero">
+        <svg class="track-arc" viewBox="0 0 200 200" fill="none"><path d="M20 180 A80 80 0 0 1 180 180" stroke="var(--rc-brand)" stroke-width="10" stroke-linecap="round"/><path d="M40 180 A60 60 0 0 1 160 180" stroke="var(--rc-data)" stroke-width="6" stroke-linecap="round"/></svg>
+        <div class="hero-row">
+          <div>
+            <div class="eyebrow">本周累计里程</div>
+            <div class="big">38.5<span class="unit"> km</span></div>
+            <div class="desc">较上周 +12%，处于计划目标区间（35–42km）上沿。配速与心率稳定，训练负荷进入峰值周，注意赛前 10 天减量。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-4" style="margin-top:var(--rc-space-4)">
+        <div class="card kpi"><div class="top"><span class="ic brand"><i data-lucide="route"></i></span> 本周里程</div><div class="val">38.5<span class="u">km</span></div></div>
+        <div class="card kpi"><div class="top"><span class="ic data"><i data-lucide="gauge"></i></span> 平均配速</div><div class="val">5:42<span class="u">/km</span></div></div>
+        <div class="card kpi"><div class="top"><span class="ic data"><i data-lucide="heart-pulse"></i></span> 平均心率</div><div class="val">148<span class="u">bpm</span></div></div>
+        <div class="card kpi"><div class="top"><span class="ic energy"><i data-lucide="zap"></i></span> 训练 readiness</div><div class="val">82<span class="u">/100</span></div></div>
+      </div>
+
+      <div class="section-title"><i data-lucide="list"></i> 近期跑步</div>
+      <div class="card">
+        <table class="runlist-table">
+          <thead><tr><th>日期</th><th>项目</th><th class="r">距离</th><th class="r">配速</th><th class="r">心率</th><th class="r">区间</th></tr></thead>
+          <tbody id="runlist-body"></tbody>
+        </table>
+      </div>
+
+      <div class="section-title"><i data-lucide="line-chart"></i> 趋势</div>
+      <div class="grid grid-2">
+        <div class="card"><h3><i data-lucide="gauge"></i> 配速趋势（越矮越好）</h3><div class="chart-box"><canvas id="ov-pace"></canvas></div></div>
+        <div class="card"><h3><i data-lucide="heart-pulse"></i> 心率趋势</h3><div class="chart-box"><canvas id="ov-hr"></canvas></div></div>
+      </div>
+
+      <div class="card" style="margin-top:var(--rc-space-4)">
+        <h3><i data-lucide="sparkles"></i> 本周教练建议</h3>
+        <p class="hint">峰值周进入后半段，建议周四安排一次节奏跑（区间 4）巩固阈值；周末长距离控制在 22km 内，赛前 10 天起执行减量（每周 -20%）。当前睡眠与 readiness 良好，可维持强度。</p>
+      </div>
+    </section>
+
+    <!-- ============ 训练计划 ============ -->
+    <section class="view" id="view-training">
+      <div class="topbar">
+        <div><div class="crumb">RunCoach / 训练计划</div><h1>4 周训练计划</h1></div>
+        <div class="right"><span class="pill brand">已生成</span><span class="pill">目标：全程马拉松</span></div>
+      </div>
+
+      <div class="steps">
+        <div class="step done"><span class="n">1</span><span class="t">上传运动数据</span></div>
+        <span class="step-arrow">→</span>
+        <div class="step done"><span class="n">2</span><span class="t">AI 生成计划</span></div>
+        <span class="step-arrow">→</span>
+        <div class="step"><span class="n">3</span><span class="t">执行与回填</span></div>
+      </div>
+
+      <div class="grid grid-3" style="margin-top:var(--rc-space-4)">
+        <div class="upload"><i data-lucide="upload-cloud" class="ic"></i><div>拖入 GPX / TCX / FIT</div><div class="hint" style="margin-top:6px">已识别 86 次训练记录</div></div>
+        <div class="card"><h3><i data-lucide="target"></i> 计划摘要</h3><div id="plan-tags"></div></div>
+        <div class="card"><h3><i data-lucide="calendar"></i> 本周重点</h3><p class="hint">周二 间歇（Z5）×8；周四 节奏（Z4）12km；周日 长距离（Z3）22km。</p></div>
+      </div>
+
+      <div class="section-title"><i data-lucide="calendar-days"></i> 4 周日历（按心率区间着色）</div>
+      <div class="card">
+        <div class="calendar" id="cal-grid"></div>
+        <div class="legend">
+          <span><i style="background:var(--rc-zone-1)"></i>Z1 恢复</span>
+          <span><i style="background:var(--rc-zone-2)"></i>Z2 轻松</span>
+          <span><i style="background:var(--rc-zone-3)"></i>Z3 有氧</span>
+          <span><i style="background:var(--rc-zone-4)"></i>Z4 节奏</span>
+          <span><i style="background:var(--rc-zone-5)"></i>Z5 间歇/比赛</span>
+        </div>
+      </div>
+
+      <div class="section-title"><i data-lucide="bar-chart-3"></i> 配速分布</div>
+      <div class="card"><div class="chart-box"><canvas id="tr-pace"></canvas></div></div>
+    </section>
+
+    <!-- ============ 教练 ============ -->
+    <section class="view" id="view-coach">
+      <div class="topbar">
+        <div><div class="crumb">RunCoach / 教练</div><h1>AI 教练对话</h1></div>
+        <div class="right"><span class="pill brand">双模型 · 生成 + 反思</span></div>
+      </div>
+      <div class="card coach-card">
+        <div class="orb">
+          <div class="ball"></div>
+          <div style="font-weight:600">RunCoach</div>
+          <div class="hint" style="font-size:var(--rc-text-xs)">基于你的数据与科学训练模型</div>
+        </div>
+        <div>
+          <div class="chat" id="chat"></div>
+          <div class="chips" id="chips"></div>
+          <div class="chat-input">
+            <input id="chat-in" placeholder="问点什么，比如「今天该跑什么？」" onkeydown="if(event.key==='Enter')sendMsg()" />
+            <button class="btn primary" onclick="sendMsg()">发送</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 洞察 ============ -->
+    <section class="view" id="view-insights">
+      <div class="topbar">
+        <div><div class="crumb">RunCoach / 洞察</div><h1>训练洞察</h1></div>
+        <div class="right"><span class="pill">近 8 周</span></div>
+      </div>
+
+      <div class="metric-row">
+        <div class="metric"><div class="l">ACWR 负荷比</div><div class="v good">1.32</div></div>
+        <div class="metric"><div class="l">急性负荷（周）</div><div class="v">412</div></div>
+        <div class="metric"><div class="l">慢性负荷（月）</div><div class="v">312</div></div>
+        <div class="metric"><div class="l">本周达成率</div><div class="v warn">94%</div></div>
+      </div>
+
+      <div class="section-title"><i data-lucide="activity"></i> 负荷与伤病风险</div>
+      <div class="card"><div class="chart-box tall"><canvas id="in-load"></canvas></div>
+        <div class="hint" style="margin-top:8px">ACWR &lt; 1.5 为安全区；1.5–2.0 为谨慎，&gt; 2.0 高风险。当前处于安全区但接近上沿，建议赛前减量。</div>
+      </div>
+
+      <div class="grid grid-2" style="margin-top:var(--rc-space-4)">
+        <div class="card"><h3><i data-lucide="trending-up"></i> 配速进步（5km 测试）</h3><div class="chart-box"><canvas id="in-pace"></canvas></div></div>
+        <div class="card"><h3><i data-lucide="pie-chart"></i> 心率区间分布</h3><div class="chart-box"><canvas id="in-zone"></canvas></div></div>
+      </div>
+    </section>
+
+    <!-- ============ 令牌配置 ============ -->
+    <section class="view" id="view-tokens">
+      <div class="topbar">
+        <div><div class="crumb">RunCoach / 令牌配置</div><h1>品牌令牌配置</h1></div>
+        <div class="right"><span class="pill brand">Pulse Green v3</span></div>
+      </div>
+      <div class="card">
+        <h3><i data-lucide="code-2"></i> 自定义 CSS 令牌</h3>
+        <p class="hint" style="margin-bottom:12px">粘贴从「获取令牌」得到的 CSS 变量块，点击应用即可实时覆盖主题；重置恢复默认 v3。</p>
+        <textarea class="token-area" id="token-css">:root{
+  --rc-brand: #10E08A;
+  --rc-data: #2BC4E6;
+  --rc-energy: #C6F000;
+}</textarea>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn primary" onclick="applyTokens()">应用令牌</button>
+          <button class="btn" onclick="resetTokens()">重置默认</button>
+        </div>
+        <div class="hint" id="token-status" style="margin-top:10px;color:var(--rc-brand);font-weight:600"></div>
+      </div>
+      <div class="card" style="margin-top:var(--rc-space-4)">
+        <h3><i data-lucide="palette"></i> 当前调色板预览</h3>
+        <div class="swatches" id="swatches"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* ============ 演示数据 ============ */
+const RUNS = [
+  {date:'07-21', name:'晨跑轻松跑', dist:'10.0', pace:'6:05', hr:138, zone:2},
+  {date:'07-19', name:'间歇跑 8×400', dist:'9.2', pace:'5:10', hr:165, zone:5},
+  {date:'07-17', name:'长距离 LSD', dist:'22.0', pace:'5:55', hr:152, zone:3},
+  {date:'07-15', name:'节奏跑', dist:'12.0', pace:'5:02', hr:160, zone:4},
+  {date:'07-13', name:'恢复跑', dist:'6.0', pace:'6:30', hr:128, zone:1},
+  {date:'07-11', name:'有氧跑', dist:'14.0', pace:'5:48', hr:150, zone:3},
+];
+const PLAN = [
+  {d:'周一', t:'休息', zone:0, dist:'-', pace:'-'},
+  {d:'周二', t:'间歇 Z5×8', zone:5, dist:'9', pace:'5:10'},
+  {d:'周三', t:'轻松 Z2', zone:2, dist:'10', pace:'6:05'},
+  {d:'周四', t:'节奏 Z4', zone:4, dist:'12', pace:'5:02'},
+  {d:'周五', t:'恢复 Z1', zone:1, dist:'6', pace:'6:30'},
+  {d:'周六', t:'有氧 Z3', zone:3, dist:'14', pace:'5:48'},
+  {d:'周日', t:'长距离 Z3', zone:3, dist:'22', pace:'5:55'},
+  {d:'周一', t:'休息', zone:0, dist:'-', pace:'-'},
+  {d:'周二', t:'间歇 Z5×6', zone:5, dist:'8', pace:'5:12'},
+  {d:'周三', t:'轻松 Z2', zone:2, dist:'10', pace:'6:05'},
+  {d:'周四', t:'节奏 Z4', zone:4, dist:'11', pace:'5:05'},
+  {d:'周五', t:'恢复 Z1', zone:1, dist:'6', pace:'6:30'},
+  {d:'周六', t:'有氧 Z3', zone:3, dist:'16', pace:'5:46'},
+  {d:'周日', t:'长距离 Z3', zone:3, dist:'24', pace:'5:58'},
+  {d:'周一', t:'休息', zone:0, dist:'-', pace:'-'},
+  {d:'周二', t:'间歇 Z5×10', zone:5, dist:'10', pace:'5:08'},
+  {d:'周三', t:'轻松 Z2', zone:2, dist:'10', pace:'6:05'},
+  {d:'周四', t:'节奏 Z4', zone:4, dist:'13', pace:'5:00'},
+  {d:'周五', t:'恢复 Z1', zone:1, dist:'6', pace:'6:30'},
+  {d:'周六', t:'有氧 Z3', zone:3, dist:'15', pace:'5:47'},
+  {d:'周日', t:'长距离 Z3', zone:3, dist:'20', pace:'5:56'},
+  {d:'周一', t:'休息', zone:0, dist:'-', pace:'-'},
+  {d:'周二', t:'减量轻松', zone:2, dist:'8', pace:'6:10'},
+  {d:'周三', t:'赛前慢跑', zone:1, dist:'5', pace:'6:40'},
+];
+const AI_REPLIES = {
+  'default': '根据你本周的负荷与恢复情况，建议今天安排一次轻松有氧（Z2，约 10km，配速 6:00–6:15）。你的 ACWR 1.32 处于安全区，维持即可。',
+  '今天该跑什么？': '今天建议：轻松有氧跑 Z2，10km，配速 6:00–6:15，心率控制在 130–140。本周已是峰值周后段，保持低强度恢复更利于适应。',
+  '我该怎么减量？': '赛前 10 天启动减量：每周总里程 -20%，强度保留间歇/节奏但缩短，赛前 3 天以 Z1 慢跑 + 休息为主，保证糖原与睡眠。',
+  '我的伤病风险高吗？': '当前 ACWR 1.32（安全区），急性负荷 412 / 慢性 312。只要不突然加量超过 +15%/周，风险可控。注意单周里程增幅。',
+};
+const CHIPS = ['今天该跑什么？', '我该怎么减量？', '我的伤病风险高吗？'];
+
+/* ============ 工具 ============ */
+function cssVar(n){ return getComputedStyle(document.body).getPropertyValue(n).trim(); }
+function hexRgba(hex, a){
+  hex = hex.replace('#','');
+  if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
+  const r=parseInt(hex.slice(0,2),16), g=parseInt(hex.slice(2,4),16), b=parseInt(hex.slice(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+function zoneColor(z){ return cssVar(`--rc-zone-${z}`); }
+
+/* ============ 视图切换 ============ */
+let currentView = 'overview';
+const charts = {};
+function destroyCharts(){ Object.values(charts).forEach(c=>c && c.destroy()); for(const k in charts) delete charts[k]; }
+function switchView(name){
+  if(!document.getElementById('view-'+name)) return;
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.querySelectorAll('.nav-link').forEach(l=>l.classList.toggle('active', l.dataset.view===name));
+  currentView = name;
+  destroyCharts();
+  renderChartsForView(name);
+  if(window.lucide) lucide.createIcons();   // 确保视图内图标就绪
+}
+
+/* ============ 主题 ============ */
+function applyTheme(t){
+  document.body.dataset.theme = t;
+  localStorage.setItem('demo-theme', t);
+  document.getElementById('theme-tx').textContent = t==='dark'?'深色':'浅色';
+  document.getElementById('theme-ic').setAttribute('data-lucide', t==='dark'?'moon':'sun');
+  lucide.createIcons();
+  destroyCharts(); renderChartsForView(currentView); renderSwatches();
+}
+function toggleTheme(){ applyTheme(document.body.dataset.theme==='dark'?'light':'dark'); }
+
+/* ============ 内容渲染 ============ */
+function renderRunlist(){
+  const b = document.getElementById('runlist-body');
+  b.innerHTML = RUNS.map(r=>`<tr>
+    <td class="run-date">${r.date}</td><td class="run-name">${r.name}</td>
+    <td class="r">${r.dist}</td><td class="r run-pace">${r.pace}</td>
+    <td class="r run-hr">${r.hr}</td>
+    <td class="r"><span class="zone-dot" style="background:${zoneColor(r.zone)}"></span>Z${r.zone}</td></tr>`).join('');
+}
+function renderPlanTags(){
+  const counts = {};
+  PLAN.forEach(p=>{ if(p.zone>0) counts[p.zone]=(counts[p.zone]||0)+1; });
+  const label = {1:'恢复',2:'轻松',3:'有氧',4:'节奏',5:'间歇'};
+  document.getElementById('plan-tags').innerHTML = Object.keys(counts).map(z=>
+    `<span class="summary-tag" data-zone="${z}">Z${z} ${label[z]} · ${counts[z]}次</span>`).join('');
+}
+function renderCalendar(){
+  document.getElementById('cal-grid').innerHTML = PLAN.map(p=>{
+    const cls = p.zone===0?'cal-day rest':'cal-day';
+    return `<div class="${cls}" ${p.zone>0?`data-zone="${p.zone}"`:''}>
+      <div class="d">${p.d}</div><div class="t">${p.t}</div>
+      <div class="meta">${p.dist==='-'?'休息':p.dist+'km · '+p.pace}</div></div>`;
+  }).join('');
+}
+function renderChat(){
+  const c = document.getElementById('chat');
+  c.innerHTML = `<div class="msg ai">你好，我是你的 AI 教练。我已读取你近 86 次训练记录，随时可以回答训练安排、减量、伤病风险等问题。</div>
+    <div class="msg me">今天该跑什么？</div>
+    <div class="msg ai">${AI_REPLIES['今天该跑什么？']}</div>`;
+  document.getElementById('chips').innerHTML = CHIPS.map(t=>`<span class="chip" onclick="sendChip('${t}')">${t}</span>`).join('');
+}
+function sendChip(t){ document.getElementById('chat-in').value=t; sendMsg(); }
+function sendMsg(){
+  const inp = document.getElementById('chat-in'); const v = inp.value.trim(); if(!v) return;
+  const c = document.getElementById('chat');
+  c.innerHTML += `<div class="msg me">${v}</div><div class="msg ai">${AI_REPLIES[v]||AI_REPLIES['default']}</div>`;
+  inp.value=''; c.scrollTop = c.scrollHeight;
+}
+function renderSwatches(){
+  const colors = {brand:'--rc-brand', data:'--rc-data', energy:'--rc-energy',
+    z1:'--rc-zone-1', z2:'--rc-zone-2', z3:'--rc-zone-3', z4:'--rc-zone-4', z5:'--rc-zone-5'};
+  const names = {brand:'品牌绿', data:'数据青', energy:'能量黄', z1:'Z1冷', z2:'Z2', z3:'Z3', z4:'Z4', z5:'Z5热'};
+  document.getElementById('swatches').innerHTML = Object.keys(colors).map(k=>
+    `<div class="swatch"><div class="c" style="background:${cssVar(colors[k])}"></div><div class="l">${names[k]}</div></div>`).join('');
+}
+function applyTokens(){
+  const css = document.getElementById('token-css').value;
+  // 将用户写的 :root 同时映射到深浅两套主题选择器，确保覆盖在任意主题下都生效
+  const scoped = css.replace(/:root/g, ':root, [data-theme="dark"], [data-theme="light"]');
+  const style = document.getElementById('dyn-style') || document.createElement('style');
+  style.id='dyn-style'; style.textContent = scoped; document.head.appendChild(style);
+  destroyCharts(); renderChartsForView(currentView); renderSwatches();
+  const s = document.getElementById('token-status'); if(s) s.textContent = '✓ 已应用自定义 CSS 令牌（深浅主题均覆盖）';
+}
+function resetTokens(){
+  document.getElementById('token-css').value=':root{\n  --rc-brand: #10E08A;\n  --rc-data: #2BC4E6;\n  --rc-energy: #C6F000;\n}';
+  applyTokens();
+  const s = document.getElementById('token-status'); if(s) s.textContent = '↺ 已重置为 Pulse Green v3 默认';
+}
+
+/* ============ 图表 ============ */
+/* 安全创建图表：先销毁该 canvas 上的已有实例（彻底消除 "canvas already in use"），
+   再创建；任一图表失败被 try/catch 隔离，不影响其余视图/图表的渲染 */
+function makeChart(id, config){
+  const el = document.getElementById(id);
+  if(!el) return null;
+  const prev = (window.Chart && Chart.getChart) ? Chart.getChart(el) : null;
+  if(prev) prev.destroy();
+  try { return new Chart(el, config); }
+  catch(err){ console.error('[chart] 渲染失败:', id, err); return null; }
+}
+function baseOpts(){
+  return { responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ display:false }, tooltip:{ backgroundColor:'#0B0F0C', borderColor:'rgba(255,255,255,.1)', borderWidth:1 } },
+    scales:{ x:{ grid:{ color: cssVar('--rc-chart-grid') }, ticks:{ color: cssVar('--rc-chart-axis'), font:{size:11} } },
+             y:{ grid:{ color: cssVar('--rc-chart-grid') }, ticks:{ color: cssVar('--rc-chart-axis'), font:{size:11} } } } };
+}
+function renderChartsForView(name){
+  if(name==='overview'){
+    const labels = RUNS.map(r=>r.date).reverse();
+    charts.pace = makeChart('ov-pace', {
+      type:'line', data:{ labels, datasets:[{ data: RUNS.map(r=>parseFloat(r.pace.split(':')[0])*60+parseFloat(r.pace.split(':')[1])).reverse(),
+        borderColor: cssVar('--rc-data'), backgroundColor: hexRgba(cssVar('--rc-data'),.12), fill:true, tension:.35, pointRadius:3 }] }, options: baseOpts() });
+    charts.hr = makeChart('ov-hr', {
+      type:'line', data:{ labels, datasets:[{ data: RUNS.map(r=>r.hr).reverse(),
+        borderColor: cssVar('--rc-zone-4'), backgroundColor: hexRgba(cssVar('--rc-zone-4'),.12), fill:true, tension:.35, pointRadius:3 }] }, options: baseOpts() });
+  }
+  if(name==='training'){
+    const zc = {1:0,2:0,3:0,4:0,5:0}; PLAN.forEach(p=>{ if(p.zone>0) zc[p.zone]++; });
+    charts.trpace = makeChart('tr-pace', {
+      type:'bar', data:{ labels:['Z1','Z2','Z3','Z4','Z5'],
+        datasets:[{ data:[zc[1],zc[2],zc[3],zc[4],zc[5]],
+          backgroundColor:[cssVar('--rc-zone-1'),cssVar('--rc-zone-2'),cssVar('--rc-zone-3'),cssVar('--rc-zone-4'),cssVar('--rc-zone-5')], borderRadius:8 }] }, options: baseOpts() });
+  }
+  if(name==='insights'){
+    charts.inload = makeChart('in-load', {
+      type:'bar', data:{ labels:['W1','W2','W3','W4','W5','W6','W7','W8'],
+        datasets:[
+          { type:'bar', label:'急性负荷', data:[240,280,310,360,390,400,405,412], backgroundColor: hexRgba(cssVar('--rc-brand'),.7), borderRadius:6, yAxisID:'y' },
+          { type:'line', label:'慢性负荷', data:[280,285,290,298,305,310,312,312], borderColor: cssVar('--rc-data'), tension:.3, pointRadius:3, yAxisID:'y' },
+          { type:'line', label:'ACWR', data:[0.86,0.98,1.07,1.21,1.28,1.29,1.30,1.32], borderColor: cssVar('--rc-energy'), borderDash:[5,4], tension:.3, pointRadius:3, yAxisID:'y1' }
+        ] },
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display:true, labels:{ color: cssVar('--rc-chart-axis'), font:{size:11} } } },
+        scales:{ x:{ grid:{color:cssVar('--rc-chart-grid')}, ticks:{color:cssVar('--rc-chart-axis')} },
+                 y:{ position:'left', grid:{color:cssVar('--rc-chart-grid')}, ticks:{color:cssVar('--rc-chart-axis')} },
+                 y1:{ position:'right', grid:{drawOnChartArea:false}, ticks:{color:cssVar('--rc-energy')}, title:{display:true,text:'ACWR',color:cssVar('--rc-energy')} } } } });
+    charts.inpace = makeChart('in-pace', {
+      type:'line', data:{ labels:['T1','T2','T3','T4','T5','T6'],
+        datasets:[{ data:[352,341,330,322,315,308], borderColor: cssVar('--rc-brand'), backgroundColor: hexRgba(cssVar('--rc-brand'),.12), fill:true, tension:.35, pointRadius:3 }] },
+      options: baseOpts() });
+    charts.inzone = makeChart('in-zone', {
+      type:'doughnut', data:{ labels:['Z1','Z2','Z3','Z4','Z5'],
+        datasets:[{ data:[12,22,38,18,10], backgroundColor:[cssVar('--rc-zone-1'),cssVar('--rc-zone-2'),cssVar('--rc-zone-3'),cssVar('--rc-zone-4'),cssVar('--rc-zone-5')], borderWidth:0 }] },
+      options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
+        plugins:{ legend:{ position:'bottom', labels:{ color: cssVar('--rc-chart-axis'), font:{size:11} } } } } });
+  }
+}
+
+/* ============ 初始化 ============ */
+renderRunlist(); renderPlanTags(); renderCalendar(); renderChat();
+const saved = localStorage.getItem('demo-theme') || 'dark';
+applyTheme(saved);   // 内部已处理 lucide.createIcons + 销毁旧图表 + 渲染当前视图图表，避免重复渲染触发 "canvas already in use"
+</script>
+</body>
+</html>

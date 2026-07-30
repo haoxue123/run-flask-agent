@@ -152,8 +152,10 @@ def classify_intent(message, history_summary="", current_state=None):
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
 # 模型名称常量
-MODEL_CHAT = "deepseek-chat"        # 标准对话模型，用于生成
-MODEL_REASONER = "deepseek-reasoner"  # 推理模型，带思维链，用于反思
+# 默认升级到 DeepSeek V4 系列；可用环境变量 DEEPSEEK_MODEL_CHAT / DEEPSEEK_MODEL_REASONER 覆盖。
+# 2026-07：原 deepseek-chat / deepseek-reasoner 已被平台下线，仅接受 deepseek-v4-flash / deepseek-v4-pro。
+MODEL_CHAT = os.getenv("DEEPSEEK_MODEL_CHAT", "deepseek-v4-flash")      # 生成初稿：快、稳、避开偶发超时
+MODEL_REASONER = os.getenv("DEEPSEEK_MODEL_REASONER", "deepseek-v4-pro")  # 反思/自检：旗舰，用用户确认的 PRO
 
 
 _dotenv_loaded = False
@@ -178,7 +180,7 @@ def _get_client():
     for k in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
         os.environ.pop(k, None)
     _client = OpenAI(api_key=api_key, base_url=DEEPSEEK_BASE_URL,
-                     timeout=30.0, max_retries=0)
+                     timeout=120.0, max_retries=0)
     return _client
 
 
@@ -526,7 +528,107 @@ def parse_plan_to_structured(plan_text):
     return _parse_plan_full(plan_text)["days"]
 
 
-def generate_training_plan(runner_profile, plan_duration=7):
+def _postprocess_plan(plan_text):
+    """解析 LLM 输出：JSON 优先 + 正则兜底，并合成人类可读 plan_text。"""
+    parsed = _parse_plan_full(plan_text)
+    structured = parsed["days"]
+    if parsed.get("summary"):
+        pt = parsed["summary"]
+    elif structured:
+        pt = _days_to_text(structured)
+    else:
+        pt = plan_text
+    return pt, structured
+
+
+def _format_feedback(missing):
+    """把结构化自检缺失项转换为精确中文反馈，供重试回灌到 prompt。"""
+    parts = []
+    for m in missing:
+        if not isinstance(m, dict):
+            parts.append(str(m))
+            continue
+        aspect = m.get("aspect")
+        if aspect == "weekday_distance":
+            wd = m.get("weekday", "")
+            exp = m.get("expected_km")
+            act = m.get("actual_km")
+            wk = m.get("week")
+            if wk:
+                parts.append(f"第{wk}周周{wd}应为{exp}km，实际{act}km")
+            else:
+                parts.append(f"周{wd}应为{exp}km，实际{act}km")
+        elif aspect == "weekly_count":
+            parts.append(f"每周应跑{m.get('expected')}次，实际生成了{m.get('actual')}次跑步日")
+        elif aspect == "weekday_type":
+            parts.append(f"周{m.get('weekday')}应为{m.get('expected')}类型，实际{m.get('actual')}")
+        else:
+            parts.append(m.get("detail") or str(m))
+    return parts
+
+
+def self_check_instructions(user_instructions, structured):
+    """用 reasoner 核对生成计划是否覆盖用户每条指令（reflection-pattern 自检）。
+
+    异常安全：任何失败都返回 covered=True（不阻断主流程），仅标记 self_check_error。
+    """
+    if not user_instructions or not structured:
+        return {"covered": True, "missing": [], "analysis": "无指令或计划为空，跳过自检",
+                "self_check_error": None}
+    lines = []
+    for d in structured:
+        wd = d.get("weekday", "")
+        t = d.get("type", "")
+        dist = d.get("distance_km")
+        if d.get("is_rest"):
+            lines.append(f"周{wd}：休息")
+        else:
+            lines.append(f"周{wd}：{t} {dist}km" if dist else f"周{wd}：{t}")
+    plan_summary = "\n".join(lines)
+    try:
+        system = load_prompt("plan_selfcheck_system")
+    except Exception:
+        system = '你是训练计划指令遵循审查员。核对用户指令是否被计划落实，输出 JSON：{"covered":bool,"missing":[str],"analysis":str}'
+    user_msg = f"""【用户的明确指令】
+{user_instructions}
+
+【训练计划结构化摘要】
+{plan_summary}
+
+请严格按 JSON 格式输出核对结论。"""
+    try:
+        resp = call_deepseek(
+            [{"role": "system", "content": system},
+             {"role": "user", "content": user_msg}],
+            model=MODEL_REASONER,
+            temperature=0.0,
+            response_format={"type": "json_object"},
+        )
+        data = _extract_json_block(resp["content"])
+        if isinstance(data, dict):
+            covered = bool(data.get("covered", True))
+            missing_raw = data.get("missing", []) or []
+            if not isinstance(missing_raw, list):
+                missing_raw = [missing_raw]
+            missing = []
+            for m in missing_raw:
+                if isinstance(m, dict):
+                    missing.append(m)
+                elif isinstance(m, str):
+                    missing.append({"aspect": "other", "detail": m})
+                else:
+                    missing.append({"aspect": "other", "detail": str(m)})
+            return {"covered": covered, "missing": missing,
+                    "analysis": str(data.get("analysis", "")),
+                    "self_check_error": None}
+    except Exception as e:
+        return {"covered": True, "missing": [], "analysis": f"自检调用失败，跳过:{e}",
+                "self_check_error": str(e)}
+    return {"covered": True, "missing": [], "analysis": "自检未返回有效 JSON，跳过",
+            "self_check_error": "bad_json"}
+
+
+def generate_training_plan(runner_profile, plan_duration=7, user_instructions="", self_check=True):
     """
     根据跑者画像生成训练计划。
 
@@ -534,11 +636,14 @@ def generate_training_plan(runner_profile, plan_duration=7):
     AI 拿到工具使用模式取回的真实数据，思考后输出一份计划。
 
     参数：
-        runner_profile: 跑者画像字典（由 data_tool.build_runner_profile 生成）
-        plan_duration:  计划天数（7/30/90），默认 7
+        runner_profile:    跑者画像字典（由 data_tool.build_runner_profile 生成）
+        plan_duration:     计划天数（7/30/90），默认 7
+        user_instructions: 用户的明确指令/命令（如"每周跑3次、周日长跑20km"）。
+                            作为一等输入注入 prompt，LLM 必须严格落实；
+                            科学约束仅作安全上限，不得以此覆盖用户指令。
 
     返回：
-        dict: {"plan_text": str, "structured": list[dict]}
+        dict: {"plan_text": str, "structured": list[dict], "science": dict}
     """
     # 目标比赛信息
     target = runner_profile.get("目标", {}) or {}
@@ -582,11 +687,17 @@ def generate_training_plan(runner_profile, plan_duration=7):
     except Exception:
         constraints = {}
 
-    # 用户消息：把跑者画像 + 科学约束作为上下文喂给 AI
+    # 用户消息：把跑者画像 + 科学约束 + 用户明确指令作为上下文喂给 AI
     user_prompt = (
         f"请根据以下跑者的真实手表数据，生成未来 {plan_duration} 天的训练计划。\n\n"
         f"【跑者画像】\n{json.dumps(runner_profile, ensure_ascii=False, indent=2)}\n"
     )
+    if user_instructions:
+        user_prompt += (
+            f"\n【用户明确指令 · 必须遵循】\n{user_instructions}\n"
+            f"（以上为用户的个性化要求，必须在计划中严格落实；科学约束仅作为安全上限，"
+            f"不得以此忽略或覆盖用户的明确指令。）\n"
+        )
     if constraints.get("constraint_text"):
         user_prompt += f"\n{constraints['constraint_text']}\n"
     # Phase 3：要求 LLM 以结构化 JSON 对象返回（与 _parse_plan_full 的 JSON 分支对齐）
@@ -615,14 +726,14 @@ def generate_training_plan(runner_profile, plan_duration=7):
         "- summary 必填，是一段连贯的人类可读叙述，前端会直接展示它。"
     )
     user_prompt += json_format_instruction
-    user_prompt += "\n\n请基于以上真实数据与科学约束，为这位跑者制定科学、安全、循序渐进的训练计划，并严格按上述 JSON 格式输出。"
+    user_prompt += "\n\n请基于以上真实数据、科学约束与【用户明确指令】，为这位跑者制定科学、安全、循序渐进且严格遵循用户指令的训练计划，并严格按上述 JSON 格式输出。"
 
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
 
-    print("正在生成训练计划（deepseek-chat，结构化 JSON 输出）...")
+    print(f"正在生成训练计划（{MODEL_CHAT}，结构化 JSON 输出）...")
     result = call_deepseek(
         messages,
         model=MODEL_CHAT,
@@ -641,6 +752,33 @@ def generate_training_plan(runner_profile, plan_duration=7):
     elif structured:
         plan_text = _days_to_text(structured)
 
+    # ---- 自检 + 一次重试（reflection-pattern）----
+    sc = None
+    if user_instructions and self_check:
+        sc = self_check_instructions(user_instructions, structured)
+        if sc and not sc.get("covered") and sc.get("missing"):
+            feedback = "；".join(_format_feedback(sc["missing"]))
+            print(f"  [自检未通过] 缺失：{feedback} —— 回灌重试一次")
+            user_prompt2 = (user_prompt
+                            + "【自检反馈 · 必须修正】上一次生成未落实："
+                            + feedback
+                            + "。请严格修正后重新输出。")
+            messages2 = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt2},
+            ]
+            try:
+                result2 = call_deepseek(
+                    messages2, model=MODEL_CHAT, temperature=0.7,
+                    response_format={"type": "json_object"})
+                plan_text, structured = _postprocess_plan(result2["content"])
+                # 重试后重新自检，用修正后的计划更新 sc（避免 sc 仍反映旧计划的未通过状态）
+                sc = self_check_instructions(user_instructions, structured)
+                sc["retried"] = True
+            except Exception as e:
+                sc["retried"] = False
+                sc["retry_error"] = str(e)
+
     # Phase 1：确定性生理内核增量增强（可降级：任何异常都不影响主流程）
     science = {}
     try:
@@ -658,4 +796,4 @@ def generate_training_plan(runner_profile, plan_duration=7):
     except Exception:
         pass
 
-    return {"plan_text": plan_text, "structured": structured, "science": science}
+    return {"plan_text": plan_text, "structured": structured, "science": science, "self_check": sc}

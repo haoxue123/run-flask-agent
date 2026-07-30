@@ -2,6 +2,7 @@
 
 <!--
 meta:
+  title: 运动生理学（Physiology of Sport and Exercise）
   category: 生理基础
   author: Kenney/Wilmore/Costill 等（运动生理学教材）
   year: 2019

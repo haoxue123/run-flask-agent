@@ -761,6 +761,17 @@
             </div>
         </div>
 
+        <!-- 用户明确指令 -->
+        <div class="card">
+            <div class="card-title-row mb-3">
+                <i data-lucide="message-square-command" class="card-title-icon"></i>
+                <h3 class="card-title">你的明确指令（可选）</h3>
+            </div>
+            <p class="card-desc">例如：每周跑3次、周日安排20公里长距离慢跑、周二做间歇跑。AI 会严格落实这些要求，科学约束仅作安全上限。</p>
+            <textarea id="instructions" name="instructions" class="form-input-full" rows="3"
+                placeholder="每周跑3次、周日长跑20km、周二间歇跑……"></textarea>
+        </div>
+
         <!-- 操作按钮 -->
         <div class="action-row">
             <button type="button" onclick="goToStep(1)" class="btn btn-secondary">
@@ -1095,6 +1106,12 @@
         var fd = (window.COACH && window.COACH.upload && window.COACH.upload.buildFormData)
             ? window.COACH.upload.buildFormData()
             : new FormData();
+
+        // 用户明确指令：作为一等输入传入生成（修复"命令不被听从"）
+        var instrEl = document.getElementById('instructions');
+        if (instrEl && instrEl.value && instrEl.value.trim()) {
+            fd.append('instructions', instrEl.value.trim());
+        }
 
         btn.disabled = true;
         btn.classList.add('btn-loading');

@@ -126,9 +126,6 @@
                 {'href': '/training', 'label': '训练计划', 'icon': 'calendar-days'},
                 {'href': '/coach', 'label': 'AI 教练', 'icon': 'message-circle'},
             ]},
-            {'group': '外观', 'items': [
-                {'href': '/tokens', 'label': '设计令牌', 'icon': 'palette'},
-            ]},
         ] %}
         <aside class="sidebar" id="sidebar">
             {% for group in nav_data %}
@@ -336,7 +333,16 @@
         if (localStorage.getItem(KEY)) return;
         var overlay = document.getElementById('welcome-overlay');
         if (!overlay) return;
-        var code = 'RC-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+        // 基于首次访问时间戳生成有意义的用户编号（如 RC-2607271430 = 2026-07-27 14:30）
+        // 生成后存入 localStorage，保证同一浏览器后续访问看到的是同一个「入会时间」编号
+        var code = localStorage.getItem('rc-user-code');
+        if (!code) {
+            var d = new Date();
+            var p = function (n) { return String(n).padStart(2, '0'); };
+            code = 'RC-' + p(d.getFullYear() % 100) + p(d.getMonth() + 1) + p(d.getDate())
+                        + p(d.getHours()) + p(d.getMinutes());
+            localStorage.setItem('rc-user-code', code);
+        }
         var codeEl = document.getElementById('welcome-code');
         if (codeEl) codeEl.textContent = code;
         overlay.hidden = false;

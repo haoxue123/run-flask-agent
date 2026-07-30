@@ -490,6 +490,7 @@ def build_index(knowledge_dir=None, db_dir=None):
             all_chunks.append(chunk)
             all_metadatas.append({
                 "source": filename,
+                "title": doc_meta.get("title") or doc_title,
                 "chunk_index": i,
                 "category": doc_meta.get("category", "自编"),
                 "author": doc_meta.get("author", "团队自编"),
@@ -506,6 +507,7 @@ def build_index(knowledge_dir=None, db_dir=None):
             all_chunks.append(f"【{doc_title}】中文摘要\n{summ}")
             all_metadatas.append({
                 "source": filename,
+                "title": doc_meta.get("title") or doc_title,
                 "chunk_index": -1,
                 "category": doc_meta.get("category", "自编"),
                 "author": doc_meta.get("author", "团队自编"),
@@ -570,6 +572,7 @@ def retrieve_knowledge(query, top_k=3, category=None, authority_boost=0.2):
         {
             "content": "知识片段文本（已截断至 800 字）",
             "source":  "文件名.md",
+            "title":   "书名/文档标题（来自 meta.title，缺省用 H1）",
             "score":   0.85,           # 原始相似度（0-1）
             "authority_level": "高",  # 文档权威度
             "is_summary": False,       # 是否中文摘要块
@@ -631,6 +634,7 @@ def retrieve_knowledge(query, top_k=3, category=None, authority_boost=0.2):
         output.append({
             "content": content,
             "source": metadata.get("source", "unknown.md"),
+            "title": metadata.get("title", metadata.get("source", "未知文档")),
             "score": score,
             "authority_level": metadata.get("authority_level", "中"),
             "is_summary": str(metadata.get("is_summary", "false")),
@@ -677,7 +681,29 @@ def format_knowledge_context(results):
 
     lines.append("")
     lines.append("请基于以上运动科学知识回答用户问题，并在回答末尾标注参考来源。")
+    lines.append("【引用格式对照】（请严格逐条抄写以下条目作为「参考来源」，不要改写或编造）：")
+    for i, r in enumerate(results, 1):
+        lines.append(f"{i}. {_format_citation(r)}")
     return "\n".join(lines)
+
+
+def _format_citation(r):
+    """
+    生成书名引用串：《书名》（作者，年份）· 文件名.md。
+
+    - 书籍类（book_*.md）：用 meta.title（书名）+ author + year
+    - 自编/综述类：无单一作者时用 H1 标题，省略作者年份括号
+    """
+    title = (r.get("title") or r.get("source") or "未知文档").strip()
+    author = (r.get("author") or "").strip()
+    year = (r.get("year") or "").strip()
+    src = r.get("source") or ""
+    has_author = bool(author) and author not in ("团队自编",)
+    if has_author and year and year != "未知":
+        return f"《{title}》（{author}，{year}）· {src}"
+    if has_author:
+        return f"《{title}》（{author}）· {src}"
+    return f"《{title}》· {src}"
 
 
 def reset_index():

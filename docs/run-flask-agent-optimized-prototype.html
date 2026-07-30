@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  跑步教练 Web · 优化原型（单文件、资源全内联、可独立运行）
+  ----------------------------------------------------------------------------
+  设计系统来源：docs/design-audit-cai.md（设计令牌 v3，保留 --rc-* 命名体系，
+               仅替换取值；主色绿提亮 + Volt 荧光 + 数据青 + HR 冷→热区间）
+  维度1 修正落地（来自 critique-reviewer）：
+    ① 首页前瞻英雄卡（下一课 · Day X · 类型 · 配速目标）+ 绿色 CTA；无计划→onboarding
+    ② 主色绿语义过载修复：大数字/图表线/数据用青色 --rc-data；绿仅留给 CTA/品牌/激活态
+    ③ 去除假控件：搜索框、通知铃、RAG「知识来源」死面板、教练「记忆加载中」全部移除
+    ④ 心率区间冷→热（zone1 蓝 → zone5 红）
+    ⑤ 大数字统一 4xl/5xl + .tnum
+  维度2/3（来自 design-system-expert）：令牌升级 + 跑步主题克制装饰（≤6%、≤2 装饰层、z-index 低于内容）
+  注：本文件为独立 demo，不依赖 Flask/CDN/外部字体；CSS/JS/SVG 全部内联。
+  ============================================================================
+-->
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>跑步教练 · 优化原型（设计令牌 v3）</title>
+<style>
+/* ============================================================
+   1) 设计令牌（design-audit-cai.md v3）— 保留 --rc-* 命名
+   ============================================================ */
+:root,
+[data-theme="dark"], .dark {
+  /* 品牌绿 — 仅身份 / 主操作 / 激活态 */
+  --rc-brand:#10E08A; --rc-brand-hover:#0FCB7E; --rc-brand-active:#0A9A63;
+  --rc-on-brand:#04140D; --rc-brand-soft:rgba(16,224,138,0.12); --rc-brand-border:rgba(16,224,138,0.30);
+
+  /* Volt 荧光 — 仅活力 / 进行中 / 在区 */
+  --rc-energy:#C6F000; --rc-energy-hover:#D6FF1A; --rc-energy-active:#B2DA00;
+  --rc-on-energy:#1A2400; --rc-energy-soft:rgba(198,240,0,0.12);
+
+  /* 数据青 — 仅数据 / 图表 */
+  --rc-data:#2BC4E6; --rc-on-data:#04222B; --rc-data-soft:rgba(43,196,230,0.12);
+
+  /* 中性（暗色优先） */
+  --rc-background:#0B0F0E; --rc-surface:#141A18; --rc-surface-raised:#1A221F; --rc-surface-sunken:#0E1311;
+  --rc-border:rgba(255,255,255,0.08); --rc-border-strong:rgba(255,255,255,0.14); --rc-border-faint:rgba(255,255,255,0.05);
+  --rc-text:#ECF3EF; --rc-text-secondary:#9FAAA4; --rc-text-muted:#7C887F;
+  --rc-ring:#10E08A; --rc-ring-offset:#0B0F0E;
+
+  /* 语义色（暗） */
+  --rc-success:#2BD493; --rc-info:#38BDF8; --rc-info-fg:#7DD3FC;
+  --rc-warning:#FFB02E; --rc-warning-fg:#FCD34D; --rc-danger:#FF5C5C; --rc-danger-fg:#FCA5A5;
+
+  /* HR 区间（冷→热） */
+  --rc-zone-1:#38BDF8; --rc-zone-2:#34D399; --rc-zone-3:#FBBF24; --rc-zone-4:#FB923C; --rc-zone-5:#FF5C5C;
+
+  /* 图表 */
+  --rc-chart-1:#10E08A; --rc-chart-2:#2BC4E6; --rc-chart-3:#FFB02E; --rc-chart-4:#C6F000; --rc-chart-5:#FF5C5C;
+
+  /* 圆角 / 阴影 / 辉光 */
+  --rc-radius-sm:6px; --rc-radius-md:10px; --rc-radius-lg:14px; --rc-radius-xl:20px; --rc-radius-2xl:28px; --rc-radius-full:9999px;
+  --rc-shadow-sm:0 1px 2px rgba(0,0,0,0.30); --rc-shadow-md:0 8px 24px -8px rgba(0,0,0,0.45); --rc-shadow-lg:0 20px 40px -12px rgba(0,0,0,0.55);
+  --rc-glow-brand:0 0 24px rgba(16,224,138,0.35); --rc-glow-energy:0 0 24px rgba(198,240,0,0.28);
+
+  /* 字体 / 字号阶梯 / 间距 */
+  --rc-font-display:'Inter Tight','Inter',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+  --rc-font-body:'Inter',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+  --rc-font-mono:'JetBrains Mono','SF Mono','Consolas',ui-monospace,monospace;
+  --rc-text-xs:0.75rem; --rc-text-sm:0.8125rem; --rc-text-base:0.9375rem; --rc-text-lg:1.125rem;
+  --rc-text-xl:1.375rem; --rc-text-2xl:1.75rem; --rc-text-3xl:2.25rem; --rc-text-4xl:3rem; --rc-text-5xl:3.75rem;
+  --rc-space-1:4px; --rc-space-2:8px; --rc-space-3:12px; --rc-space-4:16px; --rc-space-5:20px;
+  --rc-space-6:24px; --rc-space-8:32px; --rc-space-10:40px; --rc-space-12:48px; --rc-space-16:64px; --rc-space-20:80px; --rc-space-24:96px;
+  --rc-transition:0.2s cubic-bezier(0.4,0,0.2,1);
+
+  /* 主题元素装饰透明度（克制红线） */
+  --deco-opacity:0.06;
+}
+
+[data-theme="light"] {
+  --rc-brand:#10E08A; --rc-brand-hover:#0FCB7E; --rc-brand-active:#0A9A63;
+  --rc-on-brand:#04140D; --rc-brand-soft:rgba(16,224,138,0.14); --rc-brand-border:rgba(16,224,138,0.34);
+  --rc-energy:#9BB000; --rc-energy-hover:#B2CC00; --rc-energy-active:#86A100; /* 亮色下压低明度保证对比 */
+  --rc-on-energy:#1A2400; --rc-energy-soft:rgba(155,176,0,0.14);
+  --rc-data:#0B7FA0; --rc-on-data:#FFFFFF; --rc-data-soft:rgba(11,127,160,0.12);
+  --rc-background:#F6FAF7; --rc-surface:#FFFFFF; --rc-surface-raised:#EEF3F0; --rc-surface-sunken:#EAF1ED;
+  --rc-border:rgba(16,32,28,0.12); --rc-border-strong:rgba(16,32,28,0.20); --rc-border-faint:rgba(16,32,28,0.07);
+  --rc-text:#16201C; --rc-text-secondary:#445049; --rc-text-muted:#5E6862;
+  --rc-ring:#0A9A63; --rc-ring-offset:#FFFFFF;
+  --rc-success:#0E9F6E; --rc-info:#0369A1; --rc-info-fg:#0369A1;
+  --rc-warning:#B45309; --rc-warning-fg:#92560A; --rc-danger:#B91C1C; --rc-danger-fg:#B91C1C;
+  --rc-zone-1:#0369A1; --rc-zone-2:#047857; --rc-zone-3:#B45309; --rc-zone-4:#C2410C; --rc-zone-5:#B91C1C;
+  --rc-chart-1:#10A877; --rc-chart-2:#0B7FA0; --rc-chart-3:#B45309; --rc-chart-4:#9BB000; --rc-chart-5:#B91C1C;
+  --rc-shadow-sm:0 1px 2px rgba(16,32,28,0.06); --rc-shadow-md:0 6px 16px -6px rgba(16,32,28,0.12); --rc-shadow-lg:0 16px 32px -12px rgba(16,32,28,0.18);
+  --rc-glow-brand:0 0 18px rgba(16,224,138,0.25); --rc-glow-energy:0 0 18px rgba(155,176,0,0.22);
+  --deco-opacity:0.05;
+}
+
+/* 亮色下 zone 3-5 为深色填充，图例/色条文字改用浅色以保证 AA 对比 */
+[data-theme="light"] .zone-legend .zl,
+[data-theme="light"] .zone-bar .zb { color:#FFFFFF; }
+
+/* zone soft 背景（亮/暗共用，低透明度色条） */
+.zone-soft-1{background:color-mix(in srgb,var(--rc-zone-1) 14%,transparent);}
+.zone-soft-2{background:color-mix(in srgb,var(--rc-zone-2) 14%,transparent);}
+.zone-soft-3{background:color-mix(in srgb,var(--rc-zone-3) 16%,transparent);}
+.zone-soft-4{background:color-mix(in srgb,var(--rc-zone-4) 16%,transparent);}
+.zone-soft-5{background:color-mix(in srgb,var(--rc-zone-5) 16%,transparent);}
+
+/* ============================================================
+   2) 全局重置 / 布局
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box;}
+html{font-family:var(--rc-font-body);font-size:16px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+body{margin:0;background:var(--rc-background);color:var(--rc-text);line-height:1.6;transition:background .3s ease,color .3s ease;}
+a{color:inherit;text-decoration:none;}
+.font-display{font-family:var(--rc-font-display);font-weight:700;letter-spacing:-0.02em;}
+.tnum{font-variant-numeric:tabular-nums;font-family:var(--rc-font-mono);}
+:focus-visible{outline:2px solid var(--rc-ring);outline-offset:2px;border-radius:var(--rc-radius-sm);}
+::selection{background:var(--rc-brand-soft);color:var(--rc-text);}
+
+.app-shell{display:flex;min-height:100vh;position:relative;z-index:1;}
+
+/* 顶部导航（已移除：搜索框 / 通知铃 等假控件） */
+.top-nav{position:fixed;top:0;left:0;right:0;height:56px;background:var(--rc-background);
+  border-bottom:1px solid var(--rc-border);display:flex;align-items:center;padding:0 var(--rc-space-5);z-index:100;gap:var(--rc-space-3);}
+.brand{display:flex;align-items:center;gap:var(--rc-space-2);font-family:var(--rc-font-display);font-size:var(--rc-text-lg);font-weight:700;flex-shrink:0;}
+.brand .logo-icon{width:28px;height:28px;border-radius:50%;background:var(--rc-brand);box-shadow:var(--rc-glow-brand);
+  display:flex;align-items:center;justify-content:center;color:var(--rc-on-brand);}
+.badge-web{font-size:var(--rc-text-xs);padding:2px 8px;border-radius:var(--rc-radius-full);
+  background:var(--rc-brand-soft);color:var(--rc-brand);border:1px solid var(--rc-brand-border);font-weight:600;}
+.nav-spacer{flex:1;}
+.theme-toggle{background:none;border:1px solid var(--rc-border);border-radius:var(--rc-radius-full);width:36px;height:36px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--rc-text-secondary);transition:all var(--rc-transition);}
+.theme-toggle:hover{background:var(--rc-surface-raised);color:var(--rc-brand);}
+
+/* 侧边栏 */
+.sidebar{position:fixed;top:56px;left:0;bottom:0;width:240px;background:transparent;border-right:1px solid var(--rc-border);
+  display:flex;flex-direction:column;padding:var(--rc-space-4);z-index:90;overflow-y:auto;}
+.nav-group{margin-bottom:var(--rc-space-6);}
+.nav-group-label{font-size:var(--rc-text-xs);text-transform:uppercase;letter-spacing:0.08em;color:var(--rc-text-muted);margin-bottom:var(--rc-space-2);padding:0 var(--rc-space-2);}
+.nav-item{display:flex;align-items:center;gap:var(--rc-space-3);padding:var(--rc-space-2) var(--rc-space-3);border-radius:var(--rc-radius-md);
+  color:var(--rc-text-secondary);font-size:var(--rc-text-sm);position:relative;transition:all var(--rc-transition);cursor:pointer;border:none;background:none;width:100%;text-align:left;font-family:inherit;}
+.nav-item:hover{background:var(--rc-surface-raised);color:var(--rc-text);}
+.nav-item.active{color:var(--rc-brand);background:var(--rc-brand-soft);}
+.nav-item.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:var(--rc-brand);}
+.nav-item .nav-icon{width:18px;height:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.sidebar-foot{margin-top:auto;font-size:var(--rc-text-xs);color:var(--rc-text-muted);padding:var(--rc-space-2);line-height:1.5;}
+
+/* 主内容 */
+.main-content{flex:1;margin-left:240px;margin-top:56px;padding:var(--rc-space-8) var(--rc-space-10);min-height:calc(100vh - 56px);position:relative;z-index:1;max-width:1320px;}
+.container{max-width:1180px;margin:0 auto;}
+.view{display:none;}
+.view.active{display:block;animation:rc-fade .35s ease;}
+@keyframes rc-fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+
+/* ============================================================
+   3) 卡片 / 按钮 / 表单
+   ============================================================ */
+.card{background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:var(--rc-radius-lg);padding:var(--rc-space-5);transition:border-color var(--rc-transition);position:relative;overflow:hidden;}
+.card:hover{border-color:var(--rc-brand-border);}
+.card-title{font-family:var(--rc-font-display);font-weight:700;font-size:var(--rc-text-xl);margin:0 0 var(--rc-space-4);display:flex;align-items:center;gap:var(--rc-space-2);}
+.card-title .ci{width:20px;height:20px;color:var(--rc-brand);display:flex;align-items:center;justify-content:center;}
+
+.btn{display:inline-flex;align-items:center;gap:var(--rc-space-2);padding:var(--rc-space-2) var(--rc-space-4);border-radius:var(--rc-radius-md);
+  font-size:var(--rc-text-sm);font-weight:600;cursor:pointer;border:1px solid transparent;transition:all var(--rc-transition);font-family:inherit;}
+.btn:active{transform:scale(0.97);}
+.btn-primary{background:var(--rc-brand);color:var(--rc-on-brand);box-shadow:var(--rc-glow-brand);}
+.btn-primary:hover{background:var(--rc-brand-hover);}
+.btn-energy{background:var(--rc-energy);color:var(--rc-on-energy);box-shadow:var(--rc-glow-energy);}
+.btn-energy:hover{background:var(--rc-energy-hover);}
+.btn-secondary{background:transparent;border-color:var(--rc-border);color:var(--rc-text);}
+.btn-secondary:hover{background:var(--rc-surface-raised);border-color:var(--rc-brand-border);}
+.btn-ghost{background:transparent;color:var(--rc-brand);}
+.btn-ghost:hover{background:var(--rc-brand-soft);}
+.btn-block{width:100%;justify-content:center;}
+
+input,select,textarea{background:var(--rc-surface-sunken);border:1px solid var(--rc-border);border-radius:var(--rc-radius-md);
+  padding:var(--rc-space-2) var(--rc-space-3);color:var(--rc-text);font-size:var(--rc-text-sm);font-family:var(--rc-font-body);outline:none;transition:border-color var(--rc-transition);}
+input:focus,select:focus,textarea:focus{border-color:var(--rc-brand);box-shadow:0 0 0 3px var(--rc-brand-soft);}
+label{font-size:var(--rc-text-xs);color:var(--rc-text-muted);display:block;margin-bottom:var(--rc-space-1);}
+
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:var(--rc-radius-full);font-size:var(--rc-text-xs);font-weight:600;}
+.badge-success{background:color-mix(in srgb,var(--rc-success) 16%,transparent);color:var(--rc-success);}
+.badge-info{background:color-mix(in srgb,var(--rc-info) 16%,transparent);color:var(--rc-info-fg);}
+.badge-warning{background:color-mix(in srgb,var(--rc-warning) 18%,transparent);color:var(--rc-warning-fg);}
+.badge-danger{background:color-mix(in srgb,var(--rc-danger) 16%,transparent);color:var(--rc-danger-fg);}
+.badge-data{background:var(--rc-data-soft);color:var(--rc-data);}
+.badge-brand{background:var(--rc-brand-soft);color:var(--rc-brand);}
+
+.divider{border:none;border-top:1px solid var(--rc-border);margin:var(--rc-space-6) 0;}
+
+/* ============================================================
+   4) View 1 — 前瞻英雄卡 + KPI + 图表
+   ============================================================ */
+.page-head{margin-bottom:var(--rc-space-6);}
+.page-head h1{font-family:var(--rc-font-display);font-size:var(--rc-text-3xl);margin:0 0 var(--rc-space-1);font-weight:700;}
+.page-head p{font-size:var(--rc-text-sm);color:var(--rc-text-muted);margin:0;}
+
+/* 英雄卡（每屏唯一视觉焦点） */
+.hero-card{position:relative;background:linear-gradient(135deg,var(--rc-surface),var(--rc-surface-raised));
+  border:1px solid var(--rc-brand-border);border-radius:var(--rc-radius-2xl);padding:var(--rc-space-8);
+  box-shadow:var(--rc-shadow-md);overflow:hidden;margin-bottom:var(--rc-space-8);}
+/* 装饰层 1：跑道弧线（brand 描边 ≤6%，z-index 低于内容） */
+.hero-lane{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:var(--deco-opacity);}
+.hero-card > *{position:relative;z-index:1;}
+.hero-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:var(--rc-space-8);align-items:center;}
+.hero-eyebrow{display:inline-flex;align-items:center;gap:var(--rc-space-2);font-size:var(--rc-text-xs);font-weight:600;
+  letter-spacing:0.08em;text-transform:uppercase;color:var(--rc-brand);margin-bottom:var(--rc-space-3);}
+.hero-day{font-family:var(--rc-font-display);font-size:var(--rc-text-5xl);font-weight:700;line-height:1;color:var(--rc-text);font-variant-numeric:tabular-nums;}
+.hero-type{font-size:var(--rc-text-2xl);font-weight:700;color:var(--rc-text);margin:var(--rc-space-2) 0;}
+.hero-meta{display:flex;flex-wrap:wrap;gap:var(--rc-space-5);margin-top:var(--rc-space-4);}
+.hero-meta .m-label{font-size:var(--rc-text-xs);color:var(--rc-text-muted);}
+.hero-meta .m-val{font-family:var(--rc-font-mono);font-size:var(--rc-text-lg);font-weight:600;color:var(--rc-data);font-variant-numeric:tabular-nums;}
+.hero-cta{display:flex;gap:var(--rc-space-3);margin-top:var(--rc-space-6);flex-wrap:wrap;}
+/* 英雄卡右侧：配速刻度跑道（暗示，非数值） */
+.hero-gauge{border-left:1px solid var(--rc-border);padding-left:var(--rc-space-6);}
+.hero-gauge .gg-label{font-size:var(--rc-text-xs);color:var(--rc-text-muted);margin-bottom:var(--rc-space-3);}
+.hero-gauge .gg-target{font-family:var(--rc-font-mono);font-size:var(--rc-text-3xl);font-weight:700;color:var(--rc-data);font-variant-numeric:tabular-nums;}
+
+/* 无计划状态英雄卡（引导 onboarding） */
+.hero-empty{text-align:center;padding:var(--rc-space-12) var(--rc-space-6);}
+.hero-empty .he-icon{width:56px;height:56px;margin:0 auto var(--rc-space-4);color:var(--rc-brand);display:flex;align-items:center;justify-content:center;}
+.hero-empty h2{font-family:var(--rc-font-display);font-size:var(--rc-text-2xl);margin:0 0 var(--rc-space-2);}
+.hero-empty p{color:var(--rc-text-muted);margin:0 0 var(--rc-space-5);font-size:var(--rc-text-sm);}
+
+/* KPI 网格 */
+.kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--rc-space-4);margin-bottom:var(--rc-space-8);}
+@media(min-width:769px){.kpi-grid{grid-template-columns:repeat(4,1fr);}}
+.kpi-card{background:var(--rc-surface);border:1px solid var(--rc-border);border-radius:var(--rc-radius-lg);padding:var(--rc-space-5);position:relative;overflow:hidden;transition:border-color var(--rc-transition);}
+.kpi-card:hover{border-color:var(--rc-brand-border);}
+/* 装饰层 2：卡顶里程刻度（中性，≤6%） */
+.kpi-ruler{position:absolute;top:0;left:0;right:0;height:6px;opacity:var(--deco-opacity);
+  background-image:repeating-linear-gradient(90deg,var(--rc-text) 0 1px,transparent 1px 14px);background-position:center;}
+.kpi-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--rc-space-3);}
+.kpi-label{font-size:var(--rc-text-xs);font-weight:600;color:var(--rc-text-muted);letter-spacing:0.02em;}
+.kpi-ico{width:20px;height:20px;display:flex;align-items:center;justify-content:center;}
+.kpi-number{font-family:var(--rc-font-mono);font-size:var(--rc-text-4xl);font-weight:700;line-height:1;color:var(--rc-data);font-variant-numeric:tabular-nums;}
+.kpi-unit{font-size:var(--rc-text-sm);color:var(--rc-text-muted);margin-left:var(--rc-space-1);}
+.kpi-foot{font-size:var(--rc-text-xs);color:var(--rc-text-muted);margin-top:var(--rc-space-2);display:flex;align-items:center;gap:var(--rc-space-2);}
+
+/* 中部双列 */
+.dash-mid{display:grid;grid-template-columns:1fr;gap:var(--rc-space-4);margin-bottom:var(--rc-space-6);}
+@media(min-width:769px){.dash-mid{grid-template-columns:2fr 1fr;}}
+
+/* 跑步列表 */
+.runlist{width:100%;border-collapse:collapse;font-size:var(--rc-text-sm);}
+.runlist th{font-size:var(--rc-text-xs);color:var(--rc-text-muted);font-weight:600;text-align:left;padding-bottom:var(--rc-space-2);border-bottom:1px solid var(--rc-border);}
+.runlist th.r,.runlist td.r{text-align:right;}
+.runlist td{padding:var(--rc-space-2) 0;}
+.runlist tbody tr{border-top:1px solid var(--rc-border-faint);}
+.runlist tbody tr:first-child{border-top:none;}
+.runlist .rd{color:var(--rc-text-muted);font-family:var(--rc-font-mono);}
+.runlist .rn{font-weight:500;}
+.runlist .rp{color:var(--rc-data);font-family:var(--rc-font-mono);}
+.runlist .zone-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;}
+
+/* 图表容器 */
+.chart-wrap{width:100%;}
+.chart-wrap svg{width:100%;height:auto;display:block;}
+.legend{display:flex;flex-wrap:wrap;gap:var(--rc-space-3);margin-top:var(--rc-space-3);font-size:var(--rc-text-xs);color:var(--rc-text-muted);}
+.legend .lg{display:flex;align-items:center;gap:6px;}
+.legend .sw{width:10px;height:10px;border-radius:3px;}
+
+/* 身体状态行 */
+.body-row{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--rc-space-4);}
+@media(min-width:769px){.body-row{grid-template-columns:repeat(3,1fr);}}
+.mini-stat{display:flex;align-items:center;gap:var(--rc-space-3);}
+.mini-stat .ms-ico{width:36px;height:36px;border-radius:var(--rc-radius-md);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.mini-stat .ms-val{font-family:var(--rc-font-mono);font-size:var(--rc-text-2xl);font-weight:700;color:var(--rc-data);font-variant-numeric:tabular-nums;line-height:1;}
+.mini-stat .ms-label{font-size:var(--rc-text-xs);color:var(--rc-text-muted);}
+.mini-stat .ms-sub{font-size:var(--rc-text-xs);color:var(--rc-text-secondary);}
+
+/* 教练周报卡（无死状态文案） */
+.coach-card{border-left:3px solid var(--rc-data);}
+.coach-head{display:flex;align-items:center;gap:var(--rc-space-3);margin-bottom:var(--rc-space-4);}
+.coach-orb{width:40px;height:40px;border-radius:50%;background:conic-gradient(var(--rc-brand) 82%,var(--rc-border-strong) 0);
+  display:flex;align-items:center;justify-content:center;box-shadow:var(--rc-glow-brand);flex-shrink:0;position:relative;}
+.coach-orb::before{content:'';position:absolute;inset:5px;border-radius:50%;background:radial-gradient(circle at 40% 40%,#93E9C4,#0A6F47);}
+.coach-orb span{position:relative;z-index:1;font-family:var(--rc-font-mono);font-size:12px;font-weight:700;color:var(--rc-on-brand);}
+.coach-sec{margin-bottom:var(--rc-space-3);}
+.coach-sec .cs-label{font-size:var(--rc-text-xs);font-weight:600;color:var(--rc-text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;}
+.coach-sec .cs-text{font-size:var(--rc-text-sm);color:var(--rc-text-secondary);line-height:1.6;}
+.coach-sec.risk .cs-text{color:var(--rc-warning-fg);}
+
+/* ============================================================
+   5) View 2 — 月历 / 打卡面板 / 编辑弹窗
+   ============================================================ */
+.plan-head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:var(--rc-space-4);margin-bottom:var(--rc-space-5);}
+.plan-actions{display:flex;gap:var(--rc-space-2);flex-wrap:wrap;}
+
+/* 完成率 */
+.progress-card{margin-bottom:var(--rc-space-5);}
+.progress-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--rc-space-2);}
+.progress-label{font-size:var(--rc-text-sm);font-weight:600;}
+.progress-val{font-family:var(--rc-font-mono);font-size:var(--rc-text-sm);color:var(--rc-data);font-variant-numeric:tabular-nums;}
+.progress-track{height:8px;border-radius:var(--rc-radius-full);background:var(--rc-surface-sunken);overflow:hidden;}
+.progress-fill{height:100%;background:var(--rc-brand);border-radius:var(--rc-radius-full);transition:width .4s cubic-bezier(0.2,0.7,0.3,1);}
+
+/* 月历 */
+.cal-weeklabel{font-size:var(--rc-text-xs);font-weight:600;color:var(--rc-text-muted);margin:var(--rc-space-3) 0 var(--rc-space-1);}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:var(--rc-space-2);}
+.cal-weekhead{font-size:var(--rc-text-xs);color:var(--rc-text-muted);text-align:center;padding-bottom:2px;}
+.plan-day{position:relative;aspect-ratio:1/1;border:1px solid var(--rc-border);border-left:3px solid var(--rc-border-strong);
+  border-radius:var(--rc-radius-md);padding:var(--rc-space-2);background:var(--rc-surface);cursor:pointer;
+  display:flex;flex-direction:column;text-align:left;font-size:var(--rc-text-xs);transition:transform .18s cubic-bezier(0.2,0.7,0.3,1),border-color .18s,background .18s,box-shadow .18s;overflow:hidden;}
+.plan-day:hover{transform:translateY(-3px);border-color:var(--rc-brand-border);box-shadow:var(--rc-shadow-sm);}
+.plan-day.completed{opacity:0.62;}
+.plan-day .pd-num{font-family:var(--rc-font-mono);font-size:var(--rc-text-xs);font-weight:600;color:var(--rc-text-secondary);}
+.plan-day .pd-bar{margin-top:auto;height:4px;border-radius:var(--rc-radius-full);}
+.plan-day .pd-type{font-weight:600;margin-top:4px;line-height:1.2;font-size:var(--rc-text-xs);}
+.plan-day .pd-type.rest{color:var(--rc-text-muted);}
+.plan-day .pd-pace{font-family:var(--rc-font-mono);font-size:9px;color:var(--rc-data);line-height:1.2;}
+.plan-day .pd-check{position:absolute;top:6px;right:6px;width:14px;height:14px;color:var(--rc-success);display:none;}
+.plan-day.completed .pd-check{display:block;}
+/* hover 出现编辑铅笔（独立编辑入口，修复 P0） */
+.plan-day .pd-edit{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:var(--rc-radius-sm);
+  background:var(--rc-surface-raised);border:1px solid var(--rc-border);display:flex;align-items:center;justify-content:center;
+  color:var(--rc-text-secondary);opacity:0;transform:scale(.85);transition:opacity .15s,transform .15s;cursor:pointer;}
+.plan-day:hover .pd-edit{opacity:1;transform:scale(1);}
+.plan-day .pd-edit:hover{color:var(--rc-brand);border-color:var(--rc-brand-border);}
+.plan-day:hover .pd-check{opacity:0;} /* hover 时优先显示编辑入口 */
+
+/* HR 区间图例 */
+.zone-legend{display:flex;align-items:center;gap:0;margin-top:var(--rc-space-4);border-radius:var(--rc-radius-full);overflow:hidden;border:1px solid var(--rc-border);}
+.zone-legend .zl{flex:1;text-align:center;padding:6px 0;font-size:10px;font-weight:600;color:var(--rc-on-brand);}
+.zone-legend .zl-meta{display:flex;flex-direction:column;font-size:9px;line-height:1.1;}
+
+/* 打卡面板（右侧滑出） */
+.exec-overlay{position:fixed;inset:0;z-index:300;display:none;align-items:flex-end;justify-content:flex-end;}
+.exec-overlay.open{display:flex;}
+.exec-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.55);}
+.exec-panel{position:relative;width:100%;max-width:400px;height:100%;background:var(--rc-surface);border-left:1px solid var(--rc-border);
+  box-shadow:var(--rc-shadow-lg);padding:var(--rc-space-6);overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(0.2,0.7,0.3,1);}
+.exec-overlay.open .exec-panel{transform:translateX(0);}
+.exec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--rc-space-5);}
+.exec-head h3{font-family:var(--rc-font-display);font-size:var(--rc-text-xl);margin:0;}
+.exec-close{width:32px;height:32px;border-radius:var(--rc-radius-md);border:1px solid var(--rc-border);background:none;color:var(--rc-text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.exec-close:hover{background:var(--rc-surface-raised);color:var(--rc-text);}
+.exec-plan{background:var(--rc-surface-sunken);border:1px solid var(--rc-border);border-radius:var(--rc-radius-md);padding:var(--rc-space-4);margin-bottom:var(--rc-space-5);}
+.exec-plan .ep-row{display:flex;justify-content:space-between;font-size:var(--rc-text-sm);padding:4px 0;}
+.exec-plan .ep-row .k{color:var(--rc-text-muted);}
+.exec-plan .ep-row .v{font-family:var(--rc-font-mono);color:var(--rc-text);font-weight:600;}
+.exec-form .ef-row{display:grid;grid-template-columns:1fr 1fr;gap:var(--rc-space-3);margin-bottom:var(--rc-space-3);}
+.exec-form .ef-full{grid-column:1/-1;}
+.exec-foot{display:flex;gap:var(--rc-space-2);margin-top:var(--rc-space-5);}
+
+/* 编辑弹窗（独立、可达，修复 P0） */
+.modal-overlay{position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.6);}
+.modal-card{position:relative;width:100%;max-width:420px;margin:0 var(--rc-space-4);background:var(--rc-surface);
+  border:1px solid var(--rc-border);border-radius:var(--rc-radius-lg);box-shadow:var(--rc-shadow-lg);padding:var(--rc-space-6);
+  transform:translateY(12px) scale(.97);transition:transform .25s cubic-bezier(0.2,0.7,0.3,1);}
+.modal-overlay.open .modal-card{transform:translateY(0) scale(1);}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--rc-space-4);}
+.modal-head h3{font-family:var(--rc-font-display);font-size:var(--rc-text-lg);margin:0;}
+.modal-body{display:flex;flex-direction:column;gap:var(--rc-space-3);}
+.modal-foot{display:flex;gap:var(--rc-space-2);margin-top:var(--rc-space-5);}
+.modal-foot .btn{flex:1;justify-content:center;}
+.check-row{display:flex;align-items:center;gap:var(--rc-space-2);}
+.check-row input{width:16px;height:16px;accent-color:var(--rc-brand);}
+
+/* ============================================================
+   6) View 3 — 设计令牌展示
+   ============================================================ */
+.token-section{margin-bottom:var(--rc-space-10);}
+.token-section h2{font-family:var(--rc-font-display);font-size:var(--rc-text-2xl);margin:0 0 var(--rc-space-2);}
+.token-section .ts-desc{color:var(--rc-text-muted);font-size:var(--rc-text-sm);margin:0 0 var(--rc-space-5);max-width:760px;}
+.swatch-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:var(--rc-space-4);}
+.swatch{border:1px solid var(--rc-border);border-radius:var(--rc-radius-md);overflow:hidden;background:var(--rc-surface);}
+.swatch .sw-color{height:64px;display:block;}
+.swatch .sw-info{padding:var(--rc-space-3);}
+.swatch .sw-name{font-size:var(--rc-text-sm);font-weight:600;}
+.swatch .sw-hex{font-family:var(--rc-font-mono);font-size:var(--rc-text-xs);color:var(--rc-text-muted);}
+.swatch .sw-use{font-size:var(--rc-text-xs);color:var(--rc-text-secondary);margin-top:4px;line-height:1.4;}
+
+.rule-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:var(--rc-space-4);}
+.rule-card{border:1px solid var(--rc-border);border-radius:var(--rc-radius-md);padding:var(--rc-space-4);background:var(--rc-surface);}
+.rule-card .rc-dot{width:14px;height:14px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle;}
+.rule-card h4{margin:0 0 var(--rc-space-2);font-size:var(--rc-text-sm);font-weight:700;display:flex;align-items:center;}
+.rule-card p{margin:0;font-size:var(--rc-text-xs);color:var(--rc-text-muted);line-height:1.5;}
+
+.zone-bar{display:flex;height:40px;border-radius:var(--rc-radius-md);overflow:hidden;border:1px solid var(--rc-border);margin:var(--rc-space-4) 0;}
+.zone-bar .zb{flex:1;display:flex;align-items:center;justify-content:center;font-size:var(--rc-text-xs);font-weight:700;color:var(--rc-on-brand);}
+.type-scale{display:flex;flex-direction:column;gap:var(--rc-space-3);}
+.type-row{display:flex;align-items:baseline;gap:var(--rc-space-4);border-bottom:1px solid var(--rc-border-faint);padding-bottom:var(--rc-space-3);}
+.type-row .tr-name{font-family:var(--rc-font-mono);font-size:var(--rc-text-xs);color:var(--rc-text-muted);width:120px;flex-shrink:0;}
+.type-row .tr-sample{color:var(--rc-text);}
+
+/* 响应式 */
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);transition:transform .3s ease;}
+  .sidebar.is-open{transform:translateX(0);}
+  .main-content{margin-left:0;padding:var(--rc-space-4);}
+  .hero-grid{grid-template-columns:1fr;}
+  .hero-gauge{border-left:none;padding-left:0;border-top:1px solid var(--rc-border);padding-top:var(--rc-space-5);}
+  .exec-panel{max-width:none;}
+}
+@media(min-width:769px){.hamburger-btn{display:none;}}
+
+/* 动效统一纳入 reduced-motion */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important;}
+  .view.active{animation:none;}
+  .plan-day:hover{transform:none;}
+  .coach-orb{box-shadow:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- 内联 SVG 图标精灵（无 CDN，stroke 用 currentColor） -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-dashboard" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="2"/><rect x="14" y="12" width="7" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="16" width="7" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 2v4M8 2v4M3 10h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="M22 7l-8.5 8.5-4-4L2 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 7h6v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M3 18a9 9 0 0 1 18 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 14l4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="14" r="1.4" fill="currentColor"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A4.5 4.5 0 0 0 12 5 4.5 4.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M12 20h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z" fill="currentColor"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></symbol>
+  <symbol id="i-bar" viewBox="0 0 24 24"><path d="M3 3v18h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="7" y="10" width="3" height="8" fill="currentColor"/><rect x="12" y="6" width="3" height="12" fill="currentColor"/><rect x="17" y="13" width="3" height="5" fill="currentColor"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+</svg>
+
+<div class="app-shell">
+
+  <!-- 顶部导航（无搜索框 / 无通知铃） -->
+  <header class="top-nav">
+    <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="菜单" style="display:none;"><svg style="width:18px;height:18px"><use href="#i-menu"/></svg></button>
+    <a class="brand" onclick="switchView('v1')" style="cursor:pointer">
+      <span class="logo-icon"><svg style="width:16px;height:16px"><use href="#i-activity"/></svg></span>
+      <span>跑步教练</span>
+    </a>
+    <span class="badge-web">Web</span>
+    <div class="nav-spacer"></div>
+    <button class="theme-toggle" onclick="toggleTheme()" title="切换主题" aria-label="切换主题">
+      <svg id="theme-icon-sun" style="width:16px;height:16px;display:none"><use href="#i-sun"/></svg>
+      <svg id="theme-icon-moon" style="width:16px;height:16px"><use href="#i-moon"/></svg>
+    </button>
+  </header>
+
+  <!-- 侧边栏（仅 3 个真实可达视图，无死链接） -->
+  <aside class="sidebar" id="sidebar">
+    <div class="nav-group">
+      <div class="nav-group-label">视图</div>
+      <button class="nav-item active" data-view="v1" onclick="switchView('v1')"><span class="nav-icon"><svg style="width:18px;height:18px"><use href="#i-dashboard"/></svg></span><span>数据总览</span></button>
+      <button class="nav-item" data-view="v2" onclick="switchView('v2')"><span class="nav-icon"><svg style="width:18px;height:18px"><use href="#i-calendar"/></svg></span><span>训练计划</span></button>
+      <button class="nav-item" data-view="v3" onclick="switchView('v3')"><span class="nav-icon"><svg style="width:18px;height:18px"><use href="#i-target"/></svg></span><span>设计系统</span></button>
+    </div>
+    <div class="sidebar-foot">
+      run-flask-agent · 训练数据看板<br/>
+      演示原型 · 数据均为 mock
+    </div>
+  </aside>
+
+  <!-- 主内容 -->
+  <main class="main-content">
+    <div class="container">
+
+      <!-- ============ View 1：优化首页 / 数据总览 ============ -->
+      <section class="view active" id="v1">
+        <div class="page-head">
+          <h1>数据总览</h1>
+          <p>本周训练数据与教练洞察 · 前瞻英雄卡为你指向下一课</p>
+        </div>
+
+        <!-- 前瞻英雄卡（有计划） -->
+        <div class="hero-card" id="hero-with-plan">
+          <svg class="hero-lane" viewBox="0 0 800 320" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M-20 300 C 200 250, 420 300, 820 200" fill="none" style="stroke:var(--rc-brand)" stroke-width="2"/>
+            <path d="M-20 320 C 240 270, 460 320, 820 220" fill="none" style="stroke:var(--rc-brand)" stroke-width="1"/>
+          </svg>
+          <div class="hero-grid">
+            <div>
+              <div class="hero-eyebrow"><svg style="width:14px;height:14px"><use href="#i-zap"/></svg> 下一课 · 前瞻</div>
+              <div class="hero-day tnum" id="hero-day">Day 8</div>
+              <div class="hero-type" id="hero-type">长距离慢跑</div>
+              <div class="hero-meta">
+                <div><div class="m-label">配速目标</div><div class="m-val" id="hero-pace">5:45</div></div>
+                <div><div class="m-label">预计距离</div><div class="m-val" id="hero-dist">16.0</div></div>
+                <div><div class="m-label">目标区间</div><div class="m-val" id="hero-zone">Z3</div></div>
+              </div>
+              <div class="hero-cta">
+                <button class="btn btn-primary" onclick="startNextSession()"><svg style="width:16px;height:16px"><use href="#i-play"/></svg> 开始本课训练</button>
+                <button class="btn btn-secondary" onclick="switchView('v2')"><svg style="width:16px;height:16px"><use href="#i-calendar"/></svg> 查看周计划</button>
+              </div>
+            </div>
+            <div class="hero-gauge">
+              <div class="gg-label">本课目标配速刻度</div>
+              <div class="gg-target tnum">5:45<span style="font-size:var(--rc-text-base);color:var(--rc-text-muted)"> /km</span></div>
+              <svg viewBox="0 0 240 60" style="width:100%;height:auto;margin-top:var(--rc-space-4)" aria-hidden="true">
+                <line x1="6" y1="40" x2="234" y2="40" style="stroke:var(--rc-border-strong)" stroke-width="2" stroke-dasharray="2 6"/>
+                <circle cx="170" cy="40" r="6" style="fill:var(--rc-energy)"/>
+                <text x="170" y="20" text-anchor="middle" font-size="10" style="fill:var(--rc-text-muted);font-family:var(--rc-font-mono)">5:45</text>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- 无计划状态英雄卡（引导 onboarding） -->
+        <div class="hero-card hero-empty" id="hero-no-plan" style="display:none">
+          <div class="he-icon"><svg style="width:32px;height:32px"><use href="#i-target"/></svg></div>
+          <h2>还没有训练计划</h2>
+          <p>上传一次运动记录或填写目标，AI 教练会为你生成个性化周计划。</p>
+          <button class="btn btn-primary" onclick="switchView('v2')"><svg style="width:16px;height:16px"><use href="#i-plus"/></svg> 创建训练计划</button>
+        </div>
+
+        <!-- KPI 网格：大数字青色 + 语义图标（不再全绿） -->
+        <div class="kpi-grid" id="kpi-grid"></div>
+
+        <!-- 中部双列：最近跑步 + 训练趋势 -->
+        <div class="dash-mid">
+          <div class="card">
+            <h2 class="card-title"><span class="ci"><svg style="width:20px;height:20px"><use href="#i-activity"/></svg></span> 最近跑步</h2>
+            <table class="runlist">
+              <thead><tr><th>日期</th><th>活动</th><th class="r">距离</th><th class="r">配速</th><th class="r">心率</th></tr></thead>
+              <tbody id="run-tbody"></tbody>
+            </table>
+          </div>
+          <div class="card">
+            <h2 class="card-title"><span class="ci"><svg style="width:20px;height:20px"><use href="#i-bar"/></svg></span> 训练趋势</h2>
+            <div class="chart-wrap" id="trend-chart"></div>
+            <div class="legend"><span class="lg"><span class="sw" style="background:var(--rc-data)"></span> 每日跑量 (km)</span></div>
+          </div>
+        </div>
+
+        <!-- 配速趋势（青色线）+ 心率区间分布（冷→热） -->
+        <div class="card" style="margin-bottom:var(--rc-space-6)">
+          <h2 class="card-title"><span class="ci"><svg style="width:20px;height:20px"><use href="#i-trend"/></svg></span> 配速 / 心率区间分布</h2>
+          <div style="display:grid;grid-template-columns:1fr;gap:var(--rc-space-5)">
+            <div>
+              <div class="kpi-label" style="margin-bottom:var(--rc-space-2)">配速趋势 (min/km) — 数据青</div>
+              <div class="chart-wrap" id="pace-chart"></div>
+            </div>
+            <div>
+              <div class="kpi-label" style="margin-bottom:var(--rc-space-2)">本周心率区间分布 — 冷→热</div>
+              <div class="zone-bar" id="zone-dist"></div>
+              <div class="legend" id="zone-dist-legend"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 身体状态（心率→zone5 红，演示语义图标映射） -->
+        <div class="card" style="margin-bottom:var(--rc-space-6)">
+          <h2 class="card-title"><span class="ci"><svg style="width:20px;height:20px"><use href="#i-heart"/></svg></span> 身体状态</h2>
+          <div class="body-row" id="body-row"></div>
+        </div>
+
+        <!-- 教练周报卡（无死状态文案 / 无假 RAG 面板） -->
+        <div class="card coach-card">
+          <div class="coach-head">
+            <div class="coach-orb"><span>82</span></div>
+            <div>
+              <div class="font-display" style="font-weight:600;font-size:var(--rc-text-lg)">教练周报</div>
+              <span class="badge badge-info">AI 分析</span>
+            </div>
+          </div>
+          <div class="coach-sec"><div class="cs-label">总结</div><div class="cs-text">本周累计 38.5 km，完成度良好；长距离课按目标区间完成，节奏稳定。</div></div>
+          <div class="coach-sec"><div class="cs-label">建议</div><div class="cs-text">Day 8 长距离建议前 30 分钟压在 Z2，避免过早进入阈值；本周末可安排一次恢复跑平衡负荷。</div></div>
+          <div class="coach-sec risk"><div class="cs-label">风险</div><div class="cs-text">训练负荷连续两周上行，ACWR 接近 1.4，注意下行风险，必要时下调间歇强度。</div></div>
+        </div>
+
+      </section>
+
+      <!-- ============ View 2：优化训练计划 ============ -->
+      <section class="view" id="v2">
+        <div class="plan-head">
+          <div>
+            <h1 class="font-display" style="font-size:var(--rc-text-3xl);margin:0 0 var(--rc-space-1)">训练计划</h1>
+            <p style="font-size:var(--rc-text-sm);color:var(--rc-text-muted);margin:0">单击某天 = 打卡；hover 出现铅笔或直接点「调整本日计划」= 编辑</p>
+          </div>
+          <div class="plan-actions">
+            <button class="btn btn-secondary" onclick="switchView('v1')"><svg style="width:16px;height:16px"><use href="#i-dashboard"/></svg> 返回总览</button>
+            <button class="btn btn-primary" onclick="generatePlan()"><svg style="width:16px;height:16px"><use href="#i-plus"/></svg> 生成训练计划</button>
+          </div>
+        </div>
+
+        <!-- 完成率 -->
+        <div class="card progress-card">
+          <div class="progress-row"><span class="progress-label">训练完成率</span><span class="progress-val" id="completion-val">0 / 0</span></div>
+          <div class="progress-track"><div class="progress-fill" id="completion-fill" style="width:0%"></div></div>
+        </div>
+
+        <!-- 月历 -->
+        <div class="card">
+          <h2 class="card-title"><span class="ci"><svg style="width:20px;height:20px"><use href="#i-calendar"/></svg></span> 教练计划 · 4 周</h2>
+          <div id="calendar"></div>
+          <div class="zone-legend" id="zone-legend"></div>
+        </div>
+      </section>
+
+      <!-- ============ View 3：设计令牌展示 ============ -->
+      <section class="view" id="v3">
+        <div class="page-head">
+          <h1>设计系统 · 令牌 v3 <span style="font-size:var(--rc-text-xs);font-weight:600;color:var(--rc-text-secondary);background:var(--rc-surface-sunken);border:1px solid var(--rc-border);padding:2px 9px;border-radius:var(--rc-radius-full);vertical-align:middle;margin-left:8px;">内部样式指南</span></h1>
+          <p>一色一职：动作=绿 · 数据=青 · 活力=Volt · HR 区间冷→热</p>
+        </div>
+
+        <div class="token-section">
+          <h2>核心身份色</h2>
+          <p class="ts-desc">品牌绿仅用于主操作 / 激活态；Volt 仅用于活力 / 进行中 / 在区；数据青仅用于数据线与图表。每屏视觉焦点（暖色）≤ 2。</p>
+          <div class="swatch-grid" id="sw-core"></div>
+        </div>
+
+        <div class="token-section">
+          <h2>一色一职规则</h2>
+          <div class="rule-grid" id="rule-grid"></div>
+        </div>
+
+        <div class="token-section">
+          <h2>语义色（含亮色 -fg 文字变体，过 AA）</h2>
+          <p class="ts-desc">亮色模式文字一律使用 -fg 深色变体（如 info-fg / warning-fg / danger-fg），避免白字落中明度填充导致对比度不达标。</p>
+          <div class="swatch-grid" id="sw-semantic"></div>
+        </div>
+
+        <div class="token-section">
+          <h2>HR 心率区间（冷→热，领域正确）</h2>
+          <p class="ts-desc">zone1 蓝（恢复）→ zone5 红（最大摄氧），与运动科学惯例一致，修复原单色绿表达。</p>
+          <div class="zone-bar" id="zone-show"></div>
+          <div class="legend" id="zone-show-legend"></div>
+        </div>
+
+        <div class="token-section">
+          <h2>字号阶梯（大数字统一 4xl / 5xl + .tnum）</h2>
+          <div class="type-scale" id="type-scale"></div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- 打卡面板（单击单日触发） -->
+<div class="exec-overlay" id="exec-overlay">
+  <div class="exec-backdrop" onclick="closeExec()"></div>
+  <div class="exec-panel">
+    <div class="exec-head">
+      <h3 id="exec-title">第 1 天</h3>
+      <button class="exec-close" onclick="closeExec()"><svg style="width:16px;height:16px"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="exec-plan" id="exec-plan"></div>
+    <div class="exec-form">
+      <div class="ef-row">
+        <div><label>实际距离 (km)</label><input type="number" step="0.1" min="0" id="exec-dist" placeholder="如 16.0"></div>
+        <div><label>实际配速 (分:秒)</label><input type="text" id="exec-pace" placeholder="如 5:45"></div>
+      </div>
+      <div class="ef-row">
+        <div><label>实际时长 (分钟)</label><input type="number" step="0.1" min="0" id="exec-dur" placeholder="如 92"></div>
+        <div><label>实际心率区间</label>
+          <select id="exec-zone">
+            <option value="1">Z1 恢复</option><option value="2">Z2 有氧</option>
+            <option value="3">Z3 节奏</option><option value="4">Z4 阈值</option><option value="5">Z5 最大</option>
+          </select>
+        </div>
+      </div>
+      <div class="ef-full"><label>训练感受（可选）</label><textarea id="exec-feel" rows="2" placeholder="记录今天的训练感受…"></textarea></div>
+    </div>
+    <div class="exec-foot">
+      <button class="btn btn-secondary" onclick="openEditFromExec()"><svg style="width:16px;height:16px"><use href="#i-pencil"/></svg> 调整本日计划</button>
+      <button class="btn btn-primary" id="exec-submit" onclick="submitExec()"><svg style="width:16px;height:16px"><use href="#i-check"/></svg> 标记完成</button>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑弹窗（独立可达，修复 P0） -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal-backdrop" onclick="closeEdit()"></div>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>编辑 <span id="edit-day-label">第 1 天</span></h3>
+      <button class="exec-close" onclick="closeEdit()"><svg style="width:16px;height:16px"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div><label>训练类型</label>
+        <select id="edit-type">
+          <option value="休息">休息</option><option value="恢复跑">恢复跑</option><option value="轻松跑">轻松跑</option>
+          <option value="慢跑">慢跑</option><option value="节奏跑">节奏跑</option><option value="长距离">长距离</option>
+          <option value="间歇跑">间歇跑</option><option value="冲刺跑">冲刺跑</option>
+        </select>
+      </div>
+      <div class="check-row"><input type="checkbox" id="edit-completed"><label style="margin:0">标记为已完成</label></div>
+      <div><label>距离 (km)</label><input type="number" step="0.1" min="0" id="edit-distance" placeholder="如 16.0"></div>
+      <div><label>目标配速 (分:秒)</label><input type="text" id="edit-pace" placeholder="如 5:45"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeEdit()">取消</button>
+      <button class="btn btn-primary" onclick="saveEdit()"><svg style="width:16px;height:16px"><use href="#i-check"/></svg> 保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   主题切换（暗色优先 / 亮色对应）
+   ============================================================ */
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  try{localStorage.setItem('coach-theme', theme);}catch(e){}
+  var isLight = theme === 'light';
+  var sun = document.getElementById('theme-icon-sun');
+  var moon = document.getElementById('theme-icon-moon');
+  if(sun) sun.style.display = isLight ? '' : 'none';
+  if(moon) moon.style.display = isLight ? 'none' : '';
+  // 主题切换后重绘依赖令牌色的图表
+  if(currentView === 'v1'){ renderTrendChart(); renderPaceChart(); }
+}
+function toggleTheme(){
+  var cur = document.documentElement.getAttribute('data-theme');
+  applyTheme(cur === 'light' ? 'dark' : 'light');
+}
+(function(){ var saved; try{saved = localStorage.getItem('coach-theme');}catch(e){} applyTheme(saved === 'light' ? 'light' : 'dark'); })();
+
+/* ============================================================
+   视图切换
+   ============================================================ */
+var currentView = 'v1';
+function switchView(v){
+  currentView = v;
+  document.querySelectorAll('.view').forEach(function(el){ el.classList.remove('active'); });
+  var t = document.getElementById(v); if(t) t.classList.add('active');
+  document.querySelectorAll('.nav-item[data-view]').forEach(function(el){
+    el.classList.toggle('active', el.getAttribute('data-view') === v);
+  });
+  if(v === 'v1'){ renderTrendChart(); renderPaceChart(); }
+}
+function toggleSidebar(){ var s=document.getElementById('sidebar'); if(s) s.classList.toggle('is-open'); }
+
+/* ============================================================
+   Mock 数据
+   ============================================================ */
+var hasPlan = true;
+var nextSession = { day:8, type:'长距离慢跑', pace:'5:45', dist:16.0, zone:3 };
+var kpis = [
+  { label:'周跑量', icon:'i-trend', color:'var(--rc-data)', value:'38.5', unit:'km', foot:'最近 7 天 · +6%' },
+  { label:'平均配速', icon:'i-clock', color:'var(--rc-data)', value:'5:42', unit:'/km', foot:'最近 7 天' },
+  { label:'训练负荷', icon:'i-gauge', color:'var(--rc-warning)', value:'64', unit:'', foot:'<span class="badge badge-warning">适中</span>' },
+  { label:'就绪度', icon:'i-zap', color:'var(--rc-energy)', value:'82', unit:'', foot:'<span class="badge badge-success">状态良好</span>' }
+];
+var runs = [
+  { d:'07-21', n:'长距离慢跑', dist:'16.0', pace:"5:48", hr:'152', zone:3 },
+  { d:'07-19', n:'节奏跑', dist:'10.0', pace:"5:20", hr:'165', zone:4 },
+  { d:'07-17', n:'轻松跑', dist:'7.5', pace:"6:10", hr:'138', zone:2 },
+  { d:'07-15', n:'恢复跑', dist:'5.0', pace:"6:25", hr:'128', zone:1 },
+  { d:'07-13', n:'间歇跑', dist:'9.0', pace:"5:05", hr:'171', zone:5 }
+];
+var paceSeries = [5.9, 5.8, 5.7, null, 5.6, 5.5, 5.48]; // min/km，休息日为 null
+var distSeries = [6.0, 7.5, 5.0, 0, 10.0, 16.0, 9.0];
+var zoneDist = { 1:8, 2:26, 3:35, 4:18, 5:9 }; // 本周各区间 km 分布
+var bodyStats = [
+  { label:'静息心率', sub:'bpm · 偏低为好', value:'48', icon:'i-heart', color:'var(--rc-zone-5)' },
+  { label:'平均睡眠', sub:'小时 / 晚', value:'7.2', icon:'i-clock', color:'var(--rc-data)' },
+  { label:'体重', sub:'kg', value:'63.5', icon:'i-trend', color:'var(--rc-text-muted)' }
+];
+
+// 训练计划（28 天），type → zone 映射用于左侧色条
+var TYPE_ZONE = { '休息':0,'恢复跑':1,'轻松跑':2,'慢跑':2,'节奏跑':3,'长距离':3,'间歇跑':4,'冲刺跑':5 };
+var planDays = [
+  {day:1,type:'休息',pace:'',dist:0,completed:true},
+  {day:2,type:'轻松跑',pace:'6:10',dist:7.5,completed:true},
+  {day:3,type:'恢复跑',pace:'6:25',dist:5.0,completed:true},
+  {day:4,type:'休息',pace:'',dist:0,completed:true},
+  {day:5,type:'节奏跑',pace:'5:20',dist:10.0,completed:true},
+  {day:6,type:'长距离',pace:'5:48',dist:16.0,completed:true},
+  {day:7,type:'慢跑',pace:'6:00',dist:8.0,completed:true},
+  {day:8,type:'长距离',pace:'5:45',dist:16.0,completed:false},
+  {day:9,type:'休息',pace:'',dist:0,completed:false},
+  {day:10,type:'恢复跑',pace:'6:25',dist:5.0,completed:false},
+  {day:11,type:'轻松跑',pace:'6:05',dist:8.0,completed:false},
+  {day:12,type:'间歇跑',pace:'5:05',dist:9.0,completed:false},
+  {day:13,type:'休息',pace:'',dist:0,completed:false},
+  {day:14,type:'长距离',pace:'5:50',dist:18.0,completed:false},
+  {day:15,type:'慢跑',pace:'6:00',dist:8.0,completed:false},
+  {day:16,type:'轻松跑',pace:'6:10',dist:7.0,completed:false},
+  {day:17,type:'休息',pace:'',dist:0,completed:false},
+  {day:18,type:'节奏跑',pace:'5:18',dist:11.0,completed:false},
+  {day:19,type:'恢复跑',pace:'6:30',dist:5.0,completed:false},
+  {day:20,type:'长距离',pace:'5:42',dist:20.0,completed:false},
+  {day:21,type:'休息',pace:'',dist:0,completed:false},
+  {day:22,type:'轻松跑',pace:'6:00',dist:8.0,completed:false},
+  {day:23,type:'慢跑',pace:'6:05',dist:9.0,completed:false},
+  {day:24,type:'间歇跑',pace:'5:00',dist:10.0,completed:false},
+  {day:25,type:'休息',pace:'',dist:0,completed:false},
+  {day:26,type:'节奏跑',pace:'5:15',dist:12.0,completed:false},
+  {day:27,type:'恢复跑',pace:'6:30',dist:5.0,completed:false},
+  {day:28,type:'长距离',pace:'5:40',dist:21.1,completed:false}
+];
+
+/* ============================================================
+   View 1 渲染
+   ============================================================ */
+function renderKPIs(){
+  var grid = document.getElementById('kpi-grid'); if(!grid) return;
+  grid.innerHTML = kpis.map(function(k){
+    return '<div class="kpi-card">'+
+      '<div class="kpi-ruler"></div>'+
+      '<div class="kpi-head"><span class="kpi-label">'+k.label+'</span>'+
+      '<span class="kpi-ico" style="color:'+k.color+'"><svg style="width:20px;height:20px"><use href="#'+k.icon+'"/></svg></span></div>'+
+      '<div><span class="kpi-number">'+k.value+'</span><span class="kpi-unit">'+k.unit+'</span></div>'+
+      '<div class="kpi-foot">'+k.foot+'</div>'+
+    '</div>';
+  }).join('');
+}
+function renderRuns(){
+  var tb = document.getElementById('run-tbody'); if(!tb) return;
+  tb.innerHTML = runs.map(function(r){
+    var zc = 'var(--rc-zone-'+r.zone+')';
+    return '<tr><td class="rd">'+r.d+'</td><td class="rn">'+r.n+'</td>'+
+      '<td class="r rd">'+r.dist+'</td><td class="r rp">'+r.pace+'</td>'+
+      '<td class="r"><span class="zone-dot" style="background:'+zc+'"></span><span class="rd">'+r.hr+'</span></td></tr>';
+  }).join('');
+}
+function renderBody(){
+  var row = document.getElementById('body-row'); if(!row) return;
+  row.innerHTML = bodyStats.map(function(b){
+    return '<div class="mini-stat"><span class="ms-ico" style="background:color-mix(in srgb,'+b.color+' 14%,transparent);color:'+b.color+'">'+
+      '<svg style="width:18px;height:18px"><use href="#'+b.icon+'"/></svg></span>'+
+      '<div><div class="ms-val">'+b.value+'</div><div class="ms-label">'+b.label+'</div><div class="ms-sub">'+b.sub+'</div></div></div>';
+  }).join('');
+}
+function renderZoneDist(){
+  var bar = document.getElementById('zone-dist'); if(!bar) return;
+  var total = 0; for(var z in zoneDist) total += zoneDist[z];
+  var labels = ['Z1 恢复','Z2 有氧','Z3 节奏','Z4 阈值','Z5 最大'];
+  bar.innerHTML = '';
+  for(var z=1; z<=5; z++){
+    var seg = document.createElement('div');
+    seg.className = 'zb';
+    seg.style.background = 'var(--rc-zone-'+z+')';
+    seg.style.flex = (zoneDist[z]/total);
+    seg.textContent = zoneDist[z] + 'km';
+    bar.appendChild(seg);
+  }
+  var lg = document.getElementById('zone-dist-legend');
+  lg.innerHTML = labels.map(function(l,i){ var z=i+1;
+    return '<span class="lg"><span class="sw" style="background:var(--rc-zone-'+z+')"></span>'+l+'</span>';
+  }).join('');
+}
+
+/* 训练趋势（青色柱） */
+function renderTrendChart(){
+  var wrap = document.getElementById('trend-chart'); if(!wrap) return;
+  var W=560,H=200,pad=24, max=Math.max.apply(null,distSeries)||1;
+  var bw=(W-pad*2)/distSeries.length;
+  var bars='';
+  distSeries.forEach(function(v,i){
+    if(v<=0) return;
+    var h=(v/max)*(H-pad*2);
+    var x=pad+i*bw+bw*0.2, y=H-pad-h, w=bw*0.6;
+    bars+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="3" style="fill:var(--rc-data)" opacity="0.85"/>';
+    bars+='<text x="'+(x+w/2).toFixed(1)+'" y="'+(y-5).toFixed(1)+'" text-anchor="middle" font-size="10" style="fill:var(--rc-text-muted);font-family:var(--rc-font-mono)">'+v+'</text>';
+  });
+  var grid='';
+  for(var g=0;g<=2;g++){ var gy=pad+g*((H-pad*2)/2); grid+='<line x1="'+pad+'" y1="'+gy+'" x2="'+(W-pad)+'" y2="'+gy+'" style="stroke:var(--rc-border)" stroke-width="1"/>'; }
+  wrap.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="训练趋势柱状图">'+
+    grid + bars + '</svg>';
+}
+/* 配速趋势（青色线，休息日留空） */
+function renderPaceChart(){
+  var wrap = document.getElementById('pace-chart'); if(!wrap) return;
+  var W=560,H=200,pad=24;
+  var pts=[]; var pmin=99,pmax=0;
+  paceSeries.forEach(function(v,i){ if(v!=null){ pmin=Math.min(pmin,v); pmax=Math.max(pmax,v);} });
+  if(pmin===99){pmin=5;pmax=6;}
+  var span=(pmax-pmin)||1;
+  paceSeries.forEach(function(v,i){
+    var x=pad+i*((W-pad*2)/(paceSeries.length-1));
+    var y = v==null ? null : (H-pad) - ((v-pmin)/span)*(H-pad*2);
+    pts.push({x:x,y:y,v:v});
+  });
+  var line='', area='', dots='';
+  var valid=pts.filter(function(p){return p.y!=null;});
+  valid.forEach(function(p,i){
+    line += (i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';
+    area += (i===0?'M':'L')+p.x.toFixed(1)+' '+p.y.toFixed(1)+' ';
+    dots += '<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3.5" style="fill:var(--rc-data)"/>';
+    dots += '<text x="'+p.x.toFixed(1)+'" y="'+(p.y-8).toFixed(1)+'" text-anchor="middle" font-size="9" style="fill:var(--rc-text-muted);font-family:var(--rc-font-mono)">'+p.v.toFixed(2)+'</text>';
+  });
+  area += 'L'+valid[valid.length-1].x.toFixed(1)+' '+(H-pad)+' L'+valid[0].x.toFixed(1)+' '+(H-pad)+' Z';
+  wrap.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="配速趋势折线图">'+
+    '<path d="'+area+'" style="fill:var(--rc-data)" opacity="0.10"/>'+
+    '<path d="'+line+'" fill="none" style="stroke:var(--rc-data)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'+
+    dots+'</svg>';
+}
+
+/* 无计划 / 有计划 英雄卡切换 */
+function setPlanState(state){
+  hasPlan = state;
+  document.getElementById('hero-with-plan').style.display = state ? '' : 'none';
+  document.getElementById('hero-no-plan').style.display = state ? 'none' : '';
+  // 同步侧边栏生成按钮文案
+}
+function startNextSession(){
+  // 演示：定位到 Day 8 打卡面板
+  var d = planDays.find(function(x){return x.day===nextSession.day;});
+  if(d) openExec(d);
+}
+
+/* ============================================================
+   View 2 渲染：月历 + 打卡面板 + 编辑弹窗（P0 修复）
+   ============================================================ */
+function zoneColorOf(type){ var z=TYPE_ZONE[type]; return z? 'var(--rc-zone-'+z+')' : 'var(--rc-border-strong)'; }
+function zoneSoftClass(type){ var z=TYPE_ZONE[type]; return z? 'zone-soft-'+z : ''; }
+
+function renderCalendar(){
+  var c = document.getElementById('calendar'); if(!c) return;
+  var html='';
+  var weeks = Math.ceil(planDays.length/7);
+  var wlabels = ['一','二','三','四','五','六','日'];
+  for(var w=0; w<weeks; w++){
+    html += '<div class="cal-weeklabel">第 '+(w+1)+' 周</div>';
+    html += '<div class="cal-grid">';
+    for(var d=0; d<7; d++){
+      if(w===0) html += '<div class="cal-weekhead">'+wlabels[d]+'</div>';
+    }
+    for(var d2=0; d2<7; d2++){
+      var idx=w*7+d2; if(idx>=planDays.length) break;
+      var day=planDays[idx];
+      var isRest = day.type==='休息';
+      var zb = isRest ? 'var(--rc-border-strong)' : zoneColorOf(day.type);
+      html += '<div class="plan-day'+(day.completed?' completed':'')+'" data-day="'+day.day+'" style="border-left-color:'+zb+'">'+
+        '<span class="pd-num tnum">'+day.day+'</span>'+
+        '<span class="pd-type'+(isRest?' rest':'')+'">'+day.type+'</span>'+
+        (day.pace? '<span class="pd-pace">'+day.pace+'</span>' : (isRest? '<span class="pd-pace" style="color:var(--rc-text-muted)">—</span>' : ''))+
+        '<span class="pd-bar" style="background:'+zb+'"></span>'+
+        '<svg class="pd-check" viewBox="0 0 24 24"><use href="#i-check"/></svg>'+
+        // 独立编辑入口：hover 出现，直接调出编辑弹窗（不依赖 ExecutionPanel 事件）
+        '<button class="pd-edit" title="编辑本日" data-edit="'+day.day+'" onclick="event.stopPropagation();openEdit('+day.day+')"><svg style="width:13px;height:13px"><use href="#i-pencil"/></svg></button>'+
+      '</div>';
+    }
+    html += '</div>';
+  }
+  c.innerHTML = html;
+  // 单击单日 = 打卡面板
+  c.querySelectorAll('.plan-day').forEach(function(el){
+    el.addEventListener('click', function(){
+      var dayNum = parseInt(el.getAttribute('data-day'));
+      var day = planDays.find(function(x){return x.day===dayNum;});
+      if(day) openExec(day);
+    });
+  });
+  renderZoneLegend();
+  updateCompletion();
+}
+function renderZoneLegend(){
+  var lg = document.getElementById('zone-legend'); if(!lg) return;
+  var names=['Z1 恢复','Z2 有氧','Z3 节奏','Z4 阈值','Z5 最大'];
+  lg.innerHTML='';
+  for(var z=1; z<=5; z++){
+    var seg=document.createElement('div');
+    seg.className='zl'; seg.style.background='var(--rc-zone-'+z+')';
+    seg.innerHTML='<span class="zl-meta"><span>'+z+'</span><span>'+names[z-1].split(' ')[1]+'</span></span>';
+    lg.appendChild(seg);
+  }
+}
+function updateCompletion(){
+  var total = planDays.length;
+  var done = planDays.filter(function(d){return d.completed;}).length;
+  var pct = total? Math.round(done/total*100):0;
+  var v=document.getElementById('completion-val'); if(v) v.textContent = done+' / '+total;
+  var f=document.getElementById('completion-fill'); if(f) f.style.width = pct+'%';
+}
+
+/* 打卡面板 */
+var execDay = null;
+function openExec(day){
+  execDay = day;
+  document.getElementById('exec-title').textContent = '第 '+day.day+' 天 · '+day.type;
+  var planHtml =
+    '<div class="ep-row"><span class="k">类型</span><span class="v">'+day.type+'</span></div>'+
+    '<div class="ep-row"><span class="k">目标配速</span><span class="v">'+(day.pace||'—')+'</span></div>'+
+    '<div class="ep-row"><span class="k">目标距离</span><span class="v">'+(day.dist?day.dist+' km':'休息')+'</span></div>'+
+    '<div class="ep-row"><span class="k">目标区间</span><span class="v">Z'+(TYPE_ZONE[day.type]||'—')+'</span></div>';
+  document.getElementById('exec-plan').innerHTML = planHtml;
+  document.getElementById('exec-dist').value = day.dist||'';
+  document.getElementById('exec-pace').value = day.pace||'';
+  document.getElementById('exec-dur').value = '';
+  document.getElementById('exec-zone').value = String(TYPE_ZONE[day.type]||2);
+  document.getElementById('exec-feel').value = '';
+  document.getElementById('exec-submit').innerHTML = '<svg style="width:16px;height:16px"><use href="#i-check"/></svg> '+(day.completed?'已完成的记录':'标记完成');
+  document.getElementById('exec-overlay').classList.add('open');
+}
+function closeExec(){ document.getElementById('exec-overlay').classList.remove('open'); }
+function submitExec(){
+  if(!execDay) return;
+  execDay.completed = true;
+  var cell = document.querySelector('.plan-day[data-day="'+execDay.day+'"]');
+  if(cell) cell.classList.add('completed');
+  updateCompletion();
+  closeExec();
+}
+/* 从打卡面板进入编辑（修复 P0：独立可达） */
+function openEditFromExec(){ if(execDay) openEdit(execDay.day); }
+
+/* 编辑弹窗（核心 P0 修复：直接可达，不再被 ExecutionPanel 事件优先级拦截） */
+var editDay = null;
+function openEdit(dayNum){
+  var day = planDays.find(function(x){return x.day===dayNum;}); if(!day) return;
+  editDay = day;
+  document.getElementById('edit-day-label').textContent = '第 '+day.day+' 天';
+  document.getElementById('edit-type').value = day.type;
+  document.getElementById('edit-completed').checked = !!day.completed;
+  document.getElementById('edit-distance').value = day.dist||'';
+  document.getElementById('edit-pace').value = day.pace||'';
+  document.getElementById('edit-modal').classList.add('open');
+  // 若从打卡面板进入，关闭面板保持弹窗唯一焦点
+  closeExec();
+}
+function closeEdit(){ document.getElementById('edit-modal').classList.remove('open'); editDay=null; }
+function saveEdit(){
+  if(!editDay) return;
+  editDay.type = document.getElementById('edit-type').value;
+  editDay.completed = document.getElementById('edit-completed').checked;
+  editDay.dist = parseFloat(document.getElementById('edit-distance').value)||0;
+  editDay.pace = document.getElementById('edit-pace').value;
+  // 同步单元格
+  var cell = document.querySelector('.plan-day[data-day="'+editDay.day+'"]');
+  if(cell){
+    var isRest = editDay.type==='休息';
+    var zb = isRest ? 'var(--rc-border-strong)' : zoneColorOf(editDay.type);
+    cell.style.borderLeftColor = zb;
+    cell.querySelector('.pd-type').textContent = editDay.type;
+    cell.querySelector('.pd-type').className = 'pd-type'+(isRest?' rest':'');
+    var paceEl = cell.querySelector('.pd-pace');
+    if(paceEl) paceEl.textContent = editDay.pace || (isRest?'—':'');
+    cell.querySelector('.pd-bar').style.background = zb;
+    cell.classList.toggle('completed', editDay.completed);
+  }
+  updateCompletion();
+  closeEdit();
+}
+
+/* 生成计划（已有计划则 confirm 覆盖） */
+function generatePlan(){
+  if(hasPlan){
+    var ok = window.confirm('已有训练计划，确定覆盖并生成新计划吗？');
+    if(!ok) return;
+  }
+  // 演示：随机重置完成状态，模拟新计划
+  planDays.forEach(function(d){ d.completed = (d.day<=7); });
+  setPlanState(true);
+  renderCalendar();
+  switchView('v2');
+}
+
+/* ============================================================
+   View 3 渲染：令牌展示
+   ============================================================ */
+function renderTokens(){
+  // 核心身份色
+  var core = [
+    {name:'品牌绿 --rc-brand', hex:'#10E08A', use:'主操作 / 品牌 / 激活态（动作=绿）'},
+    {name:'Volt --rc-energy', hex:'#C6F000', use:'活力 / 进行中 / 在区（每屏焦点≤2）'},
+    {name:'数据青 --rc-data', hex:'#2BC4E6', use:'数据数值 / 图表线（数据=青）'}
+  ];
+  document.getElementById('sw-core').innerHTML = core.map(function(s){
+    return '<div class="swatch"><span class="sw-color" style="background:'+s.hex+'"></span>'+
+      '<div class="sw-info"><div class="sw-name">'+s.name+'</div><div class="sw-hex">'+s.hex+'</div>'+
+      '<div class="sw-use">'+s.use+'</div></div></div>';
+  }).join('');
+
+  // 一色一职规则
+  var rules = [
+    {c:'var(--rc-brand)', t:'动作 = 绿', d:'按钮、激活态、品牌标识。不铺满背景。'},
+    {c:'var(--rc-energy)', t:'活力 = Volt', d:'仅「进行中 / 在区 / 直播」脉冲态，每屏≤2 焦点。'},
+    {c:'var(--rc-data)', t:'数据 = 青', d:'图表线、KPI 大数字、数据读数，传达科学/专业。'},
+    {c:'var(--rc-warning)', t:'负荷/告警 = 琥珀', d:'训练负荷、阈值附近、需关注状态。'},
+    {c:'var(--rc-zone-5)', t:'高强度 = 红', d:'仅 Z5 最大摄氧与告警，绝不作常驻装饰。'},
+    {c:'var(--rc-info)', t:'次级/科学 = 蓝', d:'信息徽章、科学引用，克制使用。'}
+  ];
+  document.getElementById('rule-grid').innerHTML = rules.map(function(r){
+    return '<div class="rule-card"><h4><span class="rc-dot" style="background:'+r.c+'"></span>'+r.t+'</h4><p>'+r.d+'</p></div>';
+  }).join('');
+
+  // 语义色
+  var sem = [
+    {name:'success', hex:'var(--rc-success)', note:'正向状态'},
+    {name:'info / info-fg', hex:'var(--rc-info)', note:'信息（亮色用 -fg 深色文字）'},
+    {name:'warning / warning-fg', hex:'var(--rc-warning)', note:'警告（亮色用 -fg 过 AA）'},
+    {name:'danger / danger-fg', hex:'var(--rc-danger)', note:'危险/破坏（亮色用 -fg）'}
+  ];
+  document.getElementById('sw-semantic').innerHTML = sem.map(function(s){
+    return '<div class="swatch"><span class="sw-color" style="background:'+s.hex+'"></span>'+
+      '<div class="sw-info"><div class="sw-name">'+s.name+'</div><div class="sw-use">'+s.note+'</div></div></div>';
+  }).join('');
+
+  // HR 区间展示
+  var znames=['Z1 恢复','Z2 有氧','Z3 节奏','Z4 阈值','Z5 最大'];
+  document.getElementById('zone-show').innerHTML='';
+  for(var z=1;z<=5;z++){ var seg=document.createElement('div'); seg.className='zb'; seg.style.background='var(--rc-zone-'+z+')'; seg.textContent=z; document.getElementById('zone-show').appendChild(seg); }
+  document.getElementById('zone-show-legend').innerHTML = znames.map(function(n,i){
+    return '<span class="lg"><span class="sw" style="background:var(--rc-zone-'+(i+1)+')"></span>'+n+'</span>';
+  }).join('');
+
+  // 字号阶梯
+  var types=[
+    {n:'Display-2 / 5xl', s:'var(--rc-text-5xl)', t:'前瞻超大数字'},
+    {n:'Display-1 / 4xl', s:'var(--rc-text-4xl)', t:'KPI 大数字（统一）'},
+    {n:'H1 / 3xl', s:'var(--rc-text-3xl)', t:'页面标题'},
+    {n:'H2 / 2xl', s:'var(--rc-text-2xl)', t:'分区标题'},
+    {n:'Body / base', s:'var(--rc-text-base)', t:'正文'},
+    {n:'Micro / xs', s:'var(--rc-text-xs)', t:'徽章/标签'}
+  ];
+  document.getElementById('type-scale').innerHTML = types.map(function(t){
+    return '<div class="type-row"><span class="tr-name">'+t.n+'</span><span class="tr-sample font-display" style="font-size:'+t.s+'">跑步 42.2K</span></div>';
+  }).join('');
+}
+
+/* ============================================================
+   初始化
+   ============================================================ */
+renderKPIs(); renderRuns(); renderBody(); renderZoneDist();
+renderTrendChart(); renderPaceChart();
+renderCalendar(); renderTokens();
+</script>
+</body>
+</html>
