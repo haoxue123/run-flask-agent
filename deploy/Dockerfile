@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
     MPLBACKEND=Agg \
@@ -6,9 +6,9 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# 系统依赖：matplotlib 需要无头渲染，中文显示需要字体，chromadb 可能需要编译
+# 系统依赖：matplotlib Agg 后端无需 X11，但需基础 GL 库；中文显示需要字体
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc g++ libgl1-mesa-glx fonts-wqy-zenhei \
+    gcc g++ libgl1 fonts-wqy-zenhei \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
