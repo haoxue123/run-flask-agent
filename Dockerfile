@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn
 COPY . .
 
 # 持久化挂载点：全部有状态数据（运动文件/uploads/charts/chroma_db）均落在 data/ 卷内
-VOLUME ["/app/data"]
+# 注意：Railway 不支持 Dockerfile VOLUME 指令，需在 Railway 控制台手动挂载 /app/data
 
 EXPOSE 5000
 
