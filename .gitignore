@@ -22,6 +22,7 @@ Thumbs.db
 # ===== 部署运行时（不入库）=====
 deploy/certs/
 deploy/logs/
+flask_runtime*.log
 
 # ===== 用户运动数据（隐私，不入库）=====
 # 注意：不能写成 `data/`（整目录忽略会让下面的 ! 取反失效，
@@ -30,6 +31,7 @@ deploy/logs/
 data/_rag_temp/
 data/charts/
 data/chroma_db/
+data/mem0_chroma/
 data/eval/
 data/uploads/
 data/*.json
