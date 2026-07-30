@@ -38,20 +38,23 @@ _EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
 
 
 # ============================================================
-# 嵌入函数：优先 sentence-transformers，降级到 ChromaDB 内置
+# 嵌入函数：优先 SiliconFlow API(bge-m3)，降级 sentence-transformers，最后 ChromaDB 内置
 # ============================================================
 
 _embedding_fn = None
+_embedding_fn_tag = None   # 标识当前嵌入函数，用于检测索引是否需要重建
 _embedding_fn_lock = threading.Lock()
 
 
 def _get_embedding_function():
     """
-    获取嵌入函数，优先使用 sentence-transformers 多语言模型，
-    不可用时降级到 ChromaDB 内置的 all-MiniLM-L6-v2。
+    获取嵌入函数，优先级：
+    1. SiliconFlow API (BAAI/bge-m3) — 需 SILICONFLOW_API_KEY，中文效果最佳，与 mem0 一致
+    2. sentence-transformers (paraphrase-multilingual-MiniLM-L12-v2) — 本地模型，需下载权重
+    3. ChromaDB 内置嵌入 — 最后兜底（英文模型，中文效果差）
     线程安全：使用锁保证单例初始化。
     """
-    global _embedding_fn
+    global _embedding_fn, _embedding_fn_tag
     if _embedding_fn is not None:
         return _embedding_fn
 
@@ -59,21 +62,52 @@ def _get_embedding_function():
         if _embedding_fn is not None:
             return _embedding_fn
 
-        # 尝试加载 sentence-transformers
+        # 确保环境变量已加载
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except Exception:
+            pass
+
+        # 1. 尝试 SiliconFlow API (BAAI/bge-m3)
+        sf_key = os.getenv("SILICONFLOW_API_KEY")
+        if sf_key:
+            try:
+                from chromadb.utils import embedding_functions
+                _embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
+                    api_key=sf_key,
+                    api_base="https://api.siliconflow.cn/v1",
+                    model_name="BAAI/bge-m3",
+                )
+                # 验证可用性：嵌入一个测试文本
+                test_result = _embedding_fn(["测试"])
+                if test_result and len(test_result[0]) > 0:
+                    _embedding_fn_tag = "siliconflow_bge_m3"
+                    print("[RAG] 使用嵌入模型：SiliconFlow BAAI/bge-m3（API）")
+                    return _embedding_fn
+                else:
+                    raise RuntimeError("嵌入返回空结果")
+            except Exception as e:
+                print(f"[RAG] SiliconFlow API 嵌入不可用（{e}），尝试下一选项")
+                _embedding_fn = None
+
+        # 2. 尝试 sentence-transformers
         try:
             from chromadb.utils import embedding_functions
             _embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
                 model_name=_EMBEDDING_MODEL
             )
+            _embedding_fn_tag = "sentence_transformers"
             print(f"[RAG] 使用嵌入模型：{_EMBEDDING_MODEL}")
             return _embedding_fn
         except Exception as e:
             print(f"[RAG] sentence-transformers 不可用（{e}），降级到 ChromaDB 内置嵌入")
 
-        # 降级：使用 ChromaDB 内置嵌入
+        # 3. 降级：ChromaDB 内置嵌入
         try:
             import chromadb
             _embedding_fn = chromadb.utils.embedding_functions.DefaultEmbeddingFunction()
+            _embedding_fn_tag = "chromadb_default"
             print("[RAG] 使用降级嵌入：ChromaDB DefaultEmbeddingFunction")
             return _embedding_fn
         except Exception as e:
@@ -409,6 +443,13 @@ def _get_collection(knowledge_dir=None, db_dir=None):
                     "running_knowledge",
                     embedding_function=_get_embedding_function(),
                 )
+                # 检测嵌入函数是否变更：若索引是用不同嵌入函数构建的，需重建
+                col_meta = _collection.metadata or {}
+                stored_fn = col_meta.get("embedding_fn", "")
+                if stored_fn != (_embedding_fn_tag or ""):
+                    print(f"[RAG] 嵌入函数已变更（{stored_fn or '未知'} → {_embedding_fn_tag}），重建索引...")
+                    client.delete_collection("running_knowledge")
+                    _collection = build_index(knowledge_dir, db_dir)
             except Exception:
                 print("[RAG] 集合读取失败，重建索引...")
                 try:
@@ -535,7 +576,10 @@ def build_index(knowledge_dir=None, db_dir=None):
     collection = client.create_collection(
         name="running_knowledge",
         embedding_function=embedding_fn,
-        metadata={"description": "跑步运动科学知识库"},
+        metadata={
+            "description": "跑步运动科学知识库",
+            "embedding_fn": _embedding_fn_tag or "unknown",
+        },
     )
 
     # 批量添加
