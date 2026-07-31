@@ -2,13 +2,13 @@
 import os
 import json
 import re
-import tempfile
-import shutil
 import threading
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, Response, stream_with_context, current_app, session
 
 import data_tool
+import safeio
+import visualize
 import llm_agent
 import training_science as ts
 import rag
@@ -180,7 +180,7 @@ def _infer_plan_duration(message):
     return 7
 
 
-def _stream_generated_plan(message, data_dir, history):
+def _stream_generated_plan(message, data_dir, history, start_epoch=None):
     """当用户给出明确计划指令时，直接调用生成并把结果流式返回。
 
     关键修复：把用户的原始命令作为 user_instructions 传入 generate_training_plan，
@@ -217,6 +217,32 @@ def _stream_generated_plan(message, data_dir, history):
                 profile, plan_duration=plan_duration, user_instructions=effective_instructions
             )
             plan_text = result.get("plan_text", "")
+            structured = result.get("structured", [])
+            science = result.get("science", {})
+
+            # --- 自动写入训练计划系统（与 /generate 路径对齐）---
+            try:
+                target = profile.get("目标", {}) or {}
+                plan_path = os.path.join(data_dir, "plan.json")
+                meta = {
+                    "generated_at": datetime.now().isoformat(),
+                    "plan_duration": plan_duration,
+                    "target_race": target.get("目标比赛", ""),
+                    "target_time": target.get("目标完赛时间", ""),
+                    "source": "coach_chat",
+                }
+                plan_payload = {"plan": structured, "meta": meta, "science": science}
+                safeio.safe_write_json(plan_path, plan_payload)
+                # 生成配速图表
+                chart_dir = current_app.config.get("CHART_DIR", os.path.join(data_dir, "charts"))
+                chart_filename = f"pace_chart_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                os.makedirs(chart_dir, exist_ok=True)
+                chart_path = os.path.join(chart_dir, chart_filename)
+                visualize.plot_pace_chart(structured, output_path=chart_path)
+                chart_url = f"/chart/{chart_filename}"
+            except Exception:
+                chart_url = ""
+
             header = "📋 已根据你的指令生成训练计划：\n\n"
             yield f"data: {json.dumps({'chunk': header})}\n\n"
             full_reply.append(header)
@@ -226,7 +252,10 @@ def _stream_generated_plan(message, data_dir, history):
                 if c:
                     full_reply.append(c)
                     yield f"data: {json.dumps({'chunk': c})}\n\n"
-            note = "\n\n（本计划已根据你给出的指令生成；如需保存，可到「训练计划」页面点击保存。）"
+            # 发送结构化计划数据供前端渲染为卡片（替代纯文本的土格式）
+            if structured:
+                yield f"data: {json.dumps({'plan_data': {'days': structured, 'chart_url': chart_url}})}\n\n"
+            note = "\n\n✅ 训练计划已自动保存至「训练计划」页面，可直接前往查看和调整。"
             full_reply.append(note)
             yield f"data: {json.dumps({'chunk': note})}\n\n"
         except Exception as e:
@@ -242,14 +271,16 @@ def _stream_generated_plan(message, data_dir, history):
             max_entries = MAX_HISTORY_ROUNDS * 2
             if len(history) > max_entries:
                 history[:] = history[-max_entries:]
-            try:
-                _save_chat_history(data_dir, history)
-            except Exception:
-                pass
-            try:
-                memory.update_profile_summary_from_history(history)
-            except Exception:
-                pass
+            # 会话作废检查：点过"新对话"则跳过历史持久化（回复仍返回给用户）
+            if start_epoch is None or _load_epoch(data_dir) == start_epoch:
+                try:
+                    _save_chat_history(data_dir, history)
+                except Exception:
+                    pass
+                try:
+                    memory.update_profile_summary_from_history(history)
+                except Exception:
+                    pass
             try:
                 memory.update_long_term_memory(message, reply_text)
                 session["memory_profile"] = memory.load_long_term_memory()
@@ -281,18 +312,42 @@ def _load_chat_history(data_dir):
 
 
 def _save_chat_history(data_dir, history):
-    """原子写入对话历史。"""
+    """稳健写入对话历史（去删除化：备份 + 截断式覆盖写 + 校验）。"""
     path = _chat_history_path(data_dir)
     os.makedirs(data_dir, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(suffix=".json", dir=data_dir)
+    safeio.safe_write_json(path, history)
+
+
+# ---------------------------------------------------------------------------
+# 会话 epoch：用于"新对话"语义的原子作废标记
+# 单进程单用户场景下，用 data/chat_epoch 文件存一个自增整数。
+# "新对话"时递增 epoch 并清空历史；进行中的对话在收尾保存历史前比对 epoch，
+# 若已变化则丢弃本次保存，彻底消除「清空 vs 流式回复收尾写回」的竞态复活。
+# ---------------------------------------------------------------------------
+def _chat_epoch_path(data_dir):
+    return os.path.join(data_dir, "chat_epoch")
+
+
+def _load_epoch(data_dir):
+    path = _chat_epoch_path(data_dir)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(history, f, ensure_ascii=False, indent=2)
-        os.replace(tmp_path, path)
-    except Exception:
-        if os.path.isfile(tmp_path):
-            os.unlink(tmp_path)
-        raise
+        with open(path, "r", encoding="utf-8") as f:
+            return int((f.read() or "0").strip() or "0")
+    except (OSError, ValueError):
+        return 0
+
+
+def _bump_epoch(data_dir):
+    """递增会话 epoch（线程安全）。返回新的 epoch 值。"""
+    with _cache_lock:
+        ep = _load_epoch(data_dir) + 1
+        try:
+            os.makedirs(data_dir, exist_ok=True)
+            with open(_chat_epoch_path(data_dir), "w", encoding="utf-8") as f:
+                f.write(str(ep))
+        except OSError:
+            pass
+        return ep
 
 
 def _build_history_summary(history, rounds=CONTEXT_ROUNDS):
@@ -418,7 +473,7 @@ def api_coach_chat():
     # ---- 计划生成命令拦截：用户给出明确指令时直接生成，而非仅引导去页面 ----
     # 修复"我让他做命令生成计划，但他不听从"：把用户命令作为一等输入传入生成
     if intent == "plan" and _is_plan_generation_command(message):
-        return _stream_generated_plan(message, data_dir, history)
+        return _stream_generated_plan(message, data_dir, history, _load_epoch(data_dir))
 
     # ---- 长期记忆（session 缓存，避免每次对话读磁盘） ----
     user_profile = session.get("memory_profile")
@@ -597,6 +652,8 @@ def api_coach_chat():
     def generate():
         nonlocal full_reply
         max_tool_rounds = 2
+        # 捕获会话 epoch：本次对话收尾保存前会再次比对，变化则说明期间点过"新对话"
+        _chat_start_epoch = _load_epoch(data_dir)
         current_messages = messages  # 使用外部构建的 messages
 
         for tool_round in range(max_tool_rounds):
@@ -653,29 +710,33 @@ def api_coach_chat():
         now = datetime.now().isoformat()
         reply_text = "".join(full_reply)
         references = _parse_references(reply_text)
-        history.append({"role": "user", "content": message, "time": now})
-        history.append({
-            "role": "assistant",
-            "content": reply_text,
-            "time": now,
-            "references": references,
-        })
-        # 只保留最近 MAX_HISTORY_ROUNDS 轮（每轮 = user + assistant）
-        max_entries = MAX_HISTORY_ROUNDS * 2
-        if len(history) > max_entries:
-            history[:] = history[-max_entries:]
-        try:
-            _save_chat_history(data_dir, history)
-        except Exception:
-            pass  # 保存失败不阻塞响应
 
-        # 增量更新用户画像结构化摘要（随对话演进）
-        try:
-            memory.update_profile_summary_from_history(history)
-        except Exception:
-            pass  # 摘要更新失败不阻塞响应
+        # 会话作废检查：若点过"新对话"，epoch 已变化，跳过历史持久化，
+        # 避免竞态把旧对话写回（否则"新对话"后历史又复活）。
+        if _load_epoch(data_dir) == _chat_start_epoch:
+            history.append({"role": "user", "content": message, "time": now})
+            history.append({
+                "role": "assistant",
+                "content": reply_text,
+                "time": now,
+                "references": references,
+            })
+            # 只保留最近 MAX_HISTORY_ROUNDS 轮（每轮 = user + assistant）
+            max_entries = MAX_HISTORY_ROUNDS * 2
+            if len(history) > max_entries:
+                history[:] = history[-max_entries:]
+            try:
+                _save_chat_history(data_dir, history)
+            except Exception:
+                pass  # 保存失败不阻塞响应
 
-        # 更新长期记忆
+            # 增量更新用户画像结构化摘要（随对话演进）
+            try:
+                memory.update_profile_summary_from_history(history)
+            except Exception:
+                pass  # 摘要更新失败不阻塞响应
+
+        # 更新长期记忆（跨会话用户事实，即便开了新对话也保留）
         try:
             memory.update_long_term_memory(message, reply_text)
             # 刷新 session 中的记忆缓存，下次请求会重新加载
@@ -726,10 +787,11 @@ def api_coach_history():
 
 @coach_bp.route("/api/coach/history/clear", methods=["POST"])
 def api_coach_history_clear():
-    """清空对话历史（开始新对话）。"""
+    """清空对话历史（开始新对话）。同时递增 epoch，作废进行中的旧对话保存。"""
     data_dir = current_app.config["DATA_DIR"]
     try:
         _save_chat_history(data_dir, [])
+        _bump_epoch(data_dir)
     except Exception:
         return jsonify({"ok": False, "error": "清空失败"}), 500
     return jsonify({"ok": True})

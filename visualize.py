@@ -14,6 +14,7 @@ import os
 import glob
 import matplotlib
 import physiology
+import safeio
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -304,10 +305,8 @@ def _cleanup_old_charts(latest_path, keep=5):
     pattern = os.path.join(chart_dir, "pace_chart_*.png")
     existing = sorted(glob.glob(pattern), key=os.path.getmtime, reverse=True)
     for old in existing[keep:]:
-        try:
-            os.remove(old)
-        except OSError:
-            pass
+        # 非关键清理：删除失败（如沙箱 safe-delete 拦截）不应影响主流程
+        safeio.safe_remove(old)
 
 
 if __name__ == "__main__":

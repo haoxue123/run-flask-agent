@@ -145,6 +145,14 @@ def create_app():
 
 app = create_app()
 
+# 启动清理：尽力回收历史 mkstemp 残留的临时 JSON 文件
+# （沙箱护栏下可能无法真正删除，purge_stray_temp_files 已静默忽略，故此处不再包裹 try）
+try:
+    import safeio
+    safeio.purge_stray_temp_files(app.config["DATA_DIR"])
+except Exception:
+    pass
+
 if __name__ == "__main__":
     print("=" * 50)
     print("马拉松训练计划 Agent Web 应用")

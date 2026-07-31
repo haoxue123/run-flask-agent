@@ -1,14 +1,13 @@
 """训练计划路由 — 生成、保存、加载"""
 import os
 import json
-import tempfile
-import shutil
 from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
 
 import data_tool
 import llm_agent
 import visualize
+import safeio
 from openai import APIConnectionError, AuthenticationError
 
 plan_bp = Blueprint("plan", __name__)
@@ -83,21 +82,8 @@ def generate():
             "target_time": target.get("目标完赛时间", ""),
         }
         plan_payload = {"plan": structured, "meta": meta, "science": science}
-        if os.path.isfile(plan_path):
-            bak_path = plan_path + ".bak"
-            try:
-                shutil.copy2(plan_path, bak_path)
-            except OSError:
-                pass
-        fd, tmp_path = tempfile.mkstemp(suffix=".json", dir=data_dir)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(plan_payload, f, ensure_ascii=False, indent=2)
-            os.replace(tmp_path, plan_path)
-        except Exception:
-            if os.path.isfile(tmp_path):
-                os.unlink(tmp_path)
-            raise
+        # 去删除化落盘：备份 + 截断式覆盖写 + 校验，绝不触发沙箱 safe-delete
+        safeio.safe_write_json(plan_path, plan_payload)
 
         chart_filename = f"pace_chart_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
         os.makedirs(chart_dir, exist_ok=True)
@@ -203,22 +189,8 @@ def api_plan_save():
         if science is not None:
             payload["science"] = science
 
-        if os.path.isfile(plan_path):
-            bak_path = plan_path + ".bak"
-            try:
-                shutil.copy2(plan_path, bak_path)
-            except OSError:
-                pass
-
-        fd, tmp_path = tempfile.mkstemp(suffix=".json", dir=data_dir)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(payload, f, ensure_ascii=False, indent=2)
-            os.replace(tmp_path, plan_path)
-        except Exception:
-            if os.path.isfile(tmp_path):
-                os.unlink(tmp_path)
-            raise
+        # 去删除化落盘：备份 + 截断式覆盖写 + 校验，绝不触发沙箱 safe-delete
+        safeio.safe_write_json(plan_path, payload)
 
         return jsonify({"success": True})
     except Exception as e:
@@ -267,23 +239,8 @@ def api_plan_update_day():
         if not updated:
             return jsonify({"success": False, "error": f"未找到 day={day} 的训练日"})
 
-        # 原子写入 + 备份
-        if os.path.isfile(plan_path):
-            bak_path = plan_path + ".bak"
-            try:
-                shutil.copy2(plan_path, bak_path)
-            except OSError:
-                pass
-
-        fd, tmp_path = tempfile.mkstemp(suffix=".json", dir=data_dir)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(plan_data, f, ensure_ascii=False, indent=2)
-            os.replace(tmp_path, plan_path)
-        except Exception:
-            if os.path.isfile(tmp_path):
-                os.unlink(tmp_path)
-            raise
+        # 原子写入 + 备份（去删除化：备份 + 截断式覆盖写 + 校验）
+        safeio.safe_write_json(plan_path, plan_data)
 
         return jsonify({"success": True, "plan": plan_data.get("plan", []), "meta": plan_data.get("meta", {})})
     except Exception as e:
