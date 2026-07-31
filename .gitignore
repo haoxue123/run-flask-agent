@@ -56,3 +56,8 @@ data/*.md
 
 # ===== 清理暂存区（可恢复，非永久删除）=====
 .trash/
+
+# ===== 一次性运行/调试产物（不入库）=====
+*.log
+feishu_demo_doc.xml
+lark_setup_fixed.py
