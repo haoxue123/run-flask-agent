@@ -140,20 +140,48 @@
         margin-right: var(--rc-space-1);
     }
 
-    /* ---- 打字动画 ---- */
-    .typing-dot {
-        display: inline-block;
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: var(--rc-text-muted);
+    /* ---- 增强型加载状态（渐进式上下文展示） ---- */
+    .typing-bubble {
+        padding: 14px 16px !important;
+    }
+    .typing-status {
+        display: flex; align-items: center; gap: 10px;
+    }
+    .typing-status-text {
+        font-size: var(--rc-text-sm, 13px);
+        color: var(--rc-text-secondary, #A9B4AE);
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+    }
+    .typing-dots {
+        display: inline-flex; gap: 4px; align-items: center;
+        padding-top: 2px;
+    }
+    .typing-dots i {
+        display: inline-block; width: 6px; height: 6px;
+        border-radius: 50%; background: var(--rc-primary, #2BD493);
+        opacity: 0.4;
         animation: coachBlink 1.4s infinite both;
     }
-    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
-    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes coachBlink {
-        0%, 80%, 100% { opacity: 0.2; }
-        40% { opacity: 1; }
+    .typing-dots i:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots i:nth-child(3) { animation-delay: 0.4s; }
+
+    /* 进度条（每 4s 加一段） */
+    .typing-progress {
+        display: flex; gap: 4px; margin-top: 10px;
+    }
+    .prog-seg {
+        width: 28px; height: 3px; border-radius: 2px;
+        background: rgba(255,255,255,0.06); transition: background .3s ease;
+    }
+    .prog-seg.active {
+        background: var(--rc-primary, #2BD493);
+        animation: prog-pulse 1.8s ease-in-out infinite;
+    }
+    @keyframes prog-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
     }
 
     /* ---- 输入区 ---- */
@@ -411,6 +439,8 @@
         border-radius: var(--rc-radius-lg, 14px);
         padding: var(--rc-space-4, 16px);
         margin-top: var(--rc-space-2, 8px);
+        max-width: 100%;
+        overflow: hidden;
     }
     .plan-card-header {
         display: flex; align-items: center; gap: 8px;
@@ -418,9 +448,43 @@
         color: var(--rc-text, #E8EDEA); margin-bottom: var(--rc-space-3, 12px);
     }
     .plan-card-icon { font-size: 18px; }
+    /* ---- 配速图：聊天内折叠展示（默认收起，不占空间） ---- */
+    .plan-stats-row {
+        display: flex; flex-wrap: wrap; gap: 6px;
+        margin-bottom: var(--rc-space-3, 12px);
+        align-items: center;
+    }
+    .plan-stat-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        background: rgba(43,212,147,0.08); border: 1px solid rgba(43,212,147,0.15);
+        border-radius: 20px; padding: 3px 10px; font-size: 11px;
+        color: var(--rc-primary, #2BD493); font-weight: 600;
+    }
+    .plan-stat-badge .stat-icon { font-size: 12px; }
+    .plan-stat-badge .stat-val { color: var(--rc-text, #E8EDEA); margin-left: 2px; }
+    .plan-chart-section {
+        border: 1px solid var(--rc-border, rgba(255,255,255,0.06));
+        border-radius: var(--rc-radius-md, 10px); overflow: hidden;
+        margin-bottom: var(--rc-space-3, 12px);
+        background: rgba(255,255,255,0.015);
+    }
+    .plan-chart-toggle {
+        display: flex; align-items: center; justify-content: space-between;
+        width: 100%; padding: 8px 12px; cursor: pointer;
+        background: none; border: none; color: var(--rc-text-secondary, #A9B4AE);
+        font-size: 12px; font-weight: 600; transition: color .15s ease;
+    }
+    .plan-chart-toggle:hover { color: var(--rc-text, #E8EDEA); }
+    .plan-chart-toggle .toggle-icon { transition: transform .2s ease; }
+    .plan-chart-section.expanded .toggle-icon { transform: rotate(180deg); }
+    .plan-chart-body {
+        display: none; padding: 0 10px 10px;
+    }
+    .plan-chart-section.expanded .plan-chart-body { display: block; }
     .plan-chart-img {
-        width: 100%; border-radius: var(--rc-radius-md, 10px);
-        margin-bottom: var(--rc-space-3, 12px); border: 1px solid var(--rc-border, rgba(255,255,255,0.06));
+        width: 100%; border-radius: var(--rc-radius-md, 8px);
+        max-height: 320px; object-fit: contain;
+        background: var(--rc-card, rgba(20,24,27,0.8));
     }
     .plan-week { margin-bottom: var(--rc-space-3, 12px); }
     .plan-week:last-child { margin-bottom: 0; }
@@ -430,7 +494,9 @@
         margin-bottom: var(--rc-space-2, 8px); padding-left: 2px;
     }
     .plan-week-grid {
-        display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+        gap: 6px;
     }
     .plan-day {
         background: var(--rc-muted, rgba(255,255,255,0.03));
@@ -840,27 +906,70 @@
             });
     };
 
-    // 显示 typing 动画
-    function addTyping() {
+    // ---- 意图检测（轻量，与后端 _PLAN_WORDS 保持同步） ----
+    var _PLAN_HINTS = /计划|生成.*计划|制定.*训练|安排.*训练|训练方案|周计划/;
+    function _detectIntent(msg) {
+        if (_PLAN_HINTS.test(msg)) return 'plan';
+        if (/分析|配速|跑量|心率|伤病|恢复|营养/.test(msg)) return 'analyze';
+        return 'chat';
+    }
+
+    // ---- 渐进式加载状态管理 ----
+    var _loadingTimer = null;
+    var _loadingPhase = 0;  // 0=初始 1=处理中 2=深度思考中 3=仍在工作
+
+    // 阶段文案映射（按意图）
+    var _LOADING_TEXT = {
+        plan:   ['正在理解你的训练目标…', '正在调用科学模型生成计划…', '正在计算每日配速与跑量…', '正在生成可视化图表…'],
+        analyze:['正在分析你的数据…', '正在检索相关知识库…', '正在对比科学标准…', '即将给出建议…'],
+        chat:   ['正在思考…', '正在组织回答…']
+    };
+
+    function addTyping(intent) {
+        intent = intent || 'chat';
+        removeTyping();  // 防重复
+        _loadingPhase = 0;
+
         var div = document.createElement('div');
         div.className = 'chat-message coach';
         div.id = 'typing-indicator';
         div.innerHTML =
             '<div class="chat-row">' +
             '<div class="coach-orb coach-orb--chat is-thinking" id="typing-orb"></div>' +
-            '<div class="chat-bubble-coach">' +
-            '<span class="typing-dot"></span>' +
-            '<span class="typing-dot"></span>' +
-            '<span class="typing-dot"></span>' +
+            '<div class="chat-bubble-coach typing-bubble">' +
+            '<div class="typing-status">' +
+                '<span class="typing-status-text" id="typing-text">' + (_LOADING_TEXT[intent][0] || '正在思考…') + '</span>' +
+                '<span class="typing-dots"><i></i><i></i><i></i></span>' +
+            '</div>' +
+            '<div class="typing-progress" id="typing-progress"></div>' +
             '</div>' +
             '</div>';
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;
         lucide.createIcons();
+
+        // 渐进式状态升级：每 4s 升一级，最长覆盖 16s
+        var phases = _LOADING_TEXT[intent] || _LOADING_TEXT.chat;
+        _loadingTimer = setInterval(function() {
+            _loadingPhase++;
+            var textEl = document.getElementById('typing-text');
+            var progEl = document.getElementById('typing-progress');
+            if (!textEl) { clearInterval(_loadingTimer); return; }
+            if (_loadingPhase < phases.length) {
+                textEl.textContent = phases[_loadingPhase];
+                // 进度条加一段
+                if (progEl) {
+                    var seg = document.createElement('div');
+                    seg.className = 'prog-seg active';
+                    progEl.appendChild(seg);
+                }
+            }
+        }, 4000);
     }
 
-    // 移除 typing 动画
+    // 移除 typing 动画（含定时器清理）
     function removeTyping() {
+        if (_loadingTimer) { clearInterval(_loadingTimer); _loadingTimer = null; }
         var el = document.getElementById('typing-indicator');
         if (el) el.remove();
     }
@@ -880,12 +989,13 @@
 
         isSending = true;
         setOrbState('is-thinking');
+        var intent = _detectIntent(msg);
         addMessage('user', msg);
         pushMirror('user', msg);
         chatInput.value = '';
         chatInput.style.height = '';
         sendBtn.disabled = true;
-        addTyping();
+        addTyping(intent);
 
         fetch('/api/coach/chat', {
             method: 'POST',
@@ -967,7 +1077,57 @@
             function renderPlanCard(planData) {
                 var days = planData.days || [];
                 if (!days.length) return '<p>（无法解析计划结构）</p>';
-                var chartHtml = planData.chart_url ? '<img src="' + escapeHtml(planData.chart_url) + '" class="plan-chart-img" alt="配速图" onerror="this.style.display=\'none\'">' : '';
+
+                // ---- 从 days 提取关键指标 ----
+                var totalDays = days.length;
+                var runDays = days.filter(function(d) { return !(d.is_rest || d.type === '休息'); });
+                var restDays = totalDays - runDays.length;
+                var totalDist = 0;
+                var paceVals = [];
+                for (var i = 0; i < runDays.length; i++) {
+                    if (runDays[i].distance_km) totalDist += Number(runDays[i].distance_km);
+                    if (runDays[i].target_pace_sec) paceVals.push(Number(runDays[i].target_pace_sec));
+                }
+                var avgPace = '--';
+                if (paceVals.length > 0) {
+                    var avgSec = Math.round(paceVals.reduce(function(a,b){return a+b;},0) / paceVals.length);
+                    var m = Math.floor(avgSec / 60), s = avgSec % 60;
+                    avgPace = m + '\'' + (s < 10 ? '0' : '') + s + '\"';
+                }
+                // 类型分布统计
+                var typeCount = {};
+                for (var t = 0; t < runDays.length; t++) {
+                    var tp = runDays[t].type || '训练';
+                    typeCount[tp] = (typeCount[tp] || 0) + 1;
+                }
+                var topTypes = Object.keys(typeCount).sort(function(a,b){return typeCount[b]-typeCount[a];}).slice(0,3);
+
+                // ---- 指标 badge 行 ----
+                var statsHtml = '<div class="plan-stats-row">';
+                statsHtml += '<span class="plan-stat-badge"><span class="stat-icon">📅</span>' + totalDays + '天</span>';
+                statsHtml += '<span class="plan-stat-badge"><span class="stat-icon">🏃</span><span class="stat-val">' + runDays.length + '训练</span> / ' + restDays + '休</span>';
+                if (totalDist > 0) {
+                    statsHtml += '<span class="plan-stat-badge"><span class="stat-icon">📏</span><span class="stat-val">' + totalDist.toFixed(1) + 'km</span></span>';
+                }
+                if (avgPace !== '--') {
+                    statsHtml += '<span class="plan-stat-badge"><span class="stat-icon">⏱</span>均配速 <span class="stat-val">' + avgPace + '/km</span></span>';
+                }
+                statsHtml += '</div>';
+
+                // ---- 图表（折叠区） ----
+                var chartSection = '';
+                if (planData.chart_url) {
+                    chartSection = '<div class="plan-chart-section" id="planChartSec">' +
+                        '<button class="plan-chart-toggle" onclick="this.parentElement.classList.toggle(\'expanded\')">' +
+                            '<span>📈 配速概览</span>' +
+                            '<i data-lucide="chevron-down" class="toggle-icon" style="width:16px;height:16px"></i>' +
+                        '</button>' +
+                        '<div class="plan-chart-body">' +
+                            '<img src="' + escapeHtml(planData.chart_url) + '" class="plan-chart-img" alt="配速图" onerror="this.style.display=\'none\'">' +
+                        '</div>' +
+                    '</div>';
+                }
+
                 // 按周分组
                 var weeks = [];
                 var currentWeek = [];
@@ -980,7 +1140,8 @@
                 }
                 var html = '<div class="plan-card">';
                 html += '<div class="plan-card-header"><span class="plan-card-icon">📋</span>训练计划已生成</div>';
-                html += chartHtml;
+                html += statsHtml;
+                html += chartSection;
                 for (var w = 0; w < weeks.length; w++) {
                     html += '<div class="plan-week"><div class="plan-week-label">第 ' + (w + 1) + ' 周</div><div class="plan-week-grid">';
                     for (var d = 0; d < weeks[w].length; d++) {

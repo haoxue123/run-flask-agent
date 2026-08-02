@@ -23,11 +23,14 @@ Garmin Connect 数据同步工具（基于 garth-ng）
 """
 
 import os
+import json
 import logging
 from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
+
+import safeio
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +45,17 @@ _RUNNING_TYPE_KEYS = {
     "running", "street_running", "track_running", "trail_running",
     "treadmill_running", "virtual_run", "indoor_running", "ultra_run",
 }
+
+# 浏览器 UA：garth 默认用移动端 UA（GCM-iOS-...），Garmin 的 Cloudflare
+# 会据此拦截并让 OAuth 登录返回 400。换成桌面浏览器 UA 即可绕过。
+# （社区 2026-04 多人验证：普通登录与 MFA 流程均适用）
+_BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
+
+# 同步状态文件（让前端知道数据是否最新）
+SYNC_STATE_PATH = os.path.join(DEFAULT_OUTPUT_DIR, "sync_state.json")
 
 
 def _get_credentials():
@@ -100,6 +114,13 @@ def _get_garth():
     if is_cn:
         garth.configure(domain="garmin.cn")
 
+    # 关键修复：覆盖默认移动端 UA（GCM-iOS-...），避免 Cloudflare 拦截
+    # 导致 OAuth 登录返回 400。必须在 login/resume 之前设置。
+    try:
+        garth.client.session.headers.update({"User-Agent": _BROWSER_UA})
+    except Exception as e:  # noqa: BLE001
+        logger.warning("设置浏览器 UA 失败（将使用 garth 默认）：%s", e)
+
     home = os.getenv("GARTH_HOME", DEFAULT_GARTH_HOME)
 
     # 1) 优先恢复已保存的令牌会话（无登录，避免 429）
@@ -157,6 +178,18 @@ def pull_recent_runs(count=5, output_dir=None, fmt="tcx"):
         output_dir = DEFAULT_OUTPUT_DIR
     os.makedirs(output_dir, exist_ok=True)
 
+    # 浏览器引擎优先：garth 的 HTTP 传输已被 Garmin Cloudflare 封禁（400/401）。
+    # 浏览器引擎用真实浏览器 fetch，可绕过 bot 检测。失败再回退 garth（仅当本地有令牌）。
+    try:
+        import garmin_browser
+        if garmin_browser.engine_available():
+            logger.info("使用浏览器引擎同步 Garmin 数据")
+            return garmin_browser.pull_recent_runs_browser(
+                count=count, output_dir=output_dir, fmt=fmt, headless=True
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("浏览器引擎同步失败，回退 garth：%s", e)
+
     garth = _get_garth()
 
     # 多请求一些活动，确保过滤后仍有 count 条跑步记录
@@ -208,6 +241,24 @@ def pull_recent_runs(count=5, output_dir=None, fmt="tcx"):
     return downloaded
 
 
+def garmin_login(headless=False, timeout=300):
+    """触发浏览器交互登录（MFA 在可见浏览器输入），成功写 Cookie。
+
+    返回 True 表示登录成功；依赖 playwright，未安装时抛 RuntimeError。
+    """
+    try:
+        import garmin_browser
+    except ImportError as e:
+        raise RuntimeError(
+            "未安装 playwright。请运行：\n"
+            "  pip install playwright\n"
+            "  playwright install chromium   # 或本机有 Chrome 时可省"
+        ) from e
+    if not garmin_browser.engine_available():
+        raise RuntimeError("playwright 未安装，无法发起浏览器登录")
+    return garmin_browser.browser_login(headless=headless, timeout=timeout)
+
+
 def get_sync_status():
     """返回当前 Garmin 同步配置状态（不触发登录）。"""
     username, password, is_cn = _get_credentials()
@@ -222,6 +273,49 @@ def get_sync_status():
         "is_cn": is_cn,
         "library_installed": available,
     }
+
+
+# ============================================================
+# 同步状态持久化（让前端知道数据是否最新）
+# ============================================================
+def write_sync_state(state):
+    """把同步状态写入 data/sync_state.json（best-effort，不抛错）。"""
+    payload = dict(state)
+    payload["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    try:
+        safeio.safe_write_json(SYNC_STATE_PATH, payload)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("写入同步状态失败：%s", e)
+
+
+def read_sync_state():
+    """读取同步状态；文件不存在/损坏时返回空 dict。"""
+    try:
+        if os.path.isfile(SYNC_STATE_PATH):
+            with open(SYNC_STATE_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:  # noqa: BLE001
+        pass
+    return {}
+
+
+def record_sync_success(files, source="auto"):
+    """记录一次成功同步。files: 已下载文件路径列表。"""
+    write_sync_state({
+        "result": "success",
+        "source": source,
+        "count": len(files),
+        "files": [os.path.basename(p) for p in files],
+    })
+
+
+def record_sync_failure(error, source="auto"):
+    """记录一次失败同步。"""
+    write_sync_state({
+        "result": "failed",
+        "source": source,
+        "error": str(error),
+    })
 
 
 # ============================================================

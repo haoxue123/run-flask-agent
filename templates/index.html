@@ -315,6 +315,14 @@
     </div>
 </div>
 
+<!-- 数据同步状态条：打开即知数据是否最新 -->
+<div id="sync-status-bar" style="display:flex; align-items:center; gap:10px; padding:10px 16px; border-radius:12px; background: var(--rc-surface, #1b2330); border:1px solid var(--rc-border, #2a3342); margin-bottom: var(--rc-space-6); font-size:14px;">
+    <i data-lucide="refresh-cw" id="sync-spinner" style="width:16px;height:16px;"></i>
+    <span id="sync-status-text" style="color: var(--rc-text, #e6edf3);">正在检查数据同步状态…</span>
+    <button id="sync-now-btn" onclick="window.COACH.upload.syncGarmin('manual')" style="margin-left:auto; padding:6px 12px; border-radius:8px; border:1px solid var(--rc-border, #2a3342); background:transparent; color: var(--rc-text,#e6edf3); cursor:pointer; font-size:13px; display:none;">立即同步</button>
+    <button id="sync-login-btn" onclick="window.COACH.upload.garminLogin()" style="margin-left:auto; padding:6px 12px; border-radius:8px; border:1px solid var(--rc-accent, #4f8cff); background:var(--rc-accent, #4f8cff); color:#fff; cursor:pointer; font-size:13px; display:none;">登录 Garmin</button>
+</div>
+
 <!-- ============================================================ -->
 <!-- KPI 卡片区：桌面 4 列，移动端 2 列 -->
 <!-- ============================================================ -->

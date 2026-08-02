@@ -54,6 +54,9 @@ data/*.md
 # ===== 工作区记忆（不入库）=====
 .workbuddy/
 
+# ===== pytest 缓存（测试产物，不入库）=====
+.pytest_cache/
+
 # ===== 清理暂存区（可恢复，非永久删除）=====
 .trash/
 
@@ -61,3 +64,6 @@ data/*.md
 *.log
 feishu_demo_doc.xml
 lark_setup_fixed.py
+
+data/.garmin_browser_cookies.json
+data/chat_epoch

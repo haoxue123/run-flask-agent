@@ -223,6 +223,7 @@ def api_sync_garmin():
             output_dir=data_dir,
             fmt=fmt,
         )
+        garmin_sync.record_sync_success(downloaded, source="manual")
         data_tool.invalidate_profile_cache()
 
         return jsonify({
@@ -231,8 +232,57 @@ def api_sync_garmin():
             "files": [os.path.basename(p) for p in downloaded],
         })
     except RuntimeError as e:
+        garmin_sync.record_sync_failure(str(e), source="manual")
         logger.warning("Garmin sync runtime error: %s", e)
         return jsonify({"success": False, "error": str(e)}), 400
     except Exception as e:
+        garmin_sync.record_sync_failure(str(e), source="manual")
         logger.exception("Garmin sync failed")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@data_bp.route("/api/data/garmin_login", methods=["POST"])
+def api_garmin_login():
+    """启动可见浏览器做 Garmin 交互登录（MFA 在浏览器窗口输入），成功写 Cookie。"""
+    try:
+        garmin_sync.garmin_login(headless=False)
+        return jsonify({"success": True, "message": "浏览器登录成功，已保存会话"})
+    except RuntimeError as e:
+        logger.warning("Garmin 浏览器登录失败：%s", e)
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.exception("Garmin 浏览器登录异常")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@data_bp.route("/api/data/sync_status", methods=["GET"])
+def api_sync_status():
+    """返回 Garmin 同步状态 + 当前画像最新跑步日期，供前端判断数据是否新鲜。"""
+    try:
+        state = garmin_sync.read_sync_state()
+        latest_run = None
+        try:
+            profile = data_tool.build_runner_profile()
+            latest_run = (profile.get("基本信息") or {}).get("最近一次跑步日期")
+        except Exception:
+            pass
+
+        # 判断数据是否“新鲜”：最近一次成功同步在 30 分钟内
+        fresh = False
+        last_success = state.get("updated_at") if state.get("result") == "success" else None
+        if last_success:
+            try:
+                from datetime import datetime as _dt
+                last_dt = _dt.fromisoformat(last_success)
+                fresh = (_dt.now() - last_dt).total_seconds() < 30 * 60
+            except (ValueError, TypeError):
+                fresh = False
+
+        return jsonify({
+            "ok": True,
+            "state": state,
+            "latest_run_date": latest_run,
+            "fresh": fresh,
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "state": {}, "fresh": False})

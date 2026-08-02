@@ -24,9 +24,17 @@ def run_sync_once():
     """执行一次同步。所有异常内部消化，绝不影响调用方。"""
     try:
         files = garmin_sync.pull_recent_runs(count=SYNC_COUNT, fmt="tcx")
+        garmin_sync.record_sync_success(files, source="auto")
+        # 同步成功可能带来新文件，必须让跑者画像缓存失效，否则页面读到旧数据
+        try:
+            import data_tool
+            data_tool.invalidate_profile_cache()
+        except Exception:
+            pass
         logger.info("Garmin 自动同步完成：新增/更新 %d 个运动文件", len(files))
         return files
     except Exception as e:
+        garmin_sync.record_sync_failure(str(e), source="auto")
         logger.warning("Garmin 自动同步跳过（不影响应用）：%s", e)
         return []
 
