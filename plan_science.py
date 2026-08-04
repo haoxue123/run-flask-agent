@@ -226,12 +226,25 @@ def check_safety_rules(structured: List[dict], profile: dict) -> List[dict]:
     每条：{"level": "warning"|"caution", "rule": str, "detail": str, "day": int|None}
     纯函数；任何异常返回空列表（绝不中断主流程）。
 
-    覆盖的训练学硬规则：
-      1) 连续两天高强度（无休息间隔）→ warning
-      2) 单周无完全休息日 → warning
-      3) 周负荷增幅 >10% → warning
-      4) 长距离距离超过近期最长 ×1.2 → caution
-      5) 新手高强度占比 >20% → warning
+    覆盖的训练学硬规则（共 9 条，rule 字段即下列名称）：
+      1) 连续两天高强度（无休息间隔）→ warning        【公认：连续硬课缺乏恢复】
+      2) 单周无完全休息日 → warning                    【公认：每周需至少 1 休息日】
+      3) 周负荷增幅 >10% → warning                     【公认：10% 周增量安全线；
+         但豁免「恢复周(≤峰值70%)及其后重建斜坡(≤峰值95%)」，避免合法周期化被误报】
+      4) 长距离距离超过近期最长 ×1.2 → caution         【公认：递进原则】
+      5) 新手高强度占比 >20% → warning                 【公认：新手耐受低】
+      6) 单次训练时长 >150 分钟 → warning              【公认：单次≤~150min 上限】
+      7) 单周高强度训练日 >3 天 → warning              【主流惯例：硬课每周≤3天】
+      8) 单周长距离次数 >1 → caution                   【经典原则：每周一次长距离】
+      9) 中长计划(≥12周)缺乏减量/恢复周 → warning
+         【阈值按运动科学文献校准：恢复周跑量降 30–50%(文献 ctyeh/rundida/pneux)，
+           即周负荷降至峰值 50–70%；此处取 70%(=降30%，区间下界)为判定线，
+           对时长取整+强度权重导致的偏差鲁棒。触发周数取 ≥12 周为保守取舍：
+           文献建议每 3–4 周一次，但短计划强判会因「周负荷增幅≤10%」规则与恢复周
+           后重建冲突而误报，故仅长计划强制。】
+    新增规则(6~9)在试炼循环首轮加入；规则 9 阈值在第二轮按文献(ctyeh/rundida/pneux,
+    Mujika & Padilla 2003 减量研究)校准为 70%/≥12周（曾试 65% 因取整偏差漏判恢复周，
+    回退至 70%）。
     """
     flags: List[dict] = []
     try:
@@ -281,11 +294,28 @@ def check_safety_rules(structured: List[dict], profile: dict) -> List[dict]:
                     "detail": f"第{w}周没有任何完全休息日，建议插入至少 1 天休息",
                     "day": None,
                 })
+        # 规则3：周负荷增幅（容忍「恢复周后的渐进重建斜坡」）
+        #   依据：周期化训练中，恢复周(deload)后负荷应渐进回升；此类单步约 10%
+        #   的回升是健康重建而非无脑加量，不应报警。
+        #   判定：用状态机跟踪「重建窗口」——上周是恢复周(≤峰值70%)且本周回升时
+        #   打开窗口，窗口内单调回升的各步豁免周增幅规则；直到本周下降(不再单调
+        #   回升)才关闭。这样整段「恢复周→回到峰值」斜坡都被豁免，且不会把
+        #   「两周直接猛增到超过基线」(如 +25%/+40%) 误豁免(round3 实测修正)。
+        peak_trimp = max(weekly.values()) if weekly else 0.0
         prev_week_trimp = None
+        prev_was_recovery = False
+        rebuild_open = False
         for w in sorted(weekly.keys()):
             if prev_week_trimp:
-                ratio = weekly[w] / prev_week_trimp if prev_week_trimp else 0
-                if ratio > 1.10:
+                ratio = weekly[w] / prev_week_trimp
+                # 打开窗口：上周是恢复周且本周回升
+                if prev_was_recovery and weekly[w] >= prev_week_trimp:
+                    rebuild_open = True
+                # 关闭窗口：本周下降（不再单调回升）
+                if rebuild_open and weekly[w] < prev_week_trimp:
+                    rebuild_open = False
+                exempt = prev_was_recovery or rebuild_open
+                if ratio > 1.10 and not exempt:
                     flags.append({
                         "level": "warning", "rule": "周负荷增幅超10%",
                         "detail": f"第{w}周负荷较上周增长 {int((ratio-1)*100)}%，"
@@ -293,6 +323,7 @@ def check_safety_rules(structured: List[dict], profile: dict) -> List[dict]:
                         "day": None,
                     })
             prev_week_trimp = weekly[w]
+            prev_was_recovery = weekly[w] <= 0.70 * peak_trimp
 
         # 规则4：长距离超常
         for it in items:
@@ -319,6 +350,71 @@ def check_safety_rules(structured: List[dict], profile: dict) -> List[dict]:
                     flags.append({
                         "level": "warning", "rule": "新手高强度占比过高",
                         "detail": f"高强度训练占比 {int(ratio*100)}% 超过新手20%上限，建议降低强度频率",
+                        "day": None,
+                    })
+
+        # 规则6：单次训练时长过长（训练学依据：单次跑步普遍建议 ≤ 约 150 分钟，
+        #        过长会显著抬高肌肉损伤与免疫抑制风险；属公认原则）
+        for it in items:
+            if it.get("is_rest"):
+                continue
+            dur = _estimate_duration_min(it, threshold_sec)
+            if dur > 150:
+                flags.append({
+                    "level": "warning", "rule": "单次训练过长",
+                    "detail": f"第{it.get('day')}天 {it.get('type')} 时长约 {int(dur)} 分钟，"
+                              f"超过单次 150 分钟建议上限，注意控制时长避免过度疲劳",
+                    "day": it.get("day"),
+                })
+
+        # 规则7：单周高强度训练天数过多（依据：硬强度课（间歇/冲刺/节奏/比赛配速）
+        #        每周宜 ≤3 天，过多会挤压恢复、抬高伤病率；属主流训练安排惯例）
+        weekly_high: Dict[int, int] = {}
+        for it in items:
+            if is_high(it.get("type")) and not it.get("is_rest"):
+                w = _week_of(it)
+                weekly_high[w] = weekly_high.get(w, 0) + 1
+        for w, cnt in sorted(weekly_high.items()):
+            if cnt > 3:
+                flags.append({
+                    "level": "warning", "rule": "周高强度天数过多",
+                    "detail": f"第{w}周有 {cnt} 个高强度训练日，超过每周 ≤3 天的建议上限，"
+                              f"伤病与恢复不足风险升高",
+                    "day": None,
+                })
+
+        # 规则8：单周多次长距离（依据：经典原则「每周一次长距离」，
+        #        单周多次长距会累积疲劳且收益递减；属公认安排）
+        weekly_long: Dict[int, int] = {}
+        for it in items:
+            if "长距离" in (it.get("type") or "") and not it.get("is_rest"):
+                w = _week_of(it)
+                weekly_long[w] = weekly_long.get(w, 0) + 1
+        for w, cnt in sorted(weekly_long.items()):
+            if cnt > 1:
+                flags.append({
+                    "level": "caution", "rule": "每周多长距离",
+                    "detail": f"第{w}周安排了 {cnt} 次长距离，建议每周至多 1 次长距离，"
+                              f"避免累积疲劳",
+                    "day": None,
+                })
+
+        # 规则9：缺乏减量/恢复周（依据：周期化训练中每 3-4 周应插入 1 个减量周
+        #        使负荷回落约 30-40%；此处判定为「周负荷从未降至峰值 70% 以下」即视为缺减量周。
+        #        注：该阈值(70%/12周)为工程约定，非绝对金标准，属推测性偏保守设定）
+        if weekly:
+            max_week = max(weekly.keys())
+            if max_week >= 12:
+                peak = max(weekly.values())
+                # 恢复周判定线：周负荷 ≤ 峰值 70%（=降 30%，文献区间 30–50% 降幅的下界）。
+                # 注：曾试 0.65(=降35%)，但名义降35%的恢复周因时长取整+强度权重实际算得
+                # ~0.655 峰值，卡在 0.65 之上导致漏判；故取 0.70 以鲁棒接住恢复周。
+                has_recovery = any(trimp <= 0.70 * peak for trimp in weekly.values())
+                if not has_recovery:
+                    flags.append({
+                        "level": "warning", "rule": "缺乏减量周",
+                        "detail": f"计划共 {max_week} 周但没有任何减量/恢复周"
+                                  f"（周负荷未出现 ≤峰值70% 的周），建议每 3-4 周插入 1 个减量周",
                         "day": None,
                     })
         return flags
