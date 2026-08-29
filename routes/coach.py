@@ -16,6 +16,7 @@ import workflow
 import memory
 from llm_agent import load_prompt
 import skills
+import weekly_review
 from openai import APIConnectionError, AuthenticationError
 
 coach_bp = Blueprint("coach", __name__)
@@ -274,7 +275,7 @@ def _stream_generated_plan(message, data_dir, history, start_epoch=None):
             # 会话作废检查：点过"新对话"则跳过历史持久化（回复仍返回给用户）
             if start_epoch is None or _load_epoch(data_dir) == start_epoch:
                 try:
-                    _save_chat_history(data_dir, history)
+                    _persist_history(data_dir, history)
                 except Exception:
                     pass
                 try:
@@ -316,6 +317,35 @@ def _save_chat_history(data_dir, history):
     path = _chat_history_path(data_dir)
     os.makedirs(data_dir, exist_ok=True)
     safeio.safe_write_json(path, history)
+
+
+def _ensure_message_ids(history):
+    """为历史条目补齐稳定的 id / parent_id（对话地图分支可视化的基础）。
+
+    - 线性链：entry[i].parent_id = entry[i-1].id；首条 parent_id 为 None。
+    - 已带 id / parent_id 的分支条目（fork 产生）保持不变。
+    - 仅修改内存中的列表，不写盘；调用方若需持久化请自行 _save_chat_history。
+    """
+    prev_id = None
+    for entry in history:
+        if not entry.get("id"):
+            # 退化为基于索引的确定性 id（每次加载一致）
+            entry["id"] = "m" + str(history.index(entry))
+        if entry.get("parent_id") is None and prev_id is not None:
+            entry["parent_id"] = prev_id
+        prev_id = entry["id"]
+    return history
+
+
+def _persist_history(data_dir, history):
+    """保存对话历史前确保每条都有稳定 id / parent_id，再落盘。
+
+    对话地图（Tier1/Tier2）依赖 id 与 parent_id 渲染节点与分支边，
+    故在写盘前强制补齐——旧条目沿用既有 id（_ensure_message_ids 幂等），
+    fork 产生的显式 id / parent_id 原样保留。
+    """
+    _ensure_message_ids(history)
+    _save_chat_history(data_dir, history)
 
 
 # ---------------------------------------------------------------------------
@@ -429,6 +459,8 @@ def api_coach_chat():
     """AI 教练对话端点（SSE 流式响应 + 对话记忆）。"""
     data = request.get_json()
     message = data.get("message", "").strip()
+    client_msg_id = (data or {}).get("client_msg_id")
+    parent_id = (data or {}).get("parent_id")
     if not message:
         return jsonify({"reply": "请告诉我你的问题。"})
 
@@ -459,6 +491,7 @@ def api_coach_chat():
 
     # 加载对话历史
     history = _load_chat_history(data_dir)
+    _ensure_message_ids(history)
     history_summary = _build_history_summary(history)
 
     # ---- 工作流状态机 ----
@@ -469,6 +502,10 @@ def api_coach_chat():
         intent = llm_agent.classify_intent(message, history_summary, current_state=current_state)
     next_state = workflow.get_next_state(current_state, intent) if intent else current_state
     session["workflow_state"] = next_state
+
+    # ---- 周复盘闭环入口：用户请求"复盘/周报/调整计划"时，直接返回确定性复盘报告 ----
+    if _is_review_request(message):
+        return _stream_weekly_review(data_dir)
 
     # ---- 计划生成命令拦截：用户给出明确指令时直接生成，而非仅引导去页面 ----
     # 修复"我让他做命令生成计划，但他不听从"：把用户命令作为一等输入传入生成
@@ -524,13 +561,22 @@ def api_coach_chat():
     except Exception:
         pass
 
+    # VDOT 配速表：若用户填了近期比赛成绩，注入教练上下文（确定性内核推导）
+    try:
+        from physiology import vdot_block_from_profile
+        vdot_ctx = vdot_block_from_profile(profile)
+        if vdot_ctx:
+            system_prompt = system_prompt + "\n\n【VDOT 配速参考（由近期比赛成绩推导，确定性内核）】\n" + vdot_ctx
+    except Exception:
+        pass
+
     ts_context = ""
     if ts_summary:
         ts_context = f"""
 【训练科学指标】
 - 训练负荷：{ts_summary.get('training_load', '-')}%（基于 TRIMP 模型）
 - ACWR（负荷比）：{ts_summary.get('acwr', '-')}（{ts_summary.get('acwr_risk', {}).get('level', '-')}）
-- 就绪度：{ts_summary.get('readiness', '-')}
+- 就绪度：{ts_summary.get('readiness') if ts_summary.get('readiness_available') else '数据不足'}
 - 周 TRIMP：{ts_summary.get('weekly_trimp', '-')}
 """
 
@@ -714,19 +760,36 @@ def api_coach_chat():
         # 会话作废检查：若点过"新对话"，epoch 已变化，跳过历史持久化，
         # 避免竞态把旧对话写回（否则"新对话"后历史又复活）。
         if _load_epoch(data_dir) == _chat_start_epoch:
-            history.append({"role": "user", "content": message, "time": now})
+            # 对话地图分支：fork 时显式指定 id / parent_id，使分支点可被地图渲染；
+            # 线性对话则留 None，由 _ensure_message_ids 派生确定性 id 与链式 parent。
+            if parent_id:
+                _user_msg_id = client_msg_id or ("u" + uuid.uuid4().hex[:12])
+                _asst_msg_id = _user_msg_id + "_a"
+            else:
+                _user_msg_id = None
+                _asst_msg_id = None
+
+            history.append({
+                "role": "user",
+                "content": message,
+                "time": now,
+                "id": _user_msg_id,
+                "parent_id": parent_id,
+            })
             history.append({
                 "role": "assistant",
                 "content": reply_text,
                 "time": now,
                 "references": references,
+                "id": _asst_msg_id,
+                "parent_id": _user_msg_id,
             })
             # 只保留最近 MAX_HISTORY_ROUNDS 轮（每轮 = user + assistant）
             max_entries = MAX_HISTORY_ROUNDS * 2
             if len(history) > max_entries:
                 history[:] = history[-max_entries:]
             try:
-                _save_chat_history(data_dir, history)
+                _persist_history(data_dir, history)
             except Exception:
                 pass  # 保存失败不阻塞响应
 
@@ -782,6 +845,7 @@ def api_coach_history():
     """返回已持久化的对话历史，供前端在加载/刷新/切换标签后重水合。"""
     data_dir = current_app.config["DATA_DIR"]
     history = _load_chat_history(data_dir)
+    _ensure_message_ids(history)
     return jsonify({"ok": True, "history": history})
 
 
@@ -804,3 +868,71 @@ def api_coach_profile_summary():
     # memory 模块按固定路径读写 data/profile_summary.json
     summary = memory.load_profile_summary()
     return jsonify({"ok": True, "summary": summary})
+
+
+# ============================================================
+# 周复盘闭环：教练对话入口 + API
+# ============================================================
+def _is_review_request(message):
+    """识别周复盘 / 周报 / 调整计划意图（快速关键词，避免每次都调 LLM）。
+
+    仅匹配明确指向"训练计划复盘"的表达；纯知识问题（如"配速要不要调整"）
+    不含"计划/复盘/周报"等词，不会误触发。
+    """
+    if not message:
+        return False
+    kw = ("复盘", "周报", "本周总结", "本周回顾", "训练复盘",
+          "调整计划", "调整我的计划", "调整当前计划",
+          "调整一下当前计划", "调整一下我的计划")
+    return any(k in message for k in kw)
+
+
+def _stream_weekly_review(data_dir):
+    """流式返回周复盘报告（确定性，不依赖 LLM，离线可用）。"""
+    full_reply = []
+
+    def gen():
+        nonlocal full_reply
+        try:
+            report = weekly_review.build_review_report(data_dir)
+            text = report.get("report_text", "")
+            pieces = re.split(r'(?<=[。！？\n])', text)
+            for c in pieces:
+                if c:
+                    full_reply.append(c)
+                    yield f"data: {json.dumps({'chunk': c})}\n\n"
+            yield f"data: {json.dumps({'review_data': report})}\n\n"
+        except Exception as e:
+            err = f"\n⚠️ 复盘失败：{type(e).__name__}: {e}"
+            full_reply.append(err)
+            yield f"data: {json.dumps({'chunk': err})}\n\n"
+        finally:
+            now = datetime.now().isoformat()
+            history = _load_chat_history(data_dir)
+            history.append({"role": "user", "content": "（请求本周训练复盘）", "time": now})
+            history.append({"role": "assistant", "content": "".join(full_reply), "time": now})
+            max_entries = MAX_HISTORY_ROUNDS * 2
+            if len(history) > max_entries:
+                history[:] = history[-max_entries:]
+            try:
+                _persist_history(data_dir, history)
+            except Exception:
+                pass
+            yield "data: [DONE]\n\n"
+
+    return Response(
+        stream_with_context(gen()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@coach_bp.route("/api/coach/weekly-review", methods=["GET"])
+def api_coach_weekly_review():
+    """返回确定性周复盘报告（JSON）。不依赖 LLM，可离线调用。"""
+    data_dir = current_app.config["DATA_DIR"]
+    try:
+        report = weekly_review.build_review_report(data_dir)
+        return jsonify({"ok": True, **report})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
