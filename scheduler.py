@@ -8,6 +8,7 @@
 同步失败（如网络不通 / 令牌失效 / 沙箱限流）仅记日志，绝不阻断应用启动或页面访问。
 """
 import logging
+import os
 from apscheduler.schedulers.background import BackgroundScheduler
 
 import garmin_sync
@@ -20,9 +21,28 @@ SYNC_COUNT = 6                   # 每次拉取的跑步活动数
 _scheduler = BackgroundScheduler(timezone="Asia/Shanghai")
 
 
+def _has_local_session():
+    """判断本地是否已存在可复用的 Garmin 会话（浏览器 Cookie 或 garth 令牌）。"""
+    base = os.path.dirname(os.path.abspath(__file__))
+    cookie_path = os.path.join(base, "data", ".garmin_browser_cookies.json")
+    if os.path.isfile(cookie_path) and os.path.getsize(cookie_path) > 0:
+        return True
+    garth_home = os.getenv(
+        "GARTH_HOME", os.path.join(base, "data", ".garth")
+    )
+    if os.path.isdir(garth_home) and os.listdir(garth_home):
+        return True
+    return False
+
+
 def run_sync_once():
     """执行一次同步。所有异常内部消化，绝不影响调用方。"""
     try:
+        # 无本地会话时跳过自动同步，避免无谓的 Garmin 登录尝试（可能触发风控）；
+        # 首次需用户在本机（有显示器）通过“登录 Garmin”完成一次 MFA 验证。
+        if not _has_local_session():
+            logger.info("无本地 Garmin 会话，跳过启动自动同步（请先在本机完成一次登录）")
+            return []
         files = garmin_sync.pull_recent_runs(count=SYNC_COUNT, fmt="tcx")
         garmin_sync.record_sync_success(files, source="auto")
         # 同步成功可能带来新文件，必须让跑者画像缓存失效，否则页面读到旧数据
@@ -34,7 +54,8 @@ def run_sync_once():
         logger.info("Garmin 自动同步完成：新增/更新 %d 个运动文件", len(files))
         return files
     except Exception as e:
-        garmin_sync.record_sync_failure(str(e), source="auto")
+        # 启动时的自动同步失败不写 sync_state，避免首页一打开就显示红条；
+        # 错误仍记日志，手动点击“立即同步”时仍会把失败写入 sync_state。
         logger.warning("Garmin 自动同步跳过（不影响应用）：%s", e)
         return []
 

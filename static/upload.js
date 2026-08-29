@@ -176,7 +176,7 @@
     const loginBtn = document.getElementById('sync-login-btn');
     if (!text) return;
     if (loginBtn) loginBtn.disabled = true;
-    text.textContent = '正在打开浏览器登录 Garmin（请在弹出的窗口完成登录/MFA）…';
+    text.textContent = '正在调用系统默认浏览器并复用其日常 profile 登录 Garmin（请在弹出的窗口完成登录/MFA）…';
     try {
       const resp = await fetch('/api/data/garmin_login', { method: 'POST' });
       const data = await resp.json();
@@ -215,17 +215,29 @@
         if (bar) bar.style.borderColor = data.fresh
           ? 'var(--rc-success, #2ecc71)' : 'var(--rc-border, #2a3342)';
       } else if (result === 'failed') {
-        text.textContent = '上次同步失败：' + (state.error || '未知错误') +
-          '（可点“立即同步”重试，或手动上传文件）';
-        if (bar) bar.style.borderColor = 'var(--rc-danger, #e74c3c)';
-        if (/登录|令牌|token|playwright|mfa|验证|未配置/i.test(state.error || '')) {
+        const err = state.error || '';
+        // 区分根因：两步验证（MFA）需用户在本机用可见浏览器完成一次验证
+        const isMfa = /两步验证|mfa|验证码|verification|one-time|authenticator|无头模式/i.test(err);
+        const isKnownIssue = /DI-OAuth2|Garmin Connect 登录失败|登录|令牌|token|playwright|验证|未配置/i.test(err);
+        if (isMfa) {
+          text.textContent = 'Garmin 账号需在本机浏览器完成一次验证（将自动使用你系统的默认浏览器，如 Edge）。点击“登录 Garmin”后，请在弹出的窗口输入账号/MFA，之后即可自动同步；或手动上传运动文件。';
+          if (bar) bar.style.borderColor = 'var(--rc-warning, #f39c12)';
+          showLoginBtn();
+        } else if (isKnownIssue) {
+          text.textContent = 'Garmin 官方登录接口当前暂不可用，建议手动上传运动文件（或稍后再试）';
+          if (bar) bar.style.borderColor = 'var(--rc-warning, #f39c12)';
+        } else {
+          text.textContent = '上次同步失败：' + err + '（可点“立即同步”重试，或手动上传文件）';
+          if (bar) bar.style.borderColor = 'var(--rc-danger, #e74c3c)';
+        }
+        if (/登录|令牌|token|playwright|mfa|验证|未配置/i.test(err)) {
           showLoginBtn();
         }
       } else {
         text.textContent = '尚未同步过 Garmin，点击下方“立即同步”拉取最新数据';
       }
-      // 不新鲜（超过 30 分钟或从未成功）→ 打开即自动同步一次
-      if (!data.fresh) {
+      // 仅在非失败状态下自动同步一次；失败后自动重试只会反复报错，影响体验
+      if (!data.fresh && result !== 'failed') {
         syncGarmin('auto');
       }
     } catch (e) {

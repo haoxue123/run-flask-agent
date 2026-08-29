@@ -188,7 +188,16 @@ def pull_recent_runs(count=5, output_dir=None, fmt="tcx"):
                 count=count, output_dir=output_dir, fmt=fmt, headless=True
             )
     except Exception as e:  # noqa: BLE001
-        logger.warning("浏览器引擎同步失败，回退 garth：%s", e)
+        # 浏览器引擎已是绕过 Cloudflare 的正确路径，其报错（MFA/凭据）已足够清晰，
+        # 不要再误导性地回退到已被 Garmin 封禁的 garth HTTP OAuth 路径。
+        # 仅当本地已存有 garth 持久化令牌时才回退（resume 可免登录恢复会话）。
+        garth_token_dir = os.getenv("GARTH_HOME", DEFAULT_GARTH_HOME)
+        has_garth_token = os.path.isdir(garth_token_dir) and bool(os.listdir(garth_token_dir))
+        if has_garth_token:
+            logger.warning("浏览器引擎同步失败，尝试用本地 garth 令牌恢复：%s", e)
+        else:
+            logger.error("浏览器引擎同步失败（Garmin 账号需两步验证或凭据有误）：%s", e)
+            raise RuntimeError(str(e)) from e
 
     garth = _get_garth()
 

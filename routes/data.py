@@ -3,6 +3,7 @@ import os
 import json
 import logging
 from datetime import datetime, timedelta
+from typing import Optional
 from flask import Blueprint, request, jsonify, current_app
 
 import data_tool
@@ -27,8 +28,9 @@ def _save_uploaded_files(files, upload_dir, timestamp=None):
     for f in files:
         if f and f.filename and _allowed_file(f.filename):
             safe_name = f"{timestamp}_{f.filename}"
-            f.save(os.path.join(upload_dir, safe_name))
-            saved.append(safe_name)
+            full_path = os.path.join(upload_dir, safe_name)
+            f.save(full_path)
+            saved.append(full_path)
     return saved
 
 
@@ -41,12 +43,16 @@ def _write_manual_input(form, data_dir):
     manual_path = os.path.join(data_dir, "manual_input.json")
     existing_health = {}
     existing_fitness = {}
+    existing_recent = []
+    existing_race = {}
     if os.path.isfile(manual_path):
         try:
             with open(manual_path, "r", encoding="utf-8") as f:
                 existing_cfg = json.load(f)
             existing_health = existing_cfg.get("健康指标", {}) or {}
             existing_fitness = existing_cfg.get("体能指标", {}) or {}
+            existing_recent = existing_cfg.get("近期跑步数据", []) or []
+            existing_race = existing_cfg.get("近期比赛成绩", {}) or {}
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -57,7 +63,20 @@ def _write_manual_input(form, data_dir):
     run_hr = form.get("run_hr", "").strip()
     run_name = form.get("run_name", "").strip()
 
-    recent_runs = []
+    # 近期比赛成绩（用于推导 VDOT）：保留既有，仅当本次表单提供时更新
+    race_distance = form.get("race_distance", "").strip()
+    race_time = form.get("race_time", "").strip()
+    race = dict(existing_race) if existing_race else {}
+    if race_distance and race_time:
+        race_sec = _parse_duration_to_sec(race_time)
+        if race_sec:
+            try:
+                race = {"距离_km": float(race_distance), "时间_秒": race_sec}
+            except (ValueError, TypeError):
+                pass
+
+    # 追加而非覆盖：保留历史手动跑步，新记录排在末尾
+    recent_runs = list(existing_recent)
     if run_date and run_distance:
         run_entry = {
             "日期": run_date,
@@ -71,6 +90,7 @@ def _write_manual_input(form, data_dir):
 
     config = {
         "目标": {"目标完赛时间": target_time, "目标比赛": target_race, "目标距离": target_distance},
+        "近期比赛成绩": race if race else {},
         "近期跑步数据": recent_runs,
         "健康指标": existing_health,
         "体能指标": existing_fitness,
@@ -80,6 +100,24 @@ def _write_manual_input(form, data_dir):
         json.dump(config, f, ensure_ascii=False, indent=2)
 
     return config
+
+
+def _parse_duration_to_sec(value: str) -> Optional[float]:
+    """把时长字符串转为秒。支持 '40:00' / '40' / '1:20:00'。失败返回 None。"""
+    if not value:
+        return None
+    s = str(value).strip()
+    parts = [p for p in s.replace("'", ":").replace('"', ":").split(":") if p != ""]
+    try:
+        if len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+        if len(parts) == 2:
+            return int(parts[0]) * 60 + float(parts[1])
+        if len(parts) == 1:
+            return float(parts[0])
+    except (ValueError, TypeError):
+        return None
+    return None
 
 
 @data_bp.route("/api/data/refresh", methods=["POST"])
@@ -106,8 +144,9 @@ def api_data_refresh():
                 "error": f"仅支持 GPX/TCX/FIT/CSV 文件，不支持的文件：{', '.join(invalid_files)}",
             })
 
+        saved_paths = []
         if saved_files:
-            _save_uploaded_files(saved_files, upload_dir)
+            saved_paths = _save_uploaded_files(saved_files, upload_dir)
 
         has_manual = bool(request.form.get("run_date", "").strip() and
                          request.form.get("run_distance", "").strip())
@@ -122,8 +161,28 @@ def api_data_refresh():
                     "error": "请上传运动文件或填写手动数据",
                 })
 
+        # 解析本次上传的文件，给出"已摄入"反馈，让数据接入可见
+        ingested_runs = []
+        if saved_paths:
+            try:
+                for r in data_tool.get_recent_runs(files=saved_paths, limit=50):
+                    ingested_runs.append({
+                        "日期": r.get("日期"),
+                        "距离_km": r.get("距离_km"),
+                        "平均配速_秒每公里": r.get("平均配速_秒每公里"),
+                        "平均心率": r.get("平均心率"),
+                    })
+            except Exception:
+                pass
+
         data_tool.invalidate_profile_cache()
-        return jsonify({"success": True, "message": "数据已更新，请查看数据总览"})
+        return jsonify({
+            "success": True,
+            "message": "数据已更新",
+            "ingested_count": len(ingested_runs),
+            "ingested_runs": ingested_runs,
+            "manual_added": has_manual,
+        })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
@@ -185,6 +244,19 @@ def api_data_profile():
         run_count = len(recent_30)
         weekly_frequency = round(run_count / 30 * 7, 1) if run_count > 0 else 0
 
+        # VDOT：若用户填了近期比赛成绩，则推导有氧能力与配速表
+        import vdot as vdot_mod
+        vdot_val = None
+        vdot_paces = None
+        try:
+            race = vdot_mod.read_recent_race_from_manual(data_dir)
+            vdot_val = vdot_mod.vdot_from_recent_race(race)
+            if vdot_val is not None:
+                dist = (race or {}).get("距离_km") or (race or {}).get("distance_km") or 10.0
+                vdot_paces = vdot_mod.vdot_training_paces(vdot_val, float(dist))
+        except Exception:
+            pass
+
         return jsonify({
             "ok": True,
             "recent_runs": recent_runs,
@@ -195,6 +267,8 @@ def api_data_profile():
             },
             "target_race": goal.get("目标比赛", "") or "",
             "target_time": goal.get("目标完赛时间", "") or "",
+            "vdot": vdot_val,
+            "vdot_paces": vdot_paces,
         })
     except Exception as e:
         return jsonify({
@@ -203,6 +277,60 @@ def api_data_profile():
             "stats": {"thirty_day_volume": 0, "avg_pace": 0, "weekly_frequency": 0},
             "target_race": "", "target_time": "",
         })
+
+
+@data_bp.route("/api/data/actuals", methods=["GET"])
+def api_data_actuals():
+    """返回汇聚后的实际执行数据（周复盘闭环的输入），让数据接入可视化、可验证。
+
+    数据来自 weekly_review.load_actuals：计划按天记录 + 上传解析 + 手动录入三源合并。
+    """
+    try:
+        import weekly_review
+        actuals = weekly_review.load_actuals(current_app.config["DATA_DIR"])
+        total_distance = round(sum((a.get("distance_km") or 0) for a in actuals), 1)
+        by_source = {}
+        for a in actuals:
+            src = a.get("source", "unknown")
+            by_source[src] = by_source.get(src, 0) + 1
+        return jsonify({
+            "ok": True,
+            "count": len(actuals),
+            "total_distance_km": total_distance,
+            "by_source": by_source,
+            "items": actuals,
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
+
+@data_bp.route("/api/data/vdot", methods=["GET"])
+def api_data_vdot():
+    """由近期比赛成绩推导 VDOT 与全强度区配速表。无比赛成绩返回 ok=False。"""
+    try:
+        import vdot as vdot_mod
+        data_dir = current_app.config["DATA_DIR"]
+        race = vdot_mod.read_recent_race_from_manual(data_dir)
+        vdot_val = vdot_mod.vdot_from_recent_race(race)
+        if vdot_val is None:
+            return jsonify({
+                "ok": False,
+                "error": "未配置近期比赛成绩。请在数据页填写「近期比赛：距离 + 时间」后重试。",
+                "vdot": None,
+                "paces": None,
+            })
+        dist = (race or {}).get("距离_km") or (race or {}).get("distance_km") or 10.0
+        paces = vdot_mod.vdot_training_paces(vdot_val, float(dist))
+        block = vdot_mod.format_vdot_block(vdot_val, float(dist))
+        return jsonify({
+            "ok": True,
+            "vdot": vdot_val,
+            "race": race,
+            "paces_sec": paces,
+            "block": block,
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
 
 
 @data_bp.route("/api/data/sync_garmin", methods=["POST"])

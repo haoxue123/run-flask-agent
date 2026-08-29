@@ -78,6 +78,9 @@ def _install_fake_playwright():
         def new_page(self):
             return FakePage()
 
+        def close(self):
+            pass
+
     class FakeBrowser:
         def new_context(self, **k):
             return FakeContext()
@@ -85,11 +88,17 @@ def _install_fake_playwright():
         def close(self):
             pass
 
+    class FakeChromium:
+        def launch(self, *a, **k):
+            return FakeBrowser()
+
+        def launch_persistent_context(self, *a, **k):
+            # 与真实 Playwright 一致：返回一个 context（而非 browser）
+            return FakeContext()
+
     class FakeP:
         def __init__(self):
-            self.chromium = type(
-                "C", (), {"launch": staticmethod(lambda *a, **k: FakeBrowser())}
-            )()
+            self.chromium = FakeChromium()
 
         def stop(self):
             pass
@@ -127,6 +136,10 @@ def test_engine_available_true_with_fake():
 
 
 def test_pull_recent_runs_browser_writes_files(tmp_out):
+    # 预置一个本地会话 Cookie，模拟"已登录过一次"：
+    # 这正是生产环境里自动同步的真实前提（无头模式不能首次登录/MFA）。
+    with open(garmin_browser.BROWSER_COOKIE_PATH, "w", encoding="utf-8") as f:
+        json.dump([{"name": "FAKE", "value": "x", "domain": "garmin.com"}], f)
     files = garmin_browser.pull_recent_runs_browser(
         count=2, output_dir=str(tmp_out), fmt="tcx", headless=True
     )
@@ -137,9 +150,10 @@ def test_pull_recent_runs_browser_writes_files(tmp_out):
 
 
 def test_cookie_persist_and_reuse(tmp_out):
-    # 第一次同步会登录并保存 Cookie
+    # 可见浏览器（headless=False）首次登录并保存 Cookie 的场景；
+    # 真实环境下这一步由用户点击"登录 Garmin"触发，此处用 mock 复现。
     garmin_browser.pull_recent_runs_browser(
-        count=1, output_dir=str(tmp_out), fmt="tcx", headless=True
+        count=1, output_dir=str(tmp_out), fmt="tcx", headless=False
     )
     assert os.path.isfile(garmin_browser.BROWSER_COOKIE_PATH)
     cookies = json.load(open(garmin_browser.BROWSER_COOKIE_PATH, encoding="utf-8"))

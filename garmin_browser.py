@@ -19,6 +19,7 @@
 """
 
 import os
+import re
 import json
 import logging
 import base64
@@ -55,8 +56,239 @@ def _domain():
     return "garmin.cn" if is_cn else "garmin.com"
 
 
+def _has_local_session():
+    """本地是否已有可用的 Garmin 会话（浏览器 Cookie 或 garth 令牌）。
+
+    无头模式无法交互输入两步验证（MFA）验证码，若本地也无会话可 resume，
+    自动登录必然卡死或失败。此函数用于在发起无头同步前快速判断，
+    避免前端「立即同步」在无会话环境下空等 60s。
+    """
+    if os.path.isfile(BROWSER_COOKIE_PATH) and os.path.getsize(BROWSER_COOKIE_PATH) > 0:
+        return True
+    garth_home = os.getenv("GARTH_HOME", os.path.join(DEFAULT_OUTPUT_DIR, ".garth"))
+    if os.path.isdir(garth_home) and bool(os.listdir(garth_home)):
+        return True
+    return False
+
+
+def _detect_default_browser():
+    """检测 Windows 系统默认浏览器，返回 (channel, executable_path)。
+
+    channel 用于 Playwright 官方支持通道（chrome/msedge）;
+    executable_path 用于其它 Chromium 内核浏览器（如 Tabbit、360 等）。
+    优先使用用户日常浏览器可降低 Garmin SSO 风控概率（已登录态、历史 Cookie、
+    扩展/指纹都更接近真实用户），也避免硬弹 Chrome 带来的突兀感。
+    """
+    try:
+        import winreg
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice",
+            0,
+            winreg.KEY_READ,
+        ) as key:
+            progid, _ = winreg.QueryValueEx(key, "ProgId")
+        progid = str(progid)
+        with winreg.OpenKey(
+            winreg.HKEY_CLASSES_ROOT,
+            f"{progid}\\shell\\open\\command",
+            0,
+            winreg.KEY_READ,
+        ) as key:
+            cmd, _ = winreg.QueryValueEx(key, None)
+        # 提取命令行中的第一个可执行文件路径（通常被双引号包裹）
+        m = re.search(r'"([^"]+\.exe)"', str(cmd), re.IGNORECASE)
+        if not m:
+            m = re.search(r'(\S+\.exe)', str(cmd), re.IGNORECASE)
+        if m:
+            exe = m.group(1)
+            base = os.path.basename(exe).lower()
+            if base in ("msedge.exe",):
+                return "msedge", None
+            if base in ("chrome.exe",):
+                return "chrome", None
+            # 其它可执行文件一律尝试用 executable_path 启动（需为 Chromium 内核）
+            return None, exe
+    except Exception as e:  # noqa: BLE001
+        logger.debug("检测系统默认浏览器失败：%s", e)
+    return None, None
+
+
+def _guess_user_data_dir(exe):
+    r"""根据浏览器可执行文件路径或名称猜测其 User Data 目录。
+
+    常见浏览器路径：
+        Chrome: %LOCALAPPDATA%\Google\Chrome\User Data
+        Edge:   %LOCALAPPDATA%\Microsoft\Edge\User Data
+        Tabbit: <exe 父目录的父目录>\User Data
+    """
+    if not exe:
+        return None
+    exe_lower = exe.lower()
+    local_appdata = os.path.expandvars("%LOCALAPPDATA%")
+    candidates = []
+    if "tabbit" in exe_lower:
+        # C:\Users\...\AppData\Local\Tabbit\Application\Tabbit Browser.exe
+        # -> C:\Users\...\AppData\Local\Tabbit\User Data
+        candidates.append(os.path.join(os.path.dirname(os.path.dirname(exe)), "User Data"))
+    elif "chrome" in exe_lower:
+        candidates.append(os.path.join(local_appdata, "Google", "Chrome", "User Data"))
+    elif "msedge" in exe_lower or "edge" in exe_lower:
+        candidates.append(os.path.join(local_appdata, "Microsoft", "Edge", "User Data"))
+    # 通用兜底：exe 所在目录的兄弟目录 User Data
+    candidates.append(os.path.join(os.path.dirname(os.path.dirname(exe)), "User Data"))
+    for c in candidates:
+        if os.path.isdir(c):
+            return c
+    return None
+
+
+def _copy_profile(source, dest, full_copy=False):
+    """复制浏览器 profile 中真正必要的文件到项目临时目录。
+
+    从第一性原理看，绕过 Garmin SSO 风控只需要：
+      - Cookies / Login Data（登录态、保存的密码）
+      - Local Storage / Session Storage（站点本地数据）
+      - Preferences / Secure Preferences（浏览器设置、证书等）
+      - Network / TransportSecurity（TLS 状态）
+    不需要复制整个 profile（Cache、GPUCache、Code Cache、Service Worker、
+    IndexedDB、扩展二进制等可能占 1GB+）。
+
+    参数：
+        full_copy: 若精简复制仍被风控，可设 .env GARMIN_BROWSER_FULL_PROFILE_COPY=1
+                   回退到完整复制。
+    """
+    import shutil
+
+    # 顶层必须文件（体积很小）
+    top_files = {
+        "Local State",
+        "Last Version",
+        "First Run",
+    }
+    # Default profile 下必须文件/目录
+    default_whitelist = {
+        "Cookies",
+        "Cookies-journal",
+        "Login Data",
+        "Login Data-journal",
+        "Local Storage",
+        "Session Storage",
+        "Preferences",
+        "Secure Preferences",
+        "Network",
+        "TransportSecurity",
+        "Extension State",
+        "Affiliation Database",
+        "Affiliation Database-journal",
+        "History",
+        "History-journal",
+        "Visited Links",
+        "Top Sites",
+        "Shortcuts",
+        "Bookmarks",
+        "Favicons",
+        "Favicons-journal",
+    }
+    # 无论 full_copy 如何都跳过的大体积/无意义目录
+    always_skip_dirs = {
+        "Cache",
+        "Code Cache",
+        "GPUCache",
+        "blob_storage",
+        "Service Worker",
+        "IndexedDB",
+        "databases",
+        "File System",
+        "Webrtc Video Stats",
+        "optimization_guide_model_and_features_store",
+        "optimization_guide_prediction_model_download_store",
+        "hyphen-data",
+        "pnacl",
+        "MEIPreload",
+        "BrowserMetrics",
+        "Crashpad",
+        "default_partner_content",
+        "GrShaderCache",
+        "ShaderCache",
+        "OnDeviceHeadSuggestModel",
+        "Subresource Filter",
+        "Web Applications",
+        "Session Storage" if full_copy else "",  # Session Storage 通常很小，保留
+    }
+    always_skip_dirs.discard("")
+
+    os.makedirs(dest, exist_ok=True)
+    copied = updated = skipped = 0
+
+    for root, dirs, files in os.walk(source):
+        rel = os.path.relpath(root, source)
+        rel_parts = rel.split(os.sep)
+        current_dir = rel_parts[-1] if rel_parts else ""
+        parent_dir = rel_parts[-2] if len(rel_parts) >= 2 else ""
+
+        # 跳过黑名单目录
+        dirs[:] = [d for d in dirs if d not in always_skip_dirs]
+
+        # 决定当前目录是否复制
+        should_copy = full_copy
+        if not should_copy:
+            if rel in (".", ""):
+                should_copy = True  # User Data 顶层，只复制白名单文件
+            elif rel.lower() == "default":
+                should_copy = True  # Default profile 目录
+            elif parent_dir.lower() == "default" and current_dir in default_whitelist:
+                should_copy = True
+            elif current_dir == "Local Storage" and parent_dir.lower() == "default":
+                should_copy = True
+            elif current_dir == "Session Storage" and parent_dir.lower() == "default":
+                should_copy = True
+            elif current_dir == "Network" and parent_dir.lower() == "default":
+                should_copy = True
+
+        if not should_copy:
+            continue
+
+        dst_dir = os.path.join(dest, rel) if rel not in (".", "") else dest
+        os.makedirs(dst_dir, exist_ok=True)
+
+        for f in files:
+            # 顶层只复制白名单
+            if rel in (".", "") and f not in top_files and not full_copy:
+                continue
+            # Default profile 下只复制白名单
+            if rel.lower() == "default" and f not in default_whitelist and not full_copy:
+                continue
+
+            src_file = os.path.join(root, f)
+            dst_file = os.path.join(dst_dir, f)
+            try:
+                if os.path.exists(dst_file):
+                    if (
+                        os.path.getmtime(src_file) > os.path.getmtime(dst_file)
+                        or os.path.getsize(src_file) != os.path.getsize(dst_file)
+                    ):
+                        shutil.copy2(src_file, dst_file, follow_symlinks=False)
+                        updated += 1
+                else:
+                    shutil.copy2(src_file, dst_file, follow_symlinks=False)
+                    copied += 1
+            except Exception:  # noqa: BLE001
+                skipped += 1
+
+    mode = "完整" if full_copy else "精简"
+    logger.info("已%s复制浏览器 profile：新增 %d，更新 %d，跳过 %d", mode, copied, updated, skipped)
+    return dest
+
+
 def _launch(headless):
-    """启动浏览器。优先用本机已装 Chrome（省去下载 chromium）。"""
+    r"""启动浏览器。优先使用系统默认浏览器并复用其日常 profile，可 .env 强制指定。
+
+    环境变量：
+        GARMIN_BROWSER_CHANNEL=msedge|chrome|chromium
+        GARMIN_BROWSER_EXECUTABLE=C:\Path\To\Browser.exe
+        GARMIN_BROWSER_USER_DATA_DIR=C:\Users\...\User Data
+    """
     from playwright.sync_api import sync_playwright
 
     p = sync_playwright().start()
@@ -64,31 +296,97 @@ def _launch(headless):
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
     )
-    context = None
+
+    # 1) .env 强制指定；2) 检测系统默认浏览器；3) 兜底 chrome -> msedge -> chromium
+    configured_channel = (os.getenv("GARMIN_BROWSER_CHANNEL") or "").strip().lower() or None
+    configured_exe = (os.getenv("GARMIN_BROWSER_EXECUTABLE") or "").strip() or None
+    configured_user_data = (os.getenv("GARMIN_BROWSER_USER_DATA_DIR") or "").strip() or None
+    default_channel, default_exe = _detect_default_browser()
+
+    # 构建候选启动列表（每个元素：type, value, name）
+    raw_attempts = []
+    if configured_exe:
+        raw_attempts.append(("exe", configured_exe, f".env executable ({configured_exe})"))
+    if configured_channel:
+        raw_attempts.append(("channel", configured_channel, f".env channel ({configured_channel})"))
+    if default_exe:
+        raw_attempts.append(("exe", default_exe, f"系统默认浏览器 ({default_exe})"))
+    if default_channel and default_channel != configured_channel:
+        raw_attempts.append(("channel", default_channel, f"系统默认 channel ({default_channel})"))
+    for fallback in ("chrome", "msedge"):
+        if fallback not in {configured_channel, default_channel}:
+            raw_attempts.append(("channel", fallback, f"兜底 {fallback}"))
+
     browser = None
-    try:
-        # 先尝试本机 Chrome（用户机器上通常已装）
-        browser = p.chromium.launch(
-            channel="chrome",
-            headless=headless,
-            args=["--no-first-run", "--no-default-browser-check", "--disable-blink-features=AutomationControlled"],
+    context = None
+    is_persistent = False
+    last_err = None
+    for kind, value, name in raw_attempts:
+        try:
+            logger.info("尝试启动浏览器：%s (headless=%s)", name, headless)
+            kwargs = {
+                "headless": headless,
+                "args": [
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                    "--disable-blink-features=AutomationControlled",
+                ],
+            }
+            exe = value if kind == "exe" else None
+            channel = value if kind == "channel" else None
+            if exe:
+                kwargs["executable_path"] = exe
+            else:
+                kwargs["channel"] = channel
+
+            # 可见模式下，尝试复用浏览器日常 profile（这是绕过 Garmin 风控的关键）
+            user_data_dir = None
+            if not headless:
+                user_data_dir = configured_user_data or _guess_user_data_dir(exe or value)
+            if user_data_dir and os.path.isdir(user_data_dir):
+                clone_dir = os.path.join(DEFAULT_OUTPUT_DIR, ".garmin_browser_profile_clone")
+                full_copy = os.getenv("GARMIN_BROWSER_FULL_PROFILE_COPY", "").strip().lower() in ("1", "true", "yes")
+                try:
+                    _copy_profile(user_data_dir, clone_dir, full_copy=full_copy)
+                except Exception as e:  # noqa: BLE001
+                    logger.warning("复制浏览器 profile 失败（将尝试不复制启动）：%s", e)
+                    clone_dir = user_data_dir
+                context = p.chromium.launch_persistent_context(
+                    clone_dir,
+                    **kwargs,
+                    user_agent=ua,
+                    locale="zh-CN",
+                    viewport={"width": 1280, "height": 900},
+                )
+                is_persistent = True
+                logger.info("浏览器启动成功（persistent context 复用 profile）：%s", name)
+                break
+
+            browser = p.chromium.launch(**kwargs)
+            context = browser.new_context(
+                user_agent=ua,
+                locale="zh-CN",
+                viewport={"width": 1280, "height": 900},
+            )
+            is_persistent = False
+            logger.info("浏览器启动成功：%s", name)
+            break
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            logger.info("启动 %s 失败：%s", name, e)
+
+    if context is None:
+        names = [name for _, _, name in raw_attempts]
+        raise RuntimeError(
+            f"无法启动任何本机浏览器（已尝试 {names}）。"
+            f"请确认已安装 Chrome/Edge/Tabbit 或设置 .env GARMIN_BROWSER_*。原始错误：{last_err}"
         )
-    except Exception as e:
-        logger.info("未找到本机 Chrome，回退到 Playwright 自带 Chromium：%s", e)
-        browser = p.chromium.launch(
-            headless=headless,
-            args=["--no-first-run", "--disable-blink-features=AutomationControlled"],
-        )
-    context = browser.new_context(
-        user_agent=ua,
-        locale="zh-CN",
-        viewport={"width": 1280, "height": 900},
-    )
-    # 去掉 webdriver 痕迹
+
+    # 去掉 webdriver 痕迹（对 new_context 和 persistent_context 都有效）
     context.add_init_script(
         "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
     )
-    return p, browser, context
+    return p, browser, context, is_persistent
 
 
 def _save_cookies(context):
@@ -145,6 +443,36 @@ def _safe_text(el):
         return ""
 
 
+def _detect_mfa(page, url):
+    """鲁棒检测 Garmin 两步验证（MFA）页面，兼容中英文与不同字段命名。
+
+    返回 True 表示当前处于 MFA 验证步骤（需要人工输入验证码）。
+    """
+    if not url:
+        url = ""
+    if "mfa" in url.lower() or "verify" in url.lower() or "otp" in url.lower():
+        return True
+    try:
+        for sel in (
+            'input[name*="mfa" i]', 'input[name*="otp" i]', 'input[name*="code" i]',
+            'input[id*="mfa" i]', 'input[id*="otp" i]', 'input[id*="code" i]',
+        ):
+            if page.query_selector(sel):
+                return True
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        txt = page.evaluate("() => document.body ? document.body.innerText : ''") or ""
+    except Exception:  # noqa: BLE001
+        txt = ""
+    if txt:
+        for kw in ("验证码", "两步验证", "动态码", "安全码", "手机验证码",
+                   "verification code", "one-time", "2-step", "two-step", "authenticator"):
+            if kw.lower() in txt.lower():
+                return True
+    return False
+
+
 def browser_login(headless=False, timeout=300):
     """
     启动（可见）浏览器完成 Garmin 登录，并把 Cookie 持久化。
@@ -158,18 +486,25 @@ def browser_login(headless=False, timeout=300):
         )
     domain = "garmin.cn" if is_cn else "garmin.com"
 
-    p, browser, context = _launch(headless=headless)
+    p, browser, context, is_persistent = _launch(headless=headless)
     try:
         page = context.new_page()
         sso = f"https://sso.{domain}/sso/signin"
         logger.info("打开 Garmin 登录页：%s", sso)
-        page.goto(sso, wait_until="domcontentloaded", timeout=60000)
-
-        # 填表（兼容 garmin.cn / garmin.com 的表单字段名）
-        page.wait_for_selector('input[name="username"]', timeout=30000)
-        page.fill('input[name="username"]', username)
-        page.fill('input[name="password"]', password)
-        page.click('button[type="submit"]')
+        # 填表（兼容 garmin.cn / garmin.com 的表单字段名）。
+        # 这一步若因网络不可达 / 表单字段变更而失败，必须转为清晰报错，
+        # 而不是把原始 TimeoutError 抛成 500，更不能在无界面环境里空等。
+        try:
+            page.goto(sso, wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_selector('input[name="username"]', timeout=30000)
+            page.fill('input[name="username"]', username)
+            page.fill('input[name="password"]', password)
+            page.click('button[type="submit"]')
+        except Exception as e:  # noqa: BLE001
+            raise RuntimeError(
+                f"无法打开 Garmin 登录页或填写凭据（请确认网络可访问 sso.{domain}，"
+                f"且账号密码正确）：{e}"
+            ) from e
         # 提交后 SSO 会跳转，等首屏稳定再开始轮询，避免立即查元素撞上导航
         try:
             page.wait_for_load_state("domcontentloaded", timeout=15000)
@@ -185,8 +520,17 @@ def browser_login(headless=False, timeout=300):
                     _save_cookies(context)
                     logger.info("浏览器登录成功，Cookie 已保存")
                     return True
-                # MFA：用户需在弹出的浏览器里输入验证码，这里只等待
-                if "verifyMFA" in url or _safe_query(page, 'input[name="mfa-code"]'):
+                # MFA：无头模式无法输入验证码，必须明确报错引导用户用可见浏览器；
+                # 可见模式则等待用户在弹出的浏览器里输入验证码。
+                if _detect_mfa(page, url):
+                    if headless:
+                        raise RuntimeError(
+                            "检测到两步验证（MFA）。无头模式无法自动输入验证码。\n"
+                            "请在本机（有显示器）运行：\n"
+                            "  python -c \"import garmin_browser; garmin_browser.browser_login(headless=False)\"\n"
+                            "完成一次登录后，会话 Cookie 会自动保存到 "
+                            "data/.garmin_browser_cookies.json，之后自动同步可复用，无需再次输入。"
+                        )
                     logger.info("检测到两步验证，请在浏览器窗口中输入验证码…")
                     time.sleep(3)
                     continue
@@ -205,7 +549,10 @@ def browser_login(headless=False, timeout=300):
 
         raise RuntimeError("浏览器登录超时（MFA 未输入或登录未完成）")
     finally:
-        browser.close()
+        if context:
+            context.close()
+        if browser:
+            browser.close()
         p.stop()
 
 
@@ -220,11 +567,21 @@ def pull_recent_runs_browser(count=5, output_dir=None, fmt="tcx", headless=True)
         output_dir = DEFAULT_OUTPUT_DIR
     os.makedirs(output_dir, exist_ok=True)
 
+    # 无头模式 + 本地无会话：必然卡在 MFA 或网络，直接给出清晰指引，
+    # 避免前端「立即同步」空等整整 60s（page.goto 默认超时）。
+    if headless and not _has_local_session():
+        raise RuntimeError(
+            "本地尚无 Garmin 会话，无法在无头模式下自动登录"
+            "（账号开启两步验证时更需人工输入验证码）。\n"
+            "请先在本机（有显示器）点击「登录 Garmin」按钮，或访问 POST /api/data/garmin_login "
+            "完成一次可见浏览器登录；登录成功后会话会自动保存，之后自动同步即可复用，无需再次输入。"
+        )
+
     username, password, is_cn = _get_credentials()
     domain = "garmin.cn" if is_cn else "garmin.com"
     api_base = f"https://connectapi.{domain}"
 
-    p, browser, context = _launch(headless=headless)
+    p, browser, context, is_persistent = _launch(headless=headless)
     try:
         # 1) 复用已保存 Cookie，必要时重新登录
         if _load_cookies(context):
@@ -301,18 +658,26 @@ def pull_recent_runs_browser(count=5, output_dir=None, fmt="tcx", headless=True)
 
         return downloaded
     finally:
-        browser.close()
+        if context:
+            context.close()
+        if browser:
+            browser.close()
         p.stop()
 
 
 def _do_login(page, username, password, domain, timeout=300):
     """内部登录流程（被 pull_recent_runs_browser 复用，headless 时若遇 MFA 会抛错）。"""
     sso = f"https://sso.{domain}/sso/signin"
-    page.goto(sso, wait_until="domcontentloaded", timeout=60000)
-    page.wait_for_selector('input[name="username"]', timeout=30000)
-    page.fill('input[name="username"]', username)
-    page.fill('input[name="password"]', password)
-    page.click('button[type="submit"]')
+    try:
+        page.goto(sso, wait_until="domcontentloaded", timeout=30000)
+        page.wait_for_selector('input[name="username"]', timeout=30000)
+        page.fill('input[name="username"]', username)
+        page.fill('input[name="password"]', password)
+        page.click('button[type="submit"]')
+    except Exception as e:  # noqa: BLE001
+        raise RuntimeError(
+            f"浏览器登录页加载/填写失败（网络不可达或登录表单字段变更）：{e}"
+        ) from e
     try:
         page.wait_for_load_state("domcontentloaded", timeout=15000)
     except Exception:  # noqa: BLE001
@@ -324,11 +689,12 @@ def _do_login(page, username, password, domain, timeout=300):
             url = page.url
             if "connect.garmin" in url or _session_valid(page, domain):
                 return True
-            if "verifyMFA" in url or _safe_query(page, 'input[name="mfa-code"]'):
+            if _detect_mfa(page, url):
                 # 无头模式下无法交互输入 MFA → 抛错，提示改用可见浏览器登录
                 raise RuntimeError(
-                    "检测到两步验证，但当前为无头模式无法输入验证码。"
-                    "请调用 /api/data/garmin_login（可见浏览器）完成登录。"
+                    "检测到两步验证（MFA），但当前为无头模式无法输入验证码。"
+                    "请调用 /api/data/garmin_login（可见浏览器）或在本机运行 "
+                    "python -c \"import garmin_browser; garmin_browser.browser_login(headless=False)\" 完成登录。"
                 )
             err = _safe_query(page, ".error-text, .alert-error, [class*='error']")
             if err:

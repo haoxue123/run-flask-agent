@@ -628,6 +628,35 @@ def self_check_instructions(user_instructions, structured):
             "self_check_error": "bad_json"}
 
 
+def build_vdot_anchor(runner_profile):
+    """从跑者画像提取 VDOT 并渲染"配速锚点"文本，供计划生成的 prompt 使用。
+
+    第一性原理：计划里的配速应由跑者真实比赛成绩推导（VDOT），而非 LLM 凭记忆"编"。
+    无比赛成绩或推导失败时返回空串；任何异常均静默吞掉，绝不阻断计划生成。
+    """
+    try:
+        from vdot import vdot_from_profile, format_vdot_block
+    except Exception:
+        return ""
+    try:
+        v = vdot_from_profile(runner_profile)
+        if not v:
+            return ""
+        block = format_vdot_block(v)
+        return (
+            f"\n【VDOT 配速锚点 · 必须遵循】\n{block}\n"
+            "请将上述 VDOT 配速作为对应训练类型的目标配速锚点：\n"
+            "  - 间歇跑 / 重复跑 → I 区（最快）\n"
+            "  - 节奏跑 → T 区\n"
+            "  - 马拉松配速跑 → M 区\n"
+            "  - 轻松跑 / 长距离慢跑(LSD) / 恢复跑 → E 区\n"
+            "除非用户在【用户明确指令】中另有明确要求，否则各训练类型的目标配速"
+            "须落在其对应区间内。\n"
+        )
+    except Exception:
+        return ""
+
+
 def generate_training_plan(runner_profile, plan_duration=7, user_instructions="", self_check=True):
     """
     根据跑者画像生成训练计划。
@@ -700,6 +729,10 @@ def generate_training_plan(runner_profile, plan_duration=7, user_instructions=""
         )
     if constraints.get("constraint_text"):
         user_prompt += f"\n{constraints['constraint_text']}\n"
+    # Phase 2.5：VDOT 配速锚点（仅当画像含近期比赛成绩时生效，失败静默跳过）
+    vdot_anchor = build_vdot_anchor(runner_profile)
+    if vdot_anchor:
+        user_prompt += vdot_anchor
     # Phase 3：要求 LLM 以结构化 JSON 对象返回（与 _parse_plan_full 的 JSON 分支对齐）
     json_format_instruction = (
         "\n\n【输出格式要求】请严格以单个 JSON 对象返回，不要包含任何额外说明文字。结构如下：\n"
