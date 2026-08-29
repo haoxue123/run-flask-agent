@@ -25,6 +25,8 @@ from __future__ import annotations
 import math
 from typing import Iterable, List, Optional, Tuple
 
+import vdot as _vdot
+
 
 # ============================================================
 # 常量（集中定义，便于校准与审计）
@@ -323,6 +325,72 @@ def target_pace_for_type(threshold_pace_sec: Optional[int],
         return None
     # 配速 ∝ 1/速度；阈值配速(秒) / 速度百分比 = 目标配速(秒)
     return int(round(threshold_pace_sec / frac))
+
+
+# ============================================================
+# Daniels VDOT 接入：比赛成绩 → 全强度区配速
+# ============================================================
+
+# 训练类型关键字 → VDOT 强度区（与 _vdot.ZONE_VO2MAX_PCT 对齐）
+_WORKOUT_TO_ZONE = [
+    (("恢复", "恢复跑"), "E"),
+    (("轻松", "慢跑", "长距离", "lsd"), "E"),
+    (("马拉松", "马拉松配速"), "M"),
+    (("节奏", "阈值"), "T"),
+    (("间歇",), "I"),
+    (("比赛", "比赛配速"), "I"),
+    (("冲刺",), "R"),
+]
+
+
+def zone_for_workout_type(workout_type: Optional[str]) -> Optional[str]:
+    """把训练类型映射到 VDOT 强度区（E/M/T/I/R）。无法识别返回 None。"""
+    if not workout_type:
+        return None
+    t = workout_type.strip().lower()
+    for keys, zone in _WORKOUT_TO_ZONE:
+        for k in keys:
+            if k in t:
+                return zone
+    return None
+
+
+def target_pace_for_type_vdot(vdot: Optional[float],
+                              workout_type: Optional[str],
+                              distance_km: float = 10.0) -> Optional[int]:
+    """由 VDOT 推导某训练类型的建议配速（秒/公里）。
+
+    流程：训练类型 → 强度区 → vdot_training_paces 中该区配速。
+    E 区为范围，取慢端作为保守建议。
+    无 VDOT 或类型无法识别返回 None（调用方回退到 target_pace_for_type）。
+    """
+    if vdot is None or not workout_type:
+        return None
+    zone = zone_for_workout_type(workout_type)
+    if zone is None:
+        return None
+    paces = _vdot.vdot_training_paces(vdot, distance_km)
+    if not paces:
+        return None
+    p = paces.get(zone)
+    if isinstance(p, list):
+        return int(round(p[0]))
+    return int(round(p))
+
+
+def vdot_block_from_profile(profile: Optional[dict]) -> Optional[str]:
+    """从跑者画像(含近期比赛成绩)生成 VDOT 配速文本块，供教练/计划上下文。无则返回 None。"""
+    if not profile:
+        return None
+    v = _vdot.vdot_from_profile(profile)
+    if v is None:
+        return None
+    race = (profile.get("近期比赛成绩") or profile.get("race_result")) or {}
+    dist = (race or {}).get("距离_km") or (race or {}).get("distance_km") or 10.0
+    try:
+        return _vdot.format_vdot_block(v, float(dist))
+    except (ValueError, TypeError):
+        return None
 
 
 # ============================================================
