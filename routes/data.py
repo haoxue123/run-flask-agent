@@ -2,6 +2,8 @@
 import os
 import json
 import logging
+import threading
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 from flask import Blueprint, request, jsonify, current_app
@@ -13,6 +15,37 @@ data_bp = Blueprint("data", __name__)
 logger = logging.getLogger(__name__)
 
 ALLOWED_EXTS = {".gpx", ".tcx", ".fit", ".csv"}
+
+# ============================================================
+# 书签一键同步的实时进度状态（线程安全）
+# 书签脚本把活动压缩包 POST 过来后，服务端在后台线程里解包 + 刷新画像，
+# 期间持续更新 _SYNC_PROGRESS；前端卡片每 1s 轮询 /api/data/garmin_sync_progress。
+# ============================================================
+_SYNC_LOCK = threading.Lock()
+_SYNC_PROGRESS = {
+    "status": "idle",          # idle | running | success | failed
+    "task_id": "",
+    "stage": "",               # 当前阶段中文描述
+    "stage_detail": "",        # 阶段补充信息
+    "processed": 0,            # 已处理压缩包数
+    "total": 0,                # 总压缩包数
+    "extracted_fit": 0,        # 已解出的 .fit 数
+    "started_at": None,        # ISO 字符串
+    "finished_at": None,       # ISO 字符串
+    "message": "",             # 完成/失败摘要
+    "error": "",
+    "profile_summary": {},     # 画像摘要（完成后填充）
+}
+
+
+def _set_progress(**kw):
+    with _SYNC_LOCK:
+        _SYNC_PROGRESS.update(kw)
+
+
+def _get_progress():
+    with _SYNC_LOCK:
+        return dict(_SYNC_PROGRESS)
 
 
 def _allowed_file(filename):
@@ -414,3 +447,179 @@ def api_sync_status():
         })
     except Exception as e:
         return jsonify({"ok": False, "error": str(e), "state": {}, "fresh": False})
+
+
+@data_bp.route("/api/data/garmin_ingest", methods=["POST", "OPTIONS"])
+def api_garmin_ingest():
+    """
+    一键同步入口：接收从 Garmin Connect 网页书签脚本 POST 来的活动压缩包
+    （Garmin 下载端点返回的外层 zip，内部每个活动又是一个 zip）。
+
+    流程：存 inbox → extract_garmin_fit 解包为原始 .fit → 刷新跑者画像缓存。
+    书签脚本在用户已登录的 Garmin 会话里运行，绕过 Cloudflare 风控与 2FA，
+    因此本端点只负责「接收 + 解包 + 刷新」，不做身份验证。
+
+    CORS：书签从 https://connect.garmin.cn 跨域 POST 到本地 Agent，
+    必须放行 Origin，否则浏览器拦截响应。
+    """
+    # 预检（multipart 属简单请求，但兜底处理 OPTIONS 以防部分浏览器触发）
+    if request.method == "OPTIONS":
+        resp = jsonify({})
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        return resp, 200
+
+    try:
+        activities_dir = os.path.join(garmin_sync.DEFAULT_OUTPUT_DIR, "activities")
+        inbox_dir = os.path.join(garmin_sync.DEFAULT_OUTPUT_DIR, "_ingest_inbox")
+        os.makedirs(activities_dir, exist_ok=True)
+        os.makedirs(inbox_dir, exist_ok=True)
+
+        files = request.files.getlist("files")
+        if not files:
+            resp = jsonify({
+                "success": False,
+                "error": "未收到文件。期望 multipart 字段 'files' 携带 Garmin 下载的 .zip",
+            })
+            resp.headers["Access-Control-Allow-Origin"] = "*"
+            return resp, 400
+
+        # 同步落盘，避免请求上下文在后台线程失效；记录待处理的包清单
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        packages = []  # [(path, kind)]  kind ∈ {"zip", "fit"}
+        for i, f in enumerate(files):
+            if not f or not f.filename:
+                continue
+            low = f.filename.lower()
+            if low.endswith(".fit"):
+                path = os.path.join(activities_dir, f"{ts}_{f.filename}")
+                f.save(path)
+                packages.append((path, "fit"))
+            elif low.endswith(".zip"):
+                path = os.path.join(inbox_dir, f"{ts}_{i}_{f.filename}")
+                f.save(path)
+                packages.append((path, "zip"))
+            # 其它扩展名忽略
+
+        if not packages:
+            resp = jsonify({
+                "success": False,
+                "error": "收到的文件均非 .zip / .fit，无法摄入",
+            })
+            resp.headers["Access-Control-Allow-Origin"] = "*"
+            return resp, 400
+
+        task_id = uuid.uuid4().hex[:12]
+        _set_progress(
+            status="running", task_id=task_id, stage="接收文件",
+            stage_detail="已收到书签上传的压缩包，准备解包…",
+            processed=0, total=len(packages), extracted_fit=0,
+            started_at=datetime.now().isoformat(), finished_at=None,
+            message="", error="", profile_summary={},
+        )
+
+        t = threading.Thread(
+            target=_run_ingest_background,
+            args=(packages, activities_dir, task_id),
+            daemon=True,
+        )
+        t.start()
+
+        resp = jsonify({
+            "success": True,
+            "task_id": task_id,
+            "message": "同步任务已启动，正在后台解包并刷新画像，请在 Agent 网页查看实时进度",
+            "package_count": len(packages),
+        })
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp, 200
+
+    except Exception as e:
+        logger.exception("Garmin ingest 启动失败")
+        _set_progress(status="failed", error=str(e),
+                      finished_at=datetime.now().isoformat())
+        resp = jsonify({"success": False, "error": str(e)})
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp, 500
+
+
+def _run_ingest_background(packages, activities_dir, task_id):
+    """后台线程：逐包解包 → 刷新画像 → 更新实时进度。不依赖 Flask 请求上下文。"""
+    try:
+        total = len(packages)
+        extracted_fit = 0
+        _set_progress(stage="解包活动",
+                      stage_detail=f"正在解包 {total} 个活动压缩包…",
+                      processed=0, total=total, extracted_fit=0)
+
+        for idx, (path, kind) in enumerate(packages, start=1):
+            if kind == "fit":
+                extracted_fit += 1
+            else:
+                fits = garmin_sync.extract_garmin_fit(path, dest_dir=activities_dir)
+                extracted_fit += len(fits)
+            _set_progress(
+                processed=idx, total=total, extracted_fit=extracted_fit,
+                stage="解包活动",
+                stage_detail=f"已解包 {idx}/{total}，累计解出 {extracted_fit} 个 .fit",
+            )
+
+        _set_progress(stage="解析与刷新画像",
+                      stage_detail="重新构建跑者画像…",
+                      processed=total, total=total, extracted_fit=extracted_fit)
+        data_tool.invalidate_profile_cache()
+
+        try:
+            profile = data_tool.build_runner_profile()
+            basic = profile.get("基本信息", {})
+            summary = {
+                "最近跑步次数": basic.get("最近跑步次数"),
+                "最近一次跑步": basic.get("最近一次跑步"),
+            }
+        except Exception:
+            summary = {}
+
+        _set_progress(
+            status="success",
+            stage="完成",
+            stage_detail=f"已解出 {extracted_fit} 个 .fit 活动，画像已刷新",
+            processed=total, total=total, extracted_fit=extracted_fit,
+            finished_at=datetime.now().isoformat(),
+            message=f"同步完成：解出 {extracted_fit} 个 .fit 活动，画像已刷新",
+            profile_summary=summary,
+        )
+        # 同步成功也写一份状态，供 /api/data/sync_status 展示“已是最新”
+        try:
+            garmin_sync.record_sync_success(
+                [p for p, _ in packages], source="bookmark")
+        except Exception:
+            pass
+    except Exception as e:
+        logger.exception("后台 ingest 处理异常")
+        _set_progress(
+            status="failed", error=str(e),
+            finished_at=datetime.now().isoformat(),
+            stage="失败", stage_detail=f"同步失败：{e}",
+        )
+
+
+@data_bp.route("/api/data/garmin_sync_progress", methods=["GET", "OPTIONS"])
+def api_garmin_sync_progress():
+    """
+    返回书签一键同步的实时进度，供前端「同步状态」卡片轮询。
+    跨域放行：书签脚本拉起 Agent 页后，页面同源访问本接口（无需 CORS），
+    但保留 CORS 以便书签脚本直接读取进度。
+    """
+    if request.method == "OPTIONS":
+        resp = jsonify({})
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        return resp, 200
+
+    data = _get_progress()
+    resp = jsonify(data)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Cache-Control"] = "no-store"
+    return resp, 200

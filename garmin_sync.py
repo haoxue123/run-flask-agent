@@ -327,6 +327,78 @@ def record_sync_failure(error, source="auto"):
     })
 
 
+def _looks_like_zip_bytes(blob):
+    """判断一段字节是否为 ZIP（本地文件头 PK\\x03\\x04）。"""
+    return blob[:4] == b"PK\x03\x04"
+
+
+def extract_garmin_fit(src, dest_dir=None):
+    """
+    把从 Garmin Connect 网页下载的活动文件解压成原始 .fit，落到 dest_dir。
+
+    用途：替代已失效的 garth 自动同步。你在 Garmin Connect 网页用控制台脚本
+    下载的活动，Garmin 端点会返回一个 ZIP，里面每个活动又是一个 ZIP（文件名
+    形如 XXXX.fit，内部才是真正的 XXXX_ACTIVITY.fit）。本函数用纯内存递归解包，
+    只在拿到原始 .fit 时才落盘，绕过沙箱对 os.remove 的拦截。
+
+    解出的 .fit 会被 _scan_activity_files（data_tool.build_runner_profile）递归
+    扫到，从而无缝接入已有的"解析 → 画像 → 生理 → 计划"链路。
+
+    参数:
+        src: 单个 .zip 路径，或包含多个下载物的目录（如 Downloads 里的那一堆）。
+        dest_dir: 输出目录，默认 DEFAULT_OUTPUT_DIR（即 Agent 的 data/）。
+
+    返回:
+        解出的全部 .fit 文件路径列表（绝对路径）。
+    """
+    import io
+    import zipfile
+
+    dest_dir = dest_dir or DEFAULT_OUTPUT_DIR
+    os.makedirs(dest_dir, exist_ok=True)
+    extracted = []
+
+    def _unpack_blob(blob, out_dir, fallback_name):
+        # 是 ZIP（可能是外层下载包，也可能是 Garmin 套娃里的 XXXX.fit 包装）
+        if _looks_like_zip_bytes(blob):
+            try:
+                z = zipfile.ZipFile(io.BytesIO(blob))
+            except zipfile.BadZipFile:
+                z = None
+            if z is not None:
+                for name in z.namelist():
+                    data = z.read(name)
+                    base = os.path.basename(name) or fallback_name
+                    low = base.lower()
+                    if low.endswith(".fit"):
+                        _unpack_blob(data, out_dir, base)
+                    elif low.endswith(".zip") or _looks_like_zip_bytes(data):
+                        _unpack_blob(data, out_dir, base)
+                    # 其它无关文件（缩略图/csv）直接丢弃，不写盘
+                return
+        # 不是 ZIP → 当作原始 .fit 写入磁盘
+        if not blob:
+            logger.warning("跳过 0 字节空文件：%s", fallback_name)
+            return
+        dst = os.path.join(out_dir, fallback_name)
+        with open(dst, "wb") as f:
+            f.write(blob)
+        extracted.append(dst)
+
+    if os.path.isdir(src):
+        for fn in sorted(os.listdir(src)):
+            p = os.path.join(src, fn)
+            if fn.lower().endswith((".zip", ".fit")):
+                with open(p, "rb") as f:
+                    _unpack_blob(f.read(), dest_dir, fn)
+    else:
+        with open(src, "rb") as f:
+            _unpack_blob(f.read(), dest_dir, os.path.basename(src))
+
+    logger.info("解包完成：从 %s 解出 %d 个 .fit 到 %s", src, len(extracted), dest_dir)
+    return extracted
+
+
 # ============================================================
 # 模块自测
 # ============================================================

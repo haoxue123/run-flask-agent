@@ -103,7 +103,11 @@
   document.addEventListener('DOMContentLoaded', function () {
     initDragDrop();
     updateTargetDist();
-    loadSyncStatus();
+    startSyncPolling();
+    if (window.location.search.indexOf('sync=1') !== -1) {
+      const card = document.getElementById('sync-card');
+      if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   });
 
   /** 把 ISO 时间格式化为本地 MM-DD HH:MM */
@@ -195,54 +199,133 @@
     }
   }
 
-  /** 打开页面时检查同步状态；若不新鲜则自动同步一次 */
-  async function loadSyncStatus() {
-    const text = document.getElementById('sync-status-text');
-    const btn = document.getElementById('sync-now-btn');
-    const bar = document.getElementById('sync-status-bar');
-    if (!text) return;
-    if (btn) btn.style.display = '';
+  /** 打开页面即启动同步进度轮询：书签一键同步后实时显示进度 */
+  let _syncPollTimer = null;
+  function startSyncPolling() {
+    const helpBtn = document.getElementById('sync-help-btn');
+    if (helpBtn && !helpBtn.dataset.bound) {
+      helpBtn.dataset.bound = '1';
+      helpBtn.addEventListener('click', showSyncHelp);
+    }
+    if (_syncPollTimer) clearInterval(_syncPollTimer);
+    pollSyncProgress();  // 立即拉一次
+    _syncPollTimer = setInterval(pollSyncProgress, 1500);
+  }
+
+  /** 拉取实时进度并渲染到同步状态卡片 */
+  async function pollSyncProgress() {
+    const card = document.getElementById('sync-card');
+    if (!card) return;
+    let data;
+    try {
+      const resp = await fetch('/api/data/garmin_sync_progress', { cache: 'no-store' });
+      data = await resp.json();
+    } catch (e) {
+      renderSyncIdle('无法连接后端，请确认 Agent 已启动 (python app.py)');
+      return;
+    }
+    if (!data || data.status === 'idle') {
+      // 空闲：展示上一次同步状态（若后端有记录），否则提示用书签同步
+      renderSyncIdleFromLegacy();
+      return;
+    }
+    renderSync(data);
+  }
+
+  function renderSync(p) {
+    const badge = document.getElementById('sync-badge');
+    const wrap = document.getElementById('sync-progress-wrap');
+    const fill = document.getElementById('sync-progress-fill');
+    const stage = document.getElementById('sync-stage');
+    const counts = document.getElementById('sync-counts');
+    const detail = document.getElementById('sync-detail');
+    const summary = document.getElementById('sync-summary');
+    if (!badge) return;
+
+    const status = p.status || 'idle';
+    const labelMap = { idle: '空闲', running: '同步中', success: '已完成', failed: '失败' };
+    badge.textContent = labelMap[status] || status;
+    badge.className = 'sync-badge ' + status;
+
+    const total = p.total || 0;
+    const processed = p.processed || 0;
+    let pct = 0;
+    if (status === 'success' || status === 'failed') pct = 100;
+    else if (total > 0) pct = Math.round((processed / total) * 100);
+    if (fill) fill.style.width = pct + '%';
+
+    if (status === 'running') {
+      if (wrap) wrap.style.display = 'block';
+      if (stage) stage.textContent = p.stage || '处理中…';
+      if (counts) counts.textContent = total > 0 ? (processed + ' / ' + total) : (p.extracted_fit || 0) + ' 个 .fit';
+      if (detail) detail.textContent = p.stage_detail || '';
+      if (summary) summary.style.display = 'none';
+    } else if (status === 'success') {
+      if (wrap) wrap.style.display = 'none';
+      if (stage) stage.textContent = '同步完成';
+      if (counts) counts.textContent = (p.extracted_fit || 0) + ' 个 .fit';
+      if (detail) detail.textContent = p.stage_detail || p.message || '';
+      if (summary) {
+        const s = p.profile_summary || {};
+        const lines = [];
+        if (s['最近跑步次数'] != null) lines.push('最近跑步次数：' + s['最近跑步次数']);
+        if (s['最近一次跑步'] != null) lines.push('最近一次跑步：' + s['最近一次跑步']);
+        summary.innerHTML = lines.length ? '画像已刷新 — ' + lines.join('；') : '画像已刷新';
+        summary.style.display = 'block';
+      }
+    } else if (status === 'failed') {
+      if (wrap) wrap.style.display = 'none';
+      if (stage) stage.textContent = '同步失败';
+      if (counts) counts.textContent = '';
+      if (detail) detail.textContent = (p.error || p.stage_detail || '未知错误');
+      if (summary) summary.style.display = 'none';
+    }
+  }
+
+  /** 空闲态：优先展示后端记录的「上次成功同步」时间，否则引导用书签 */
+  let _legacyChecked = false;
+  async function renderSyncIdleFromLegacy() {
+    const detail = document.getElementById('sync-detail');
+    const badge = document.getElementById('sync-badge');
+    if (_legacyChecked) return;
+    _legacyChecked = true;
+    if (badge) { badge.textContent = '空闲'; badge.className = 'sync-badge idle'; }
+    if (detail) detail.textContent = '等待通过 Garmin Connect 网页书签同步数据…';
     try {
       const resp = await fetch('/api/data/sync_status');
       const data = await resp.json();
       const state = data.state || {};
-      const result = state.result;
-      if (result === 'success') {
-        const t = formatSyncTime(state.updated_at);
-        text.textContent = '数据更新于 ' + t +
-          (data.latest_run_date ? '，最新跑步 ' + data.latest_run_date : '') +
-          (data.fresh ? '（已是最新）' : '（可点“立即同步”刷新）');
-        if (bar) bar.style.borderColor = data.fresh
-          ? 'var(--rc-success, #2ecc71)' : 'var(--rc-border, #2a3342)';
-      } else if (result === 'failed') {
-        const err = state.error || '';
-        // 区分根因：两步验证（MFA）需用户在本机用可见浏览器完成一次验证
-        const isMfa = /两步验证|mfa|验证码|verification|one-time|authenticator|无头模式/i.test(err);
-        const isKnownIssue = /DI-OAuth2|Garmin Connect 登录失败|登录|令牌|token|playwright|验证|未配置/i.test(err);
-        if (isMfa) {
-          text.textContent = 'Garmin 账号需在本机浏览器完成一次验证（将自动使用你系统的默认浏览器，如 Edge）。点击“登录 Garmin”后，请在弹出的窗口输入账号/MFA，之后即可自动同步；或手动上传运动文件。';
-          if (bar) bar.style.borderColor = 'var(--rc-warning, #f39c12)';
-          showLoginBtn();
-        } else if (isKnownIssue) {
-          text.textContent = 'Garmin 官方登录接口当前暂不可用，建议手动上传运动文件（或稍后再试）';
-          if (bar) bar.style.borderColor = 'var(--rc-warning, #f39c12)';
-        } else {
-          text.textContent = '上次同步失败：' + err + '（可点“立即同步”重试，或手动上传文件）';
-          if (bar) bar.style.borderColor = 'var(--rc-danger, #e74c3c)';
-        }
-        if (/登录|令牌|token|playwright|mfa|验证|未配置/i.test(err)) {
-          showLoginBtn();
-        }
-      } else {
-        text.textContent = '尚未同步过 Garmin，点击下方“立即同步”拉取最新数据';
+      if (state.result === 'success' && state.updated_at) {
+        if (detail) detail.textContent = '上次同步：' + formatSyncTime(state.updated_at) +
+          (data.latest_run_date ? '，最新跑步 ' + data.latest_run_date : '');
       }
-      // 仅在非失败状态下自动同步一次；失败后自动重试只会反复报错，影响体验
-      if (!data.fresh && result !== 'failed') {
-        syncGarmin('auto');
-      }
-    } catch (e) {
-      text.textContent = '无法获取同步状态（后端可能未启动）';
+    } catch (e) { /* 忽略，保持默认提示 */ }
+  }
+
+  function renderSyncIdle(msg) {
+    const detail = document.getElementById('sync-detail');
+    const badge = document.getElementById('sync-badge');
+    const wrap = document.getElementById('sync-progress-wrap');
+    if (badge) { badge.textContent = '空闲'; badge.className = 'sync-badge idle'; }
+    if (wrap) wrap.style.display = 'none';
+    if (detail) detail.textContent = msg || '等待通过 Garmin Connect 网页书签同步数据…';
+  }
+
+  /** 帮助：说明如何用浏览器书签一键同步 */
+  function showSyncHelp() {
+    const msg = [
+      '如何一键同步 Garmin 数据：',
+      '1. 浏览器登录 Garmin Connect 活动页（connect.garmin.cn/modern/activities）',
+      '2. 点击收藏栏里的「Garmin 一键同步」书签（首次需先添加该书签）',
+      '3. 脚本会用你已登录的会话自动下载近 180 天跑步活动并推给本 Agent',
+      '4. 返回本页，本卡片会实时显示解包 / 刷新画像进度',
+      '',
+      '注：因 Garmin 风控，仍需你手动点一下书签；Agent 无法替你登录。',
+    ].join('\n');
+    if (window.DS && window.DS.showToast) {
+      window.DS.showToast('请见控制台说明，或按 F12 查看', 'info');
     }
+    alert(msg);
   }
 
   UPLOAD.showFiles = showFiles;
