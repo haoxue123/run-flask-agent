@@ -1,6 +1,35 @@
 """FIT 文件解析器（Garmin 二进制格式）"""
 import os
-from parsers import _mean
+from parsers import _mean, _safe_float, _safe_int
+
+
+def extract_record_fields(raw: dict) -> dict:
+    """从一条 record 原始字段抽取关键量（纯函数，便于单元测试）。
+
+    抽取：时间戳、距离(m)、心率(bpm)、速度(m/s)、海拔(m)、步频(spm)。
+    字段缺失返回 None，避免后续汇总出现 NaN/异常。
+    """
+    return {
+        "timestamp": raw.get("timestamp"),
+        "distance_m": _safe_float(raw.get("distance")),
+        "heart_rate": _safe_int(raw.get("heart_rate")),
+        "speed_mps": _safe_float(raw.get("speed")),
+        "altitude_m": _safe_float(raw.get("altitude")),
+        "cadence": _safe_int(raw.get("cadence")),
+    }
+
+
+def iter_fit_records(filepath):
+    """逐条流式产出 record 关键字段。
+
+    fitparse 按 FIT 消息边界读取；本生成器逐条 yield，使"逐文件处理"时内存恒定，
+    避免一次把整批活动读入内存导致溢出。解析失败时抛出异常，由调用方捕获。
+    """
+    from fitparse import FitFile
+
+    fitfile = FitFile(filepath)
+    for msg in fitfile.get_messages("record"):
+        yield extract_record_fields(msg.get_values())
 
 
 def parse_fit(filepath):

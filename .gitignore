@@ -67,3 +67,5 @@ lark_setup_fixed.py
 
 data/.garmin_browser_cookies.json
 data/chat_epoch
+data/.garmin_browser_profile_clone/
+data/.garmin_browser_profile_clone_test/

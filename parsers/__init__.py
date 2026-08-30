@@ -1,6 +1,8 @@
 """运动文件解析器包 — 统一入口与共享工具函数"""
 import os
 
+from parsers.ingest import ingest_directory, ingest_fit_stream
+
 
 def _safe_int(value):
     """安全转整数，失败返回 None。"""
