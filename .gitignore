@@ -69,3 +69,4 @@ data/.garmin_browser_cookies.json
 data/chat_epoch
 data/.garmin_browser_profile_clone/
 data/.garmin_browser_profile_clone_test/
+data/garmin_login_error_*.html
