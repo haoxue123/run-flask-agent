@@ -143,6 +143,23 @@ def _guess_user_data_dir(exe):
     return None
 
 
+def _count_files(root):
+    try:
+        n = 0
+        for _, _, files in os.walk(root):
+            n += len(files)
+        return n
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def _is_profile_invalid(clone_dir):
+    """判断复制后的 profile 是否有效：缺少 Default/ 或 Local State 即视为无效。"""
+    has_default = os.path.isdir(os.path.join(clone_dir, "Default"))
+    has_local_state = os.path.isfile(os.path.join(clone_dir, "Local State"))
+    return not (has_default and has_local_state)
+
+
 def _copy_profile(source, dest, full_copy=False):
     """复制浏览器 profile 中真正必要的文件到项目临时目录。
 
@@ -296,6 +313,19 @@ def _launch(headless):
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
     )
+    # 强 stealth 启动参数：Cloudflare 在 POST 阶段会检测这些开关
+    stealth_args = [
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-blink-features=AutomationControlled",
+        # 关键：禁用 Chromium 暴露自动化的子功能
+        "--disable-features=IsolateOrigins,site-per-process,AutomationControlled",
+        # 看起来更像普通 Chrome
+        "--disable-infobars",
+        "--disable-notifications",
+        "--disable-popup-blocking",
+        "--no-sandbox",
+    ]
 
     # 1) .env 强制指定；2) 检测系统默认浏览器；3) 兜底 chrome -> msedge -> chromium
     configured_channel = (os.getenv("GARMIN_BROWSER_CHANNEL") or "").strip().lower() or None
@@ -326,11 +356,7 @@ def _launch(headless):
             logger.info("尝试启动浏览器：%s (headless=%s)", name, headless)
             kwargs = {
                 "headless": headless,
-                "args": [
-                    "--no-first-run",
-                    "--no-default-browser-check",
-                    "--disable-blink-features=AutomationControlled",
-                ],
+                "args": stealth_args,
             }
             exe = value if kind == "exe" else None
             channel = value if kind == "channel" else None
@@ -340,8 +366,11 @@ def _launch(headless):
                 kwargs["channel"] = channel
 
             # 可见模式下，尝试复用浏览器日常 profile（这是绕过 Garmin 风控的关键）
+            # 但若 .env 设了 GARMIN_BROWSER_SKIP_PROFILE_COPY=1，则用空 profile 启动
+            # （适用于：profile 复制总崩溃 / 想用 Playwright 全新 profile + 用户手动登录）
+            skip_profile = os.getenv("GARMIN_BROWSER_SKIP_PROFILE_COPY", "").strip().lower() in ("1", "true", "yes")
             user_data_dir = None
-            if not headless:
+            if not headless and not skip_profile:
                 user_data_dir = configured_user_data or _guess_user_data_dir(exe or value)
             if user_data_dir and os.path.isdir(user_data_dir):
                 clone_dir = os.path.join(DEFAULT_OUTPUT_DIR, ".garmin_browser_profile_clone")
@@ -351,6 +380,11 @@ def _launch(headless):
                 except Exception as e:  # noqa: BLE001
                     logger.warning("复制浏览器 profile 失败（将尝试不复制启动）：%s", e)
                     clone_dir = user_data_dir
+                # 若复制后 clone 仍无效（只有零碎 tmp 文件），降级到空 profile
+                if _is_profile_invalid(clone_dir):
+                    logger.warning("clone 目录无效（含 %d 个零碎文件），降级用空 profile", _count_files(clone_dir))
+                    clone_dir = os.path.join(DEFAULT_OUTPUT_DIR, ".garmin_browser_empty_profile")
+                    os.makedirs(clone_dir, exist_ok=True)
                 context = p.chromium.launch_persistent_context(
                     clone_dir,
                     **kwargs,
@@ -382,10 +416,56 @@ def _launch(headless):
             f"请确认已安装 Chrome/Edge/Tabbit 或设置 .env GARMIN_BROWSER_*。原始错误：{last_err}"
         )
 
-    # 去掉 webdriver 痕迹（对 new_context 和 persistent_context 都有效）
-    context.add_init_script(
-        "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
-    )
+    # 强 stealth init scripts：覆盖 Playwright 默认的所有"自动化痕迹"
+    # 第一性原理：Cloudflare 在 POST 前会在浏览器里跑 JS 检测 navigator.*、
+    # window.chrome、document.hasFocus() 等，缺一项就标 bot
+    context.add_init_script("""
+        // 1. webdriver 主特征
+        Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+
+        // 2. plugins 必须非空（Playwright 默认空数组，一眼假）
+        Object.defineProperty(navigator, 'plugins', {
+            get: () => {
+                const arr = [
+                    {name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format'},
+                    {name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: ''},
+                    {name: 'Native Client', filename: 'internal-nacl-plugin', description: ''},
+                ];
+                arr.length = 3;
+                return arr;
+            }
+        });
+
+        // 3. languages 真实用户是多个
+        Object.defineProperty(navigator, 'languages', {
+            get: () => ['zh-CN', 'zh', 'en']
+        });
+
+        // 4. window.chrome 存在且有 runtime
+        window.chrome = window.chrome || {};
+        window.chrome.runtime = window.chrome.runtime || {};
+        window.chrome.app = window.chrome.app || {isInstalled: false};
+        window.chrome.csi = window.chrome.csi || function(){};
+        window.chrome.loadTimes = window.chrome.loadTimes || function(){};
+
+        // 5. permissions query 默认行为修复
+        const originalQuery = window.navigator.permissions && window.navigator.permissions.query;
+        if (originalQuery) {
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                Promise.resolve({state: Notification.permission}) :
+                originalQuery(parameters)
+            );
+        }
+
+        // 6. WebGL 真实 vendor（避免被识别为 SwiftShader）
+        const getParameter = WebGLRenderingContext.prototype.getParameter;
+        WebGLRenderingContext.prototype.getParameter = function(parameter) {
+            if (parameter === 37445) return 'Intel Inc.';
+            if (parameter === 37446) return 'Intel Iris OpenGL Engine';
+            return getParameter.call(this, parameter);
+        };
+    """)
     return p, browser, context, is_persistent
 
 
@@ -397,6 +477,24 @@ def _save_cookies(context):
         logger.info("已保存浏览器会话 Cookie 到 %s", BROWSER_COOKIE_PATH)
     except Exception as e:  # noqa: BLE001
         logger.warning("保存浏览器 Cookie 失败：%s", e)
+
+
+def _dump_diagnostics(page, tag: str):
+    """失败时把当前页 HTML + 截图保存到 data/ 便于诊断。
+
+    命名规则：garmin_{tag}_{timestamp}.html / .png
+    """
+    import datetime as _dt
+    ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    base = os.path.join(DEFAULT_OUTPUT_DIR, f"garmin_{tag}_{ts}")
+    try:
+        html = page.content()
+        with open(base + ".html", "w", encoding="utf-8") as f:
+            f.write(html)
+        page.screenshot(path=base + ".png", full_page=True)
+        logger.warning("已保存失败现场：%s.html / .png", base)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("保存失败现场失败：%s", e)
 
 
 def _load_cookies(context):
@@ -476,7 +574,19 @@ def _detect_mfa(page, url):
 def browser_login(headless=False, timeout=300):
     """
     启动（可见）浏览器完成 Garmin 登录，并把 Cookie 持久化。
-    MFA 由用户在弹出的浏览器窗口里手动输入；本函数轮询直到登录成功或超时。
+
+    关键设计（第一性原理）：
+      Cloudflare 在表单 POST 阶段会专门检测"自动化提交"行为——
+      Playwright 的 page.fill() + page.click() 即便浏览器是真实 Chrome，
+      提交速度、点击坐标、focus 事件序列都和人类不同，命中风控 → "An
+      unexpected error has occurred."。
+      正确做法：headless=False 模式下只打开页面，**不自动填表/不自动点**，
+      让用户自己输入、自己点击、自己输两步验证码，Cloudflare 看到的是真
+      人行为。cookie 一旦保存，后续 headless=True 复用即可零摩擦。
+
+    参数：
+      headless: False=可见浏览器让用户完成首登；True=已有 cookie 时静默
+      timeout:  等待登录完成的秒数（默认 300=5 分钟）
     返回 True 表示登录成功。
     """
     username, password, is_cn = _get_credentials()
@@ -491,63 +601,74 @@ def browser_login(headless=False, timeout=300):
         page = context.new_page()
         sso = f"https://sso.{domain}/sso/signin"
         logger.info("打开 Garmin 登录页：%s", sso)
-        # 填表（兼容 garmin.cn / garmin.com 的表单字段名）。
-        # 这一步若因网络不可达 / 表单字段变更而失败，必须转为清晰报错，
-        # 而不是把原始 TimeoutError 抛成 500，更不能在无界面环境里空等。
+
+        # ====== 关键：headless 模式必须已有 cookie，无则报错 ======
+        if headless:
+            if not _has_local_session():
+                raise RuntimeError(
+                    "无头模式需要先有浏览器 Cookie。请先运行可见登录：\n"
+                    "  python -c \"import garmin_browser; garmin_browser.browser_login(headless=False)\""
+                )
+            # 已有 cookie：直接尝试访问 connect，验证是否已登录
+            page.goto(f"https://connect.{domain}", wait_until="domcontentloaded", timeout=30000)
+            if "connect.garmin" in page.url and _session_valid(page, domain):
+                logger.info("复用本地 Cookie 已登录")
+                return True
+            # cookie 失效了：fall through 到可见模式
+            logger.warning("本地 Cookie 已失效，降级到可见登录")
+
+        # ====== 可见模式：不自动填表，让用户手动操作 ======
         try:
             page.goto(sso, wait_until="domcontentloaded", timeout=30000)
-            page.wait_for_selector('input[name="username"]', timeout=30000)
-            page.fill('input[name="username"]', username)
-            page.fill('input[name="password"]', password)
-            page.click('button[type="submit"]')
         except Exception as e:  # noqa: BLE001
             raise RuntimeError(
-                f"无法打开 Garmin 登录页或填写凭据（请确认网络可访问 sso.{domain}，"
-                f"且账号密码正确）：{e}"
+                f"无法打开 Garmin 登录页（请确认网络可访问 {sso}）：{e}"
             ) from e
-        # 提交后 SSO 会跳转，等首屏稳定再开始轮询，避免立即查元素撞上导航
-        try:
-            page.wait_for_load_state("domcontentloaded", timeout=15000)
-        except Exception:  # noqa: BLE001
-            pass
+
+        if not headless:
+            logger.info(
+                "请在弹出的浏览器窗口里手动完成登录（输入账号密码 + 两步验证码，"
+                "然后点 Sign in）。脚本会一直等待直到你登录成功或超时。"
+            )
 
         deadline = time.time() + timeout
         while time.time() < deadline:
             try:
                 url = page.url
-                # 登录成功：跳回 connect 域或 SSO 内嵌页
+                # 登录成功：跳回 connect 域
                 if "connect.garmin" in url or _session_valid(page, domain):
                     _save_cookies(context)
                     logger.info("浏览器登录成功，Cookie 已保存")
                     return True
-                # MFA：无头模式无法输入验证码，必须明确报错引导用户用可见浏览器；
-                # 可见模式则等待用户在弹出的浏览器里输入验证码。
+                # MFA：可见模式等待用户输入验证码；无头模式不应走到这里
                 if _detect_mfa(page, url):
                     if headless:
-                        raise RuntimeError(
-                            "检测到两步验证（MFA）。无头模式无法自动输入验证码。\n"
-                            "请在本机（有显示器）运行：\n"
-                            "  python -c \"import garmin_browser; garmin_browser.browser_login(headless=False)\"\n"
-                            "完成一次登录后，会话 Cookie 会自动保存到 "
-                            "data/.garmin_browser_cookies.json，之后自动同步可复用，无需再次输入。"
-                        )
+                        raise RuntimeError("检测到两步验证（MFA），无头模式无法处理")
                     logger.info("检测到两步验证，请在浏览器窗口中输入验证码…")
                     time.sleep(3)
                     continue
-                # 登录失败提示
+                # 错误页：保存 HTML + 截图便于诊断
                 err = _safe_query(page, ".error-text, .alert-error, [class*='error']")
                 if err:
                     msg = _safe_text(err)
                     if msg:
+                        _dump_diagnostics(page, "login_error")
                         raise RuntimeError(f"Garmin 登录失败：{msg}")
+            except RuntimeError:
+                raise
             except Exception as e:  # noqa: BLE001
                 # 页面正在跳转、执行上下文被销毁，下一轮重试
                 logger.debug("登录轮询中页面跳转，重试：%s", e)
                 time.sleep(2)
                 continue
-            time.sleep(3)
+            time.sleep(2)
 
-        raise RuntimeError("浏览器登录超时（MFA 未输入或登录未完成）")
+        # 超时：保存现场便于诊断
+        _dump_diagnostics(page, "login_timeout")
+        raise RuntimeError(
+            f"浏览器登录超时（{timeout}s 内未完成）。已保存页面快照到 data/garmin_login_*.html，"
+            "请打开看看卡在哪一步。"
+        )
     finally:
         if context:
             context.close()
