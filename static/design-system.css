@@ -104,9 +104,9 @@
 .ds-toast.ds-toast--out {
   animation: ds-toast-out 300ms ease-in forwards;
 }
-.ds-toast--success { background: var(--ds-color-success); color: #fff; }
-.ds-toast--error   { background: var(--ds-color-error); color: #fff; }
-.ds-toast--warning { background: var(--ds-color-warning); color: #fff; }
+.ds-toast--success { background: var(--ds-color-success); color: var(--rc-text-on-brand); }
+.ds-toast--error   { background: var(--ds-color-error); color: var(--rc-destructive-foreground); }
+.ds-toast--warning { background: var(--ds-color-warning); color: var(--rc-on-energy); }
 
 /* ===== Card Hover Effects ===== */
 .ds-card-interactive {
@@ -218,7 +218,7 @@
     width: 20px;
     height: 20px;
   }
-  main { padding-bottom: 72px !important; }
+  main { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0)) !important; }
 }
 
 @media (min-width: 768px) {

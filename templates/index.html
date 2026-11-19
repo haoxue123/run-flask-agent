@@ -4,9 +4,9 @@
 
 <style>
 /* ============================================================
-   数据总览 · Pulse Green v3 深改
-   - Hero 前瞻卡（5xl 大字 + 跑道弧线装饰）
-   - KPI 语义图标（数据青 / 品牌绿 / 能量黄）
+   数据总览 · 跑表读数
+   - Hero 前瞻卡（大读数 + 跑道弧线装饰）
+   - 操作绿 / 数据蓝 / 负荷琥珀分工
    - 跑步主题元素 ≤2 图层、≤6% 透明度
    ============================================================ */
 
@@ -56,7 +56,6 @@
 .hero-eyebrow .pulse {
     width: 7px; height: 7px; border-radius: 50%;
     background: var(--rc-brand);
-    box-shadow: var(--rc-glow-brand);
 }
 .hero-headline {
     font-family: var(--rc-font-display);
@@ -76,8 +75,7 @@
     font-weight: 700;
     line-height: 1;
     letter-spacing: -0.03em;
-    color: var(--rc-brand);
-    text-shadow: var(--rc-glow-brand);
+    color: var(--rc-text);
 }
 .hero-unit {
     font-size: var(--rc-text-xl);
@@ -560,7 +558,7 @@ const profileData = {{ profile.get("近期跑步数据", []) | tojson }};
 const weeklySeries = {{ weekly_series | tojson }};
 
 // I2：注入就绪度，驱动侧边栏 Orb 状态环
-{% if kpi.readiness is not none %}window.COACH_ORB = { readiness: {{ kpi.readiness }} };
+{% if kpi.readiness is number %}window.COACH_ORB = { readiness: {{ kpi.readiness }} };
 {% else %}window.COACH_ORB = { readiness: null };
 {% endif %}
 

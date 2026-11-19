@@ -23,7 +23,7 @@
       ctx.parentElement.innerHTML = '<div class="text-sm text-muted-foreground py-8 text-center">暂无就绪度数据</div>';
       return;
     }
-    const primary = getThemeColor('--rc-primary', '#2BD493');
+    const primary = getThemeColor('--rc-primary', '#167657');
     const mutedTrack = getThemeColor('--rc-muted', 'rgba(255,255,255,0.08)');
     const mutedText = getThemeColor('--rc-muted-foreground', '') || getThemeColor('--rc-text-secondary', '#8A8F98');
     const chart = new Chart(ctx, {
@@ -69,8 +69,8 @@
   function renderCharts(profileData) {
     if (!profileData || profileData.length < 2) return;
 
-    const primary = getThemeColor('--rc-primary', '#2BD493');
-    const chart2 = getThemeColor('--rc-chart-2', '#38BDF8');
+    const primary = getThemeColor('--rc-primary', '#167657');
+    const chart2 = getThemeColor('--rc-chart-2', '#EB6834');
     const muted = getThemeColor('--rc-muted-foreground', '') || getThemeColor('--rc-text-secondary', '#8A8F98');
     const gridColor = getThemeColor('--rc-chart-grid', 'rgba(255,255,255,0.06)');
     const sorted = profileData.slice().sort(function (a, b) {

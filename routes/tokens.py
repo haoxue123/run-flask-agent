@@ -14,25 +14,30 @@ _THEME_CSS = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "theme.css"
 )
 
-# 内置默认令牌（Pulse Green 优化方案，与 docs/design-audit-cai.md 一致）
+# 内置默认令牌（跑表读数方案，与 static/theme.css 当前默认值一致）
 _DEFAULT_TOKEN_CSS = """:root {
-  --rc-background:#F6FAF7; --rc-surface:#FFFFFF; --rc-surface-raised:#EEF3F0; --rc-surface-sunken:#EAF1ED;
-  --rc-border:rgba(16,32,28,0.12); --rc-border-strong:rgba(16,32,28,0.20); --rc-border-faint:rgba(16,32,28,0.07);
-  --rc-text:#16201C; --rc-text-secondary:#445049; --rc-text-muted:#5E6862; --rc-ring:#0A9A63; --rc-ring-offset:#FFFFFF;
-  --rc-on-data:#FFFFFF;
-  --rc-zone-1:#0369A1; --rc-zone-2:#047857; --rc-zone-3:#B45309; --rc-zone-4:#C2410C; --rc-zone-5:#B91C1C;
+  --rc-background:#F3F5F4; --rc-surface:#FFFFFF; --rc-surface-raised:#E9EEEB; --rc-surface-sunken:#EEF2F0;
+  --rc-border:rgba(23,32,29,0.12); --rc-border-strong:rgba(23,32,29,0.20); --rc-border-faint:rgba(23,32,29,0.06);
+  --rc-text:#17201D; --rc-text-secondary:#46514C; --rc-text-muted:#66736C; --rc-ring:#167657; --rc-ring-offset:#FFFFFF;
+  --rc-brand:#167657; --rc-brand-hover:#125F47; --rc-brand-active:#0E4E3B; --rc-on-brand:#FFFFFF; --rc-brand-soft:rgba(22,118,87,0.10); --rc-brand-border:rgba(22,118,87,0.28);
+  --rc-energy:#9A6400; --rc-on-energy:#FFFFFF; --rc-energy-soft:rgba(154,100,0,0.10);
+  --rc-data:#2A78D6; --rc-on-data:#FFFFFF; --rc-data-soft:rgba(42,120,214,0.10);
+  --rc-success:#147C55; --rc-info:#256A92; --rc-info-fg:#256A92; --rc-warning:#9A6200; --rc-warning-fg:#9A6200; --rc-danger:#C53F45; --rc-danger-fg:#C53F45;
+  --rc-zone-1:#2A78D6; --rc-zone-2:#167657; --rc-zone-3:#9A6400; --rc-zone-4:#B95627; --rc-zone-5:#B83A44;
+  --rc-chart-1:#2A78D6; --rc-chart-2:#EB6834; --rc-chart-3:#1BAF7A; --rc-chart-4:#EDA100; --rc-chart-5:#E87BA4;
+  --rc-radius-2xl:24px; --rc-glow-brand:none; --rc-glow-energy:none;
 }
 [data-theme="dark"], .dark {
-  --rc-brand:#10E08A; --rc-brand-hover:#0FCB7E; --rc-brand-active:#0A9A63; --rc-on-brand:#04140D; --rc-brand-soft:rgba(16,224,138,0.12); --rc-brand-border:rgba(16,224,138,0.30);
-  --rc-energy:#C6F000; --rc-on-energy:#1A2400; --rc-energy-soft:rgba(198,240,0,0.12);
-  --rc-data:#2BC4E6; --rc-on-data:#04222B; --rc-data-soft:rgba(43,196,230,0.12);
-  --rc-background:#0B0F0E; --rc-surface:#141A18; --rc-surface-raised:#1A221F; --rc-surface-sunken:#0E1311;
-  --rc-border:rgba(255,255,255,0.08); --rc-border-strong:rgba(255,255,255,0.14); --rc-border-faint:rgba(255,255,255,0.05);
-  --rc-text:#ECF3EF; --rc-text-secondary:#9FAAA4; --rc-text-muted:#7C887F; --rc-ring:#10E08A; --rc-ring-offset:#0B0F0E;
-  --rc-success:#2BD493; --rc-info:#38BDF8; --rc-info-fg:#0369A1; --rc-warning:#FFB02E; --rc-warning-fg:#92560A; --rc-danger:#FF5C5C; --rc-danger-fg:#B91C1C;
-  --rc-zone-1:#38BDF8; --rc-zone-2:#34D399; --rc-zone-3:#FBBF24; --rc-zone-4:#FB923C; --rc-zone-5:#FF5C5C;
-  --rc-chart-1:#10E08A; --rc-chart-2:#2BC4E6; --rc-chart-3:#FFB02E; --rc-chart-4:#C6F000; --rc-chart-5:#FF5C5C;
-  --rc-radius-2xl:28px; --rc-glow-brand:0 0 24px rgba(16,224,138,0.35); --rc-glow-energy:0 0 24px rgba(198,240,0,0.28);
+  --rc-brand:#72D6AA; --rc-brand-hover:#8AE2BC; --rc-brand-active:#4FBE90; --rc-on-brand:#09251A; --rc-brand-soft:rgba(114,214,170,0.11); --rc-brand-border:rgba(114,214,170,0.28);
+  --rc-energy:#E2B45E; --rc-on-energy:#2C1E08; --rc-energy-soft:rgba(226,180,94,0.12);
+  --rc-data:#3987E5; --rc-on-data:#FFFFFF; --rc-data-soft:rgba(57,135,229,0.14);
+  --rc-background:#101315; --rc-surface:#181D1F; --rc-surface-raised:#202729; --rc-surface-sunken:#121719;
+  --rc-border:rgba(237,241,239,0.09); --rc-border-strong:rgba(237,241,239,0.16); --rc-border-faint:rgba(237,241,239,0.05);
+  --rc-text:#EDF1EF; --rc-text-secondary:#B0BBB6; --rc-text-muted:#8D9993; --rc-ring:#72D6AA; --rc-ring-offset:#101315;
+  --rc-success:#72D6AA; --rc-info:#66B5E5; --rc-info-fg:#79BDEB; --rc-warning:#E2B45E; --rc-warning-fg:#E2B45E; --rc-danger:#F08484; --rc-danger-fg:#F08484;
+  --rc-zone-1:#6AA9E9; --rc-zone-2:#72D6AA; --rc-zone-3:#E2B45E; --rc-zone-4:#E58A61; --rc-zone-5:#F08484;
+  --rc-chart-1:#3987E5; --rc-chart-2:#D95926; --rc-chart-3:#199E70; --rc-chart-4:#C98500; --rc-chart-5:#D55181;
+  --rc-radius-2xl:24px; --rc-glow-brand:none; --rc-glow-energy:none;
   --rc-text-4xl:3rem; --rc-text-5xl:3.75rem; --rc-space-16:64px; --rc-space-20:80px; --rc-space-24:96px;
 }"""
 
@@ -63,6 +68,19 @@ def _extract_vars(block_body):
     return out
 
 
+def _extract_non_vars(block_body):
+    """保留块内非 --rc-* 声明（如 color-scheme），避免重建块时被静默丢弃。"""
+    body = re.sub(r"/\*.*?\*/", "", block_body, flags=re.S)
+    out = []
+    for decl in body.split(";"):
+        decl = re.sub(r"\s+", " ", decl).strip()
+        if not decl or ":" not in decl:
+            continue
+        if not decl.split(":", 1)[0].strip().startswith("--"):
+            out.append(decl)
+    return out
+
+
 def _parse_blocks(css_text):
     """[(selector, {var:val})] —— 仅保留含 --rc-* 的块。"""
     blocks = []
@@ -76,8 +94,9 @@ def _parse_blocks(css_text):
     return blocks
 
 
-def _root_block(vars_dict, selector):
-    body = ";\n  ".join(f"{k}:{v}" for k, v in vars_dict.items())
+def _root_block(vars_dict, selector, extra=()):
+    lines = list(extra) + [f"{k}:{v}" for k, v in vars_dict.items()]
+    body = ";\n  ".join(lines)
     return f"{selector} {{\n  {body};\n}}"
 
 
@@ -94,7 +113,7 @@ def _update_block(css, selector_key, new_vars):
         return css
     old = _extract_vars(m.group(1))
     old.update(new_vars)
-    block = _root_block(old, sel_out)
+    block = _root_block(old, sel_out, extra=_extract_non_vars(m.group(1)))
     return css[:m.start()] + block + css[m.end():]
 
 

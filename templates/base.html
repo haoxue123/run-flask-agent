@@ -2,11 +2,9 @@
 <html lang="zh-CN" data-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='16' fill='%23167657'/%3E%3Cpath d='M4 17h6l3-8 5 15 3-7h7' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
     <title>{% block title %}跑步教练{% endblock %}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/theme.css">
     <link rel="stylesheet" href="/static/design-system.css">
     <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
@@ -281,11 +279,11 @@
     function getChartColors() {
         var style = getComputedStyle(document.documentElement);
         return {
-            primary: style.getPropertyValue('--rc-chart-1').trim() || '#2BD493',
-            secondary: style.getPropertyValue('--rc-chart-2').trim() || '#38BDF8',
-            tertiary: style.getPropertyValue('--rc-chart-3').trim() || '#FF8A47',
-            quaternary: style.getPropertyValue('--rc-chart-4').trim() || '#FBBF4D',
-            quinary: style.getPropertyValue('--rc-chart-5').trim() || '#FF6A60',
+            primary: style.getPropertyValue('--rc-chart-1').trim() || '#2A78D6',
+            secondary: style.getPropertyValue('--rc-chart-2').trim() || '#EB6834',
+            tertiary: style.getPropertyValue('--rc-chart-3').trim() || '#1BAF7A',
+            quaternary: style.getPropertyValue('--rc-chart-4').trim() || '#EDA100',
+            quinary: style.getPropertyValue('--rc-chart-5').trim() || '#E87BA4',
             text: style.getPropertyValue('--rc-text-secondary').trim() || '#A9B4AE',
             grid: style.getPropertyValue('--rc-chart-grid').trim() || 'rgba(255,255,255,0.06)',
         };

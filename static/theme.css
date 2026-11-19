@@ -1,6 +1,6 @@
 /* ============================================================
-   Running Coach - 设计令牌（单一天然身份：GREEN / TEAL / ORANGE）
-   来源：design/running-coach-web/theme-tokens.css（第一性原理推导结论）
+   Running Coach - 设计令牌（跑表读数：操作绿 / 数据蓝 / 负荷琥珀）
+   目标：数据优先、状态明确、明暗主题独立校验，避免霓虹色与辉光争抢注意力
    机制：[data-theme="dark"] 与 .dark 双选择器兼容
    ============================================================ */
 
@@ -33,35 +33,36 @@
   --gray-850: #151A1F;  --gray-900: #1B2127;  --gray-950: #232C34;
 }
 
-/* 2) SEMANTIC 语义层 - 日间模式（Pulse Green 优化 v3） */
+/* 2) SEMANTIC 语义层 - 日间模式（跑表读数：操作绿 / 数据蓝 / 负荷琥珀） */
 :root {
-  --rc-background: #F6FAF7;   --rc-surface: #FFFFFF;   --rc-surface-elevated: #EEF3F0;   --rc-surface-raised: #EEF3F0;   --rc-surface-sunken: #EAF1ED;
-  --rc-surface-alt: #F1F5F3;  --rc-popover: #FFFFFF;   --rc-popover-foreground: #16201C;
+  color-scheme: light;
+  --rc-background: #F3F5F4;   --rc-surface: #FFFFFF;   --rc-surface-elevated: #E9EEEB;   --rc-surface-raised: #E9EEEB;   --rc-surface-sunken: #EEF2F0;
+  --rc-surface-alt: #F7F9F8;  --rc-popover: #FFFFFF;   --rc-popover-foreground: #17201D;
 
-  --rc-text: #16201C;  --rc-text-secondary: #445049;  --rc-text-muted: #5E6862;
-  --rc-text-on-brand: #04140D;  --rc-text-on-energy: #1A2400;
+  --rc-text: #17201D;  --rc-text-secondary: #46514C;  --rc-text-muted: #66736C;
+  --rc-text-on-brand: #FFFFFF;  --rc-text-on-energy: #2C1E08;
 
-  --rc-border: rgba(16,32,28,0.12);  --rc-border-strong: rgba(16,32,28,0.20);  --rc-border-light: rgba(16,32,28,0.08);  --rc-border-faint: rgba(16,32,28,0.07);  --rc-chart-grid: rgba(16,32,28,0.08);
+  --rc-border: rgba(23,32,29,0.12);  --rc-border-strong: rgba(23,32,29,0.20);  --rc-border-light: rgba(23,32,29,0.08);  --rc-border-faint: rgba(23,32,29,0.06);  --rc-chart-grid: rgba(23,32,29,0.08);
 
-  --rc-brand: #10E08A;  --rc-brand-hover: #0FCB7E;  --rc-brand-active: #0A9A63;
-  --rc-on-brand: #04140D;  --rc-brand-soft: rgba(16,224,138,0.12);  --rc-brand-border: rgba(16,224,138,0.30);
-  --rc-data: #0B7FA0;  --rc-data-hover: #0A6E8C;  --rc-on-data: #FFFFFF;  --rc-data-soft: rgba(11,127,160,0.12);
-  --rc-energy: #C6F000;  --rc-energy-hover: #D6FF1A;  --rc-energy-active: #B2DA00;  --rc-on-energy: #1A2400;  --rc-energy-soft: rgba(198,240,0,0.12);  --rc-glow-energy: 0 0 18px rgba(198,240,0,0.22);
+  --rc-brand: #167657;  --rc-brand-hover: #125F47;  --rc-brand-active: #0E4E3B;
+  --rc-on-brand: #FFFFFF;  --rc-brand-soft: rgba(22,118,87,0.10);  --rc-brand-border: rgba(22,118,87,0.28);
+  --rc-data: #2A78D6;  --rc-data-hover: #1F63B4;  --rc-on-data: #FFFFFF;  --rc-data-soft: rgba(42,120,214,0.10);
+  --rc-energy: #9A6400;  --rc-energy-hover: #7F5200;  --rc-energy-active: #694300;  --rc-on-energy: #FFFFFF;  --rc-energy-soft: rgba(154,100,0,0.10);  --rc-glow-energy: none;
 
-  --state-success: #2BD493;  --state-info: #38BDF8;  --state-warning: #FFB02E;  --state-error: #FF5C5C;
-  --rc-success: #2BD493;  --rc-info: #38BDF8;  --rc-info-fg: #0369A1;  --rc-warning: #FFB02E;  --rc-warning-fg: #92560A;  --rc-danger: #FF5C5C;  --rc-danger-fg: #B91C1C;
+  --state-success: #147C55;  --state-info: #256A92;  --state-warning: #9A6200;  --state-error: #C53F45;
+  --rc-success: #147C55;  --rc-info: #256A92;  --rc-info-fg: #256A92;  --rc-warning: #9A6200;  --rc-warning-fg: #9A6200;  --rc-danger: #C53F45;  --rc-danger-fg: #C53F45;
 
-  --rc-ring: #0A9A63;  --rc-ring-offset: #FFFFFF;
+  --rc-ring: #167657;  --rc-ring-offset: #FFFFFF;
 
-  --rc-zone-1: #0369A1;  --rc-zone-2: #047857;  --rc-zone-3: #B45309;  --rc-zone-4: #C2410C;  --rc-zone-5: #B91C1C;
-  --rc-chart-1: #10E08A;  --rc-chart-2: #2BC4E6;  --rc-chart-3: #FFB02E;  --rc-chart-4: #C6F000;  --rc-chart-5: #FF5C5C;
+  --rc-zone-1: #2A78D6;  --rc-zone-2: #167657;  --rc-zone-3: #9A6400;  --rc-zone-4: #B95627;  --rc-zone-5: #B83A44;
+  --rc-chart-1: #2A78D6;  --rc-chart-2: #EB6834;  --rc-chart-3: #1BAF7A;  --rc-chart-4: #EDA100;  --rc-chart-5: #E87BA4;
 
-  --rc-shadow-sm: 0 1px 2px rgba(16,32,28,0.06);  --rc-shadow-md: 0 6px 16px -6px rgba(16,32,28,0.12);
-  --rc-shadow-lg: 0 16px 32px -12px rgba(16,32,28,0.18);  --rc-glow-brand: 0 0 18px rgba(16,224,138,0.25);
+  --rc-shadow-sm: 0 1px 2px rgba(23,32,29,0.05);  --rc-shadow-md: 0 8px 20px -12px rgba(23,32,29,0.18);
+  --rc-shadow-lg: 0 18px 36px -18px rgba(23,32,29,0.22);  --rc-glow-brand: none;
 
-  --rc-radius-sm: 6px; --rc-radius-md: 10px; --rc-radius-lg: 14px; --rc-radius-xl: 20px; --rc-radius-2xl: 28px; --rc-radius-full: 9999px;
-  --rc-font-display: 'Inter Tight','Inter',-apple-system,sans-serif;
-  --rc-font-body: 'Inter',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+  --rc-radius-sm: 6px; --rc-radius-md: 10px; --rc-radius-lg: 14px; --rc-radius-xl: 20px; --rc-radius-2xl: 24px; --rc-radius-full: 9999px;
+  --rc-font-display: 'Inter Tight','Segoe UI Variable Display','Segoe UI',-apple-system,sans-serif;
+  --rc-font-body: 'Inter','Segoe UI Variable Text','Segoe UI',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
   --rc-font-mono: 'JetBrains Mono','Consolas',monospace;
   --rc-text-xs: 0.75rem; --rc-text-sm: 0.8125rem; --rc-text-base: 0.9375rem; --rc-text-lg: 1.125rem;
   --rc-text-xl: 1.375rem; --rc-text-2xl: 1.75rem; --rc-text-3xl: 2.25rem; --rc-text-4xl: 3rem; --rc-text-5xl: 3.75rem;
@@ -71,61 +72,62 @@
 
   /* 兼容别名（保持不变，避免破坏现有模板） */
   --rc-primary: var(--rc-brand);  --rc-primary-strong: var(--rc-brand-active);  --rc-primary-foreground: var(--rc-on-brand);
-  --rc-primary-light: #0FCB7E;  --rc-primary-dark: #0A9A63;  --rc-primary-bg: var(--rc-brand-soft);
+  --rc-primary-light: #4FB98E;  --rc-primary-dark: var(--rc-brand-hover);  --rc-primary-bg: var(--rc-brand-soft);
   --rc-primary-border: var(--rc-brand-border);  --rc-text-on-primary: var(--rc-on-brand);  --rc-destructive: var(--state-error);
   --rc-destructive-foreground: #FFFFFF;
   --rc-foreground: var(--rc-text);  --rc-card: var(--rc-surface);  --rc-card-foreground: var(--rc-text);
   --rc-card-hover: var(--rc-surface-elevated);  --rc-card-alt: var(--rc-surface-alt);
   --rc-muted: var(--rc-surface-elevated);  --rc-muted-foreground: var(--rc-text-secondary);  --rc-input: var(--rc-surface-sunken);
-  --rc-sidebar: var(--gray-25);  --rc-sidebar-foreground: var(--rc-text);  --rc-sidebar-primary: var(--rc-brand);
+  --rc-sidebar: #EDF1EF;  --rc-sidebar-foreground: var(--rc-text);  --rc-sidebar-primary: var(--rc-brand);
   --rc-sidebar-primary-foreground: var(--rc-on-brand);  --rc-sidebar-accent: var(--rc-surface-elevated);
   --rc-sidebar-accent-foreground: var(--rc-text);  --rc-sidebar-border: var(--rc-border);  --rc-sidebar-ring: var(--rc-ring);
   --rc-sidebar-bg: var(--rc-sidebar);  --rc-sidebar-text: var(--rc-sidebar-foreground);
   --rc-sidebar-active: var(--rc-sidebar-primary);  --rc-sidebar-hover: var(--rc-sidebar-accent);
 
-  /* Orb 辉光 */
-  --rc-orb-highlight: #93E9C4;  --rc-orb-shadow: #0A6F47;
-  --rc-orb-glow: 0 0 16px rgba(16,224,138,0.35);
-  --rc-orb-glow-strong: 0 0 28px rgba(16,224,138,0.55), 0 0 56px rgba(16,224,138,0.25);
-  --rc-logo-glow: 0 0 12px rgba(16,224,138,0.30);
+  /* Orb 只保留轻微边缘光，工作状态才呼吸 */
+  --rc-orb-highlight: #A2E8C8;  --rc-orb-shadow: #27815E;  --rc-orb-text: #09251A;
+  --rc-orb-glow: 0 0 0 4px rgba(22,118,87,0.08);
+  --rc-orb-glow-strong: 0 0 0 5px rgba(22,118,87,0.12), 0 0 24px rgba(22,118,87,0.18);
+  --rc-logo-glow: none;
 
-  /* 氛围层渐变 */
-  --rc-ambient-dawn:  linear-gradient(90deg, transparent, rgba(16,224,138,0.06), transparent);
+  /* 氛围层仅提供极轻的冷色空气感 */
+  --rc-ambient-dawn:  linear-gradient(90deg, transparent, rgba(42,120,214,0.035), transparent);
   --rc-ambient-noon:  linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,0));
-  --rc-ambient-dusk:  linear-gradient(90deg, transparent, rgba(43,196,230,0.05), transparent);
-  --rc-ambient-night: radial-gradient(circle at 20% 30%, rgba(16,224,138,0.06), transparent 60%);
+  --rc-ambient-dusk:  linear-gradient(90deg, transparent, rgba(154,100,0,0.025), transparent);
+  --rc-ambient-night: radial-gradient(circle at 20% 30%, rgba(42,120,214,0.025), transparent 60%);
 }
 
 /* 3) SEMANTIC 语义层 - 夜间模式 */
 [data-theme="dark"], .dark {
-  --rc-background: #0B0F0E;  --rc-surface: #141A18;  --rc-surface-elevated: #1A221F;  --rc-surface-raised: #1A221F;  --rc-surface-sunken: #0E1311;
-  --rc-surface-alt: #10151A;  --rc-popover: #141A18;  --rc-popover-foreground: #ECF3EF;
+  color-scheme: dark;
+  --rc-background: #101315;  --rc-surface: #181D1F;  --rc-surface-elevated: #202729;  --rc-surface-raised: #202729;  --rc-surface-sunken: #121719;
+  --rc-surface-alt: #14191B;  --rc-popover: #181D1F;  --rc-popover-foreground: #EDF1EF;
 
-  --rc-text: #ECF3EF;  --rc-text-secondary: #9FAAA4;  --rc-text-muted: #7C887F;
-  --rc-text-on-brand: #04140D;  --rc-text-on-energy: #1A2400;
+  --rc-text: #EDF1EF;  --rc-text-secondary: #B0BBB6;  --rc-text-muted: #8D9993;
+  --rc-text-on-brand: #09251A;  --rc-text-on-energy: #2C1E08;
 
-  --rc-border: rgba(255,255,255,0.08);  --rc-border-strong: rgba(255,255,255,0.14);  --rc-border-faint: rgba(255,255,255,0.05);
-  --rc-border-light: rgba(255,255,255,0.05);  --rc-chart-grid: rgba(255,255,255,0.06);
+  --rc-border: rgba(237,241,239,0.09);  --rc-border-strong: rgba(237,241,239,0.16);  --rc-border-faint: rgba(237,241,239,0.05);
+  --rc-border-light: rgba(237,241,239,0.06);  --rc-chart-grid: rgba(237,241,239,0.07);
 
-  --rc-brand: #10E08A;  --rc-brand-hover: #0FCB7E;  --rc-brand-active: #0A9A63;  --rc-on-brand: #04140D;
-  --rc-brand-soft: rgba(16,224,138,0.12);  --rc-brand-border: rgba(16,224,138,0.30);
-  --rc-data: #2BC4E6;  --rc-data-hover: #5FD4EE;  --rc-on-data: #04222B;  --rc-data-soft: rgba(43,196,230,0.12);
-  --rc-energy: #C6F000;  --rc-energy-hover: #D6FF1A;  --rc-energy-active: #B2DA00;  --rc-on-energy: #1A2400;  --rc-energy-soft: rgba(198,240,0,0.12);  --rc-glow-energy: 0 0 24px rgba(198,240,0,0.28);
+  --rc-brand: #72D6AA;  --rc-brand-hover: #8AE2BC;  --rc-brand-active: #4FBE90;  --rc-on-brand: #09251A;
+  --rc-brand-soft: rgba(114,214,170,0.11);  --rc-brand-border: rgba(114,214,170,0.28);
+  --rc-data: #3987E5;  --rc-data-hover: #63A1EC;  --rc-on-data: #FFFFFF;  --rc-data-soft: rgba(57,135,229,0.14);
+  --rc-energy: #E2B45E;  --rc-energy-hover: #F0C87C;  --rc-energy-active: #C99845;  --rc-on-energy: #2C1E08;  --rc-energy-soft: rgba(226,180,94,0.12);  --rc-glow-energy: none;
 
-  --state-success: #2BD493;  --state-info: #38BDF8;  --state-warning: #FFB02E;  --state-error: #FF5C5C;
-  --rc-success: #2BD493;  --rc-info: #38BDF8;  --rc-info-fg: #0369A1;  --rc-warning: #FFB02E;  --rc-warning-fg: #92560A;  --rc-danger: #FF5C5C;  --rc-danger-fg: #B91C1C;
+  --state-success: #72D6AA;  --state-info: #66B5E5;  --state-warning: #E2B45E;  --state-error: #F08484;
+  --rc-success: #72D6AA;  --rc-info: #66B5E5;  --rc-info-fg: #79BDEB;  --rc-warning: #E2B45E;  --rc-warning-fg: #E2B45E;  --rc-danger: #F08484;  --rc-danger-fg: #F08484;
 
-  --rc-ring: #10E08A;  --rc-ring-offset: #0B0F0E;
+  --rc-ring: #72D6AA;  --rc-ring-offset: #101315;
 
-  --rc-zone-1: #38BDF8;  --rc-zone-2: #34D399;  --rc-zone-3: #FBBF24;  --rc-zone-4: #FB923C;  --rc-zone-5: #FF5C5C;
-  --rc-chart-1: #10E08A;  --rc-chart-2: #2BC4E6;  --rc-chart-3: #FFB02E;  --rc-chart-4: #C6F000;  --rc-chart-5: #FF5C5C;
+  --rc-zone-1: #6AA9E9;  --rc-zone-2: #72D6AA;  --rc-zone-3: #E2B45E;  --rc-zone-4: #E58A61;  --rc-zone-5: #F08484;
+  --rc-chart-1: #3987E5;  --rc-chart-2: #D95926;  --rc-chart-3: #199E70;  --rc-chart-4: #C98500;  --rc-chart-5: #D55181;
 
-  --rc-shadow-sm: 0 1px 2px rgba(0,0,0,0.30);  --rc-shadow-md: 0 8px 24px -8px rgba(0,0,0,0.45);
-  --rc-shadow-lg: 0 20px 40px -12px rgba(0,0,0,0.55);  --rc-glow-brand: 0 0 24px rgba(16,224,138,0.35);
+  --rc-shadow-sm: 0 1px 2px rgba(0,0,0,0.24);  --rc-shadow-md: 0 10px 24px -14px rgba(0,0,0,0.50);
+  --rc-shadow-lg: 0 20px 40px -18px rgba(0,0,0,0.58);  --rc-glow-brand: none;
 
-  --rc-radius-sm: 6px; --rc-radius-md: 10px; --rc-radius-lg: 14px; --rc-radius-xl: 20px; --rc-radius-2xl: 28px; --rc-radius-full: 9999px;
-  --rc-font-display: 'Inter Tight','Inter',-apple-system,sans-serif;
-  --rc-font-body: 'Inter',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+  --rc-radius-sm: 6px; --rc-radius-md: 10px; --rc-radius-lg: 14px; --rc-radius-xl: 20px; --rc-radius-2xl: 24px; --rc-radius-full: 9999px;
+  --rc-font-display: 'Inter Tight','Segoe UI Variable Display','Segoe UI',-apple-system,sans-serif;
+  --rc-font-body: 'Inter','Segoe UI Variable Text','Segoe UI',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
   --rc-font-mono: 'JetBrains Mono','Consolas',monospace;
   --rc-text-xs: 0.75rem; --rc-text-sm: 0.8125rem; --rc-text-base: 0.9375rem; --rc-text-lg: 1.125rem;
   --rc-text-xl: 1.375rem; --rc-text-2xl: 1.75rem; --rc-text-3xl: 2.25rem; --rc-text-4xl: 3rem; --rc-text-5xl: 3.75rem;
@@ -134,27 +136,27 @@
   --rc-transition: 0.2s cubic-bezier(0.4,0,0.2,1);
 
   --rc-primary: var(--rc-brand);  --rc-primary-strong: var(--rc-brand-active);  --rc-primary-foreground: var(--rc-on-brand);
-  --rc-primary-light: #0FCB7E;  --rc-primary-dark: #10E08A;  --rc-primary-bg: var(--rc-brand-soft);
+  --rc-primary-light: #A2E8C8;  --rc-primary-dark: var(--rc-brand-hover);  --rc-primary-bg: var(--rc-brand-soft);
   --rc-primary-border: var(--rc-brand-border);  --rc-text-on-primary: var(--rc-on-brand);  --rc-destructive: var(--state-error);
-  --rc-destructive-foreground: #04222B;
+  --rc-destructive-foreground: #2A0D0D;
   --rc-foreground: var(--rc-text);  --rc-card: var(--rc-surface);  --rc-card-foreground: var(--rc-text);
   --rc-card-hover: var(--rc-surface-elevated);  --rc-card-alt: var(--rc-surface-alt);
   --rc-muted: var(--rc-surface-elevated);  --rc-muted-foreground: var(--rc-text-secondary);  --rc-input: var(--rc-surface-sunken);
-  --rc-sidebar: #0C1014;  --rc-sidebar-foreground: var(--rc-text);  --rc-sidebar-primary: var(--rc-brand);
+  --rc-sidebar: #0C0F11;  --rc-sidebar-foreground: var(--rc-text);  --rc-sidebar-primary: var(--rc-brand);
   --rc-sidebar-primary-foreground: var(--rc-on-brand);  --rc-sidebar-accent: var(--rc-surface-elevated);
   --rc-sidebar-accent-foreground: var(--rc-text);  --rc-sidebar-border: var(--rc-border);  --rc-sidebar-ring: var(--rc-ring);
   --rc-sidebar-bg: var(--rc-sidebar);  --rc-sidebar-text: var(--rc-sidebar-foreground);
   --rc-sidebar-active: var(--rc-sidebar-primary);  --rc-sidebar-hover: var(--rc-sidebar-accent);
 
-  --rc-orb-highlight: #93E9C4;  --rc-orb-shadow: #0A6F47;
-  --rc-orb-glow: 0 0 22px rgba(16,224,138,0.45), 0 0 44px rgba(16,224,138,0.20);
-  --rc-orb-glow-strong: 0 0 32px rgba(16,224,138,0.60), 0 0 72px rgba(16,224,138,0.28);
-  --rc-logo-glow: 0 0 14px rgba(16,224,138,0.40);
+  --rc-orb-highlight: #A2E8C8;  --rc-orb-shadow: #27815E;  --rc-orb-text: #09251A;
+  --rc-orb-glow: 0 0 0 4px rgba(114,214,170,0.08);
+  --rc-orb-glow-strong: 0 0 0 5px rgba(114,214,170,0.12), 0 0 24px rgba(114,214,170,0.18);
+  --rc-logo-glow: none;
 
-  --rc-ambient-dawn:  linear-gradient(90deg, transparent, rgba(16,224,138,0.06), transparent);
-  --rc-ambient-noon:  linear-gradient(180deg, rgba(11,15,14,0), rgba(11,15,14,0));
-  --rc-ambient-dusk:  linear-gradient(90deg, transparent, rgba(43,196,230,0.05), transparent);
-  --rc-ambient-night: radial-gradient(circle at 20% 30%, rgba(16,224,138,0.06), transparent 60%);
+  --rc-ambient-dawn:  linear-gradient(90deg, transparent, rgba(57,135,229,0.04), transparent);
+  --rc-ambient-noon:  linear-gradient(180deg, rgba(16,19,21,0), rgba(16,19,21,0));
+  --rc-ambient-dusk:  linear-gradient(90deg, transparent, rgba(226,180,94,0.025), transparent);
+  --rc-ambient-night: radial-gradient(circle at 20% 30%, rgba(57,135,229,0.03), transparent 60%);
 }
 
 
@@ -172,7 +174,7 @@
   align-items: center;
   justify-content: center;
   box-shadow: var(--rc-orb-glow);
-  animation: orb-breathe 4s ease-in-out infinite;
+  animation: none;
   cursor: pointer;
   transition: transform var(--rc-transition);
 }
@@ -192,7 +194,8 @@
   font-size: 13px;
   font-weight: 700;
   line-height: 1;
-  color: var(--rc-text-on-brand);
+  /* 读数置于浅色球面（highlight→shadow 渐变）之上，两主题均用深色保证可读 */
+  color: var(--rc-orb-text, #09251A);
 }
 
 .coach-orb:hover {
@@ -301,12 +304,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-.glow-accent-sm {
-  text-shadow: 0 0 8px var(--rc-primary);
-}
-
+.glow-accent-sm,
 .glow-accent-md {
-  text-shadow: 0 0 16px var(--rc-primary);
+  text-shadow: none;
 }
 
 .theme-toggle {
@@ -701,9 +701,7 @@ body {
 }
 
 .card:hover {
-  border-color: var(--rc-primary-border);
-  transform: translateY(-2px);
-  box-shadow: var(--rc-shadow-md);
+  border-color: var(--rc-border-strong);
 }
 
 /* 按钮 */
@@ -898,6 +896,7 @@ textarea:focus {
   .main-content {
     margin-left: 0;
     padding: var(--rc-space-4);
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0));
   }
 
   .top-nav .search-wrapper.is-open .search-input {
@@ -956,6 +955,31 @@ textarea:focus {
 
   .mobile-bottom-nav a.active {
     color: var(--rc-primary);
+  }
+}
+
+@media (max-width: 560px) {
+  .top-nav {
+    padding: 0 var(--rc-space-3);
+    gap: var(--rc-space-2);
+  }
+
+  .top-nav .brand {
+    font-size: var(--rc-text-base);
+  }
+
+  .top-nav .brand .logo-icon {
+    width: 26px;
+    height: 26px;
+  }
+
+  .top-nav .badge-web,
+  .top-nav .user-avatar {
+    display: none;
+  }
+
+  .top-nav .nav-actions {
+    gap: var(--rc-space-1);
   }
 }
 
