@@ -255,6 +255,60 @@
     .hero-card { padding: var(--rc-space-6) var(--rc-space-5); }
     .hero-number { font-size: var(--rc-text-4xl); }
 }
+
+/* ---- Garmin 同步状态卡片 ---- */
+.sync-card {
+    padding: var(--rc-space-5) var(--rc-space-6);
+    margin-bottom: var(--rc-space-6);
+    border-radius: var(--rc-radius-2xl);
+    background: var(--rc-surface);
+    border: 1px solid var(--rc-border);
+}
+.sync-card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: var(--rc-space-3); margin-bottom: var(--rc-space-3);
+}
+.sync-badge {
+    font-size: var(--rc-text-xs); font-weight: 600; padding: 3px 10px;
+    border-radius: 999px; border: 1px solid var(--rc-border);
+    color: var(--rc-text-muted); white-space: nowrap;
+}
+.sync-badge.idle { color: var(--rc-text-muted); }
+.sync-badge.running { color: var(--rc-data); border-color: var(--rc-data); }
+.sync-badge.success { color: var(--rc-success, #2ecc71); border-color: var(--rc-success, #2ecc71); }
+.sync-badge.failed { color: var(--rc-danger, #e74c3c); border-color: var(--rc-danger, #e74c3c); }
+.sync-progress-wrap { margin: var(--rc-space-2) 0; }
+.sync-progress-bar {
+    height: 8px; border-radius: 999px; overflow: hidden;
+    background: var(--rc-border); margin-bottom: 6px;
+}
+.sync-progress-fill {
+    height: 100%; width: 0%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--rc-brand), var(--rc-data));
+    transition: width .4s ease;
+}
+.sync-progress-meta {
+    display: flex; justify-content: space-between; gap: var(--rc-space-3);
+    font-size: var(--rc-text-sm); color: var(--rc-text-secondary);
+}
+.sync-stage { font-weight: 600; color: var(--rc-text); }
+.sync-counts { font-variant-numeric: tabular-nums; color: var(--rc-text-muted); }
+.sync-detail {
+    font-size: var(--rc-text-sm); color: var(--rc-text-muted);
+    margin-top: var(--rc-space-2); line-height: 1.5;
+}
+.sync-summary {
+    font-size: var(--rc-text-sm); color: var(--rc-text-secondary);
+    margin-top: var(--rc-space-2); line-height: 1.6;
+}
+.sync-actions { margin-top: var(--rc-space-3); display: flex; gap: var(--rc-space-3); }
+.sync-actions button {
+    padding: 5px 12px; border-radius: 8px; cursor: pointer; font-size: var(--rc-text-sm);
+    border: 1px solid var(--rc-border); background: transparent; color: var(--rc-text);
+}
+.sync-actions button.primary {
+    border-color: var(--rc-accent, #4f8cff); background: var(--rc-accent, #4f8cff); color: #fff;
+}
 </style>
 
 <!-- ============================================================ -->
@@ -310,6 +364,26 @@
             </div>
             <span class="hero-readiness-label">身体就绪度</span>
         </div>
+    </div>
+</div>
+
+<!-- Garmin 同步状态卡片：书签一键同步后实时展示进度 -->
+<div id="sync-card" class="sync-card">
+    <div class="sync-card-header">
+        <span class="kpi-card-label">Garmin 同步状态</span>
+        <span id="sync-badge" class="sync-badge idle">空闲</span>
+    </div>
+    <div id="sync-progress-wrap" class="sync-progress-wrap" style="display:none;">
+        <div class="sync-progress-bar"><div id="sync-progress-fill" class="sync-progress-fill"></div></div>
+        <div class="sync-progress-meta">
+            <span id="sync-stage" class="sync-stage">准备中…</span>
+            <span id="sync-counts" class="sync-counts">0 / 0</span>
+        </div>
+    </div>
+    <div id="sync-detail" class="sync-detail">等待通过 Garmin Connect 网页书签同步数据…</div>
+    <div id="sync-summary" class="sync-summary" style="display:none;"></div>
+    <div class="sync-actions">
+        <button id="sync-help-btn" type="button">如何一键同步？</button>
     </div>
 </div>
 

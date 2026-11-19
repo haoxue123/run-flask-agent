@@ -2,7 +2,10 @@
 import os
 import json
 import logging
+import threading
+import uuid
 from datetime import datetime, timedelta
+from typing import Optional
 from flask import Blueprint, request, jsonify, current_app
 
 import data_tool
@@ -12,6 +15,37 @@ data_bp = Blueprint("data", __name__)
 logger = logging.getLogger(__name__)
 
 ALLOWED_EXTS = {".gpx", ".tcx", ".fit", ".csv"}
+
+# ============================================================
+# 书签一键同步的实时进度状态（线程安全）
+# 书签脚本把活动压缩包 POST 过来后，服务端在后台线程里解包 + 刷新画像，
+# 期间持续更新 _SYNC_PROGRESS；前端卡片每 1s 轮询 /api/data/garmin_sync_progress。
+# ============================================================
+_SYNC_LOCK = threading.Lock()
+_SYNC_PROGRESS = {
+    "status": "idle",          # idle | running | success | failed
+    "task_id": "",
+    "stage": "",               # 当前阶段中文描述
+    "stage_detail": "",        # 阶段补充信息
+    "processed": 0,            # 已处理压缩包数
+    "total": 0,                # 总压缩包数
+    "extracted_fit": 0,        # 已解出的 .fit 数
+    "started_at": None,        # ISO 字符串
+    "finished_at": None,       # ISO 字符串
+    "message": "",             # 完成/失败摘要
+    "error": "",
+    "profile_summary": {},     # 画像摘要（完成后填充）
+}
+
+
+def _set_progress(**kw):
+    with _SYNC_LOCK:
+        _SYNC_PROGRESS.update(kw)
+
+
+def _get_progress():
+    with _SYNC_LOCK:
+        return dict(_SYNC_PROGRESS)
 
 
 def _allowed_file(filename):
@@ -27,8 +61,9 @@ def _save_uploaded_files(files, upload_dir, timestamp=None):
     for f in files:
         if f and f.filename and _allowed_file(f.filename):
             safe_name = f"{timestamp}_{f.filename}"
-            f.save(os.path.join(upload_dir, safe_name))
-            saved.append(safe_name)
+            full_path = os.path.join(upload_dir, safe_name)
+            f.save(full_path)
+            saved.append(full_path)
     return saved
 
 
@@ -41,12 +76,16 @@ def _write_manual_input(form, data_dir):
     manual_path = os.path.join(data_dir, "manual_input.json")
     existing_health = {}
     existing_fitness = {}
+    existing_recent = []
+    existing_race = {}
     if os.path.isfile(manual_path):
         try:
             with open(manual_path, "r", encoding="utf-8") as f:
                 existing_cfg = json.load(f)
             existing_health = existing_cfg.get("健康指标", {}) or {}
             existing_fitness = existing_cfg.get("体能指标", {}) or {}
+            existing_recent = existing_cfg.get("近期跑步数据", []) or []
+            existing_race = existing_cfg.get("近期比赛成绩", {}) or {}
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -57,7 +96,20 @@ def _write_manual_input(form, data_dir):
     run_hr = form.get("run_hr", "").strip()
     run_name = form.get("run_name", "").strip()
 
-    recent_runs = []
+    # 近期比赛成绩（用于推导 VDOT）：保留既有，仅当本次表单提供时更新
+    race_distance = form.get("race_distance", "").strip()
+    race_time = form.get("race_time", "").strip()
+    race = dict(existing_race) if existing_race else {}
+    if race_distance and race_time:
+        race_sec = _parse_duration_to_sec(race_time)
+        if race_sec:
+            try:
+                race = {"距离_km": float(race_distance), "时间_秒": race_sec}
+            except (ValueError, TypeError):
+                pass
+
+    # 追加而非覆盖：保留历史手动跑步，新记录排在末尾
+    recent_runs = list(existing_recent)
     if run_date and run_distance:
         run_entry = {
             "日期": run_date,
@@ -71,6 +123,7 @@ def _write_manual_input(form, data_dir):
 
     config = {
         "目标": {"目标完赛时间": target_time, "目标比赛": target_race, "目标距离": target_distance},
+        "近期比赛成绩": race if race else {},
         "近期跑步数据": recent_runs,
         "健康指标": existing_health,
         "体能指标": existing_fitness,
@@ -80,6 +133,24 @@ def _write_manual_input(form, data_dir):
         json.dump(config, f, ensure_ascii=False, indent=2)
 
     return config
+
+
+def _parse_duration_to_sec(value: str) -> Optional[float]:
+    """把时长字符串转为秒。支持 '40:00' / '40' / '1:20:00'。失败返回 None。"""
+    if not value:
+        return None
+    s = str(value).strip()
+    parts = [p for p in s.replace("'", ":").replace('"', ":").split(":") if p != ""]
+    try:
+        if len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+        if len(parts) == 2:
+            return int(parts[0]) * 60 + float(parts[1])
+        if len(parts) == 1:
+            return float(parts[0])
+    except (ValueError, TypeError):
+        return None
+    return None
 
 
 @data_bp.route("/api/data/refresh", methods=["POST"])
@@ -106,8 +177,9 @@ def api_data_refresh():
                 "error": f"仅支持 GPX/TCX/FIT/CSV 文件，不支持的文件：{', '.join(invalid_files)}",
             })
 
+        saved_paths = []
         if saved_files:
-            _save_uploaded_files(saved_files, upload_dir)
+            saved_paths = _save_uploaded_files(saved_files, upload_dir)
 
         has_manual = bool(request.form.get("run_date", "").strip() and
                          request.form.get("run_distance", "").strip())
@@ -122,8 +194,28 @@ def api_data_refresh():
                     "error": "请上传运动文件或填写手动数据",
                 })
 
+        # 解析本次上传的文件，给出"已摄入"反馈，让数据接入可见
+        ingested_runs = []
+        if saved_paths:
+            try:
+                for r in data_tool.get_recent_runs(files=saved_paths, limit=50):
+                    ingested_runs.append({
+                        "日期": r.get("日期"),
+                        "距离_km": r.get("距离_km"),
+                        "平均配速_秒每公里": r.get("平均配速_秒每公里"),
+                        "平均心率": r.get("平均心率"),
+                    })
+            except Exception:
+                pass
+
         data_tool.invalidate_profile_cache()
-        return jsonify({"success": True, "message": "数据已更新，请查看数据总览"})
+        return jsonify({
+            "success": True,
+            "message": "数据已更新",
+            "ingested_count": len(ingested_runs),
+            "ingested_runs": ingested_runs,
+            "manual_added": has_manual,
+        })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
@@ -185,6 +277,19 @@ def api_data_profile():
         run_count = len(recent_30)
         weekly_frequency = round(run_count / 30 * 7, 1) if run_count > 0 else 0
 
+        # VDOT：若用户填了近期比赛成绩，则推导有氧能力与配速表
+        import vdot as vdot_mod
+        vdot_val = None
+        vdot_paces = None
+        try:
+            race = vdot_mod.read_recent_race_from_manual(data_dir)
+            vdot_val = vdot_mod.vdot_from_recent_race(race)
+            if vdot_val is not None:
+                dist = (race or {}).get("距离_km") or (race or {}).get("distance_km") or 10.0
+                vdot_paces = vdot_mod.vdot_training_paces(vdot_val, float(dist))
+        except Exception:
+            pass
+
         return jsonify({
             "ok": True,
             "recent_runs": recent_runs,
@@ -195,6 +300,8 @@ def api_data_profile():
             },
             "target_race": goal.get("目标比赛", "") or "",
             "target_time": goal.get("目标完赛时间", "") or "",
+            "vdot": vdot_val,
+            "vdot_paces": vdot_paces,
         })
     except Exception as e:
         return jsonify({
@@ -203,6 +310,60 @@ def api_data_profile():
             "stats": {"thirty_day_volume": 0, "avg_pace": 0, "weekly_frequency": 0},
             "target_race": "", "target_time": "",
         })
+
+
+@data_bp.route("/api/data/actuals", methods=["GET"])
+def api_data_actuals():
+    """返回汇聚后的实际执行数据（周复盘闭环的输入），让数据接入可视化、可验证。
+
+    数据来自 weekly_review.load_actuals：计划按天记录 + 上传解析 + 手动录入三源合并。
+    """
+    try:
+        import weekly_review
+        actuals = weekly_review.load_actuals(current_app.config["DATA_DIR"])
+        total_distance = round(sum((a.get("distance_km") or 0) for a in actuals), 1)
+        by_source = {}
+        for a in actuals:
+            src = a.get("source", "unknown")
+            by_source[src] = by_source.get(src, 0) + 1
+        return jsonify({
+            "ok": True,
+            "count": len(actuals),
+            "total_distance_km": total_distance,
+            "by_source": by_source,
+            "items": actuals,
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
+
+@data_bp.route("/api/data/vdot", methods=["GET"])
+def api_data_vdot():
+    """由近期比赛成绩推导 VDOT 与全强度区配速表。无比赛成绩返回 ok=False。"""
+    try:
+        import vdot as vdot_mod
+        data_dir = current_app.config["DATA_DIR"]
+        race = vdot_mod.read_recent_race_from_manual(data_dir)
+        vdot_val = vdot_mod.vdot_from_recent_race(race)
+        if vdot_val is None:
+            return jsonify({
+                "ok": False,
+                "error": "未配置近期比赛成绩。请在数据页填写「近期比赛：距离 + 时间」后重试。",
+                "vdot": None,
+                "paces": None,
+            })
+        dist = (race or {}).get("距离_km") or (race or {}).get("distance_km") or 10.0
+        paces = vdot_mod.vdot_training_paces(vdot_val, float(dist))
+        block = vdot_mod.format_vdot_block(vdot_val, float(dist))
+        return jsonify({
+            "ok": True,
+            "vdot": vdot_val,
+            "race": race,
+            "paces_sec": paces,
+            "block": block,
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
 
 
 @data_bp.route("/api/data/sync_garmin", methods=["POST"])
@@ -223,6 +384,7 @@ def api_sync_garmin():
             output_dir=data_dir,
             fmt=fmt,
         )
+        garmin_sync.record_sync_success(downloaded, source="manual")
         data_tool.invalidate_profile_cache()
 
         return jsonify({
@@ -231,8 +393,233 @@ def api_sync_garmin():
             "files": [os.path.basename(p) for p in downloaded],
         })
     except RuntimeError as e:
+        garmin_sync.record_sync_failure(str(e), source="manual")
         logger.warning("Garmin sync runtime error: %s", e)
         return jsonify({"success": False, "error": str(e)}), 400
     except Exception as e:
+        garmin_sync.record_sync_failure(str(e), source="manual")
         logger.exception("Garmin sync failed")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@data_bp.route("/api/data/garmin_login", methods=["POST"])
+def api_garmin_login():
+    """启动可见浏览器做 Garmin 交互登录（MFA 在浏览器窗口输入），成功写 Cookie。"""
+    try:
+        garmin_sync.garmin_login(headless=False)
+        return jsonify({"success": True, "message": "浏览器登录成功，已保存会话"})
+    except RuntimeError as e:
+        logger.warning("Garmin 浏览器登录失败：%s", e)
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.exception("Garmin 浏览器登录异常")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@data_bp.route("/api/data/sync_status", methods=["GET"])
+def api_sync_status():
+    """返回 Garmin 同步状态 + 当前画像最新跑步日期，供前端判断数据是否新鲜。"""
+    try:
+        state = garmin_sync.read_sync_state()
+        latest_run = None
+        try:
+            profile = data_tool.build_runner_profile()
+            latest_run = (profile.get("基本信息") or {}).get("最近一次跑步日期")
+        except Exception:
+            pass
+
+        # 判断数据是否“新鲜”：最近一次成功同步在 30 分钟内
+        fresh = False
+        last_success = state.get("updated_at") if state.get("result") == "success" else None
+        if last_success:
+            try:
+                from datetime import datetime as _dt
+                last_dt = _dt.fromisoformat(last_success)
+                fresh = (_dt.now() - last_dt).total_seconds() < 30 * 60
+            except (ValueError, TypeError):
+                fresh = False
+
+        return jsonify({
+            "ok": True,
+            "state": state,
+            "latest_run_date": latest_run,
+            "fresh": fresh,
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "state": {}, "fresh": False})
+
+
+@data_bp.route("/api/data/garmin_ingest", methods=["POST", "OPTIONS"])
+def api_garmin_ingest():
+    """
+    一键同步入口：接收从 Garmin Connect 网页书签脚本 POST 来的活动压缩包
+    （Garmin 下载端点返回的外层 zip，内部每个活动又是一个 zip）。
+
+    流程：存 inbox → extract_garmin_fit 解包为原始 .fit → 刷新跑者画像缓存。
+    书签脚本在用户已登录的 Garmin 会话里运行，绕过 Cloudflare 风控与 2FA，
+    因此本端点只负责「接收 + 解包 + 刷新」，不做身份验证。
+
+    CORS：书签从 https://connect.garmin.cn 跨域 POST 到本地 Agent，
+    必须放行 Origin，否则浏览器拦截响应。
+    """
+    # 预检（multipart 属简单请求，但兜底处理 OPTIONS 以防部分浏览器触发）
+    if request.method == "OPTIONS":
+        resp = jsonify({})
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        return resp, 200
+
+    try:
+        activities_dir = os.path.join(garmin_sync.DEFAULT_OUTPUT_DIR, "activities")
+        inbox_dir = os.path.join(garmin_sync.DEFAULT_OUTPUT_DIR, "_ingest_inbox")
+        os.makedirs(activities_dir, exist_ok=True)
+        os.makedirs(inbox_dir, exist_ok=True)
+
+        files = request.files.getlist("files")
+        if not files:
+            resp = jsonify({
+                "success": False,
+                "error": "未收到文件。期望 multipart 字段 'files' 携带 Garmin 下载的 .zip",
+            })
+            resp.headers["Access-Control-Allow-Origin"] = "*"
+            return resp, 400
+
+        # 同步落盘，避免请求上下文在后台线程失效；记录待处理的包清单
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        packages = []  # [(path, kind)]  kind ∈ {"zip", "fit"}
+        for i, f in enumerate(files):
+            if not f or not f.filename:
+                continue
+            low = f.filename.lower()
+            if low.endswith(".fit"):
+                path = os.path.join(activities_dir, f"{ts}_{f.filename}")
+                f.save(path)
+                packages.append((path, "fit"))
+            elif low.endswith(".zip"):
+                path = os.path.join(inbox_dir, f"{ts}_{i}_{f.filename}")
+                f.save(path)
+                packages.append((path, "zip"))
+            # 其它扩展名忽略
+
+        if not packages:
+            resp = jsonify({
+                "success": False,
+                "error": "收到的文件均非 .zip / .fit，无法摄入",
+            })
+            resp.headers["Access-Control-Allow-Origin"] = "*"
+            return resp, 400
+
+        task_id = uuid.uuid4().hex[:12]
+        _set_progress(
+            status="running", task_id=task_id, stage="接收文件",
+            stage_detail="已收到书签上传的压缩包，准备解包…",
+            processed=0, total=len(packages), extracted_fit=0,
+            started_at=datetime.now().isoformat(), finished_at=None,
+            message="", error="", profile_summary={},
+        )
+
+        t = threading.Thread(
+            target=_run_ingest_background,
+            args=(packages, activities_dir, task_id),
+            daemon=True,
+        )
+        t.start()
+
+        resp = jsonify({
+            "success": True,
+            "task_id": task_id,
+            "message": "同步任务已启动，正在后台解包并刷新画像，请在 Agent 网页查看实时进度",
+            "package_count": len(packages),
+        })
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp, 200
+
+    except Exception as e:
+        logger.exception("Garmin ingest 启动失败")
+        _set_progress(status="failed", error=str(e),
+                      finished_at=datetime.now().isoformat())
+        resp = jsonify({"success": False, "error": str(e)})
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp, 500
+
+
+def _run_ingest_background(packages, activities_dir, task_id):
+    """后台线程：逐包解包 → 刷新画像 → 更新实时进度。不依赖 Flask 请求上下文。"""
+    try:
+        total = len(packages)
+        extracted_fit = 0
+        _set_progress(stage="解包活动",
+                      stage_detail=f"正在解包 {total} 个活动压缩包…",
+                      processed=0, total=total, extracted_fit=0)
+
+        for idx, (path, kind) in enumerate(packages, start=1):
+            if kind == "fit":
+                extracted_fit += 1
+            else:
+                fits = garmin_sync.extract_garmin_fit(path, dest_dir=activities_dir)
+                extracted_fit += len(fits)
+            _set_progress(
+                processed=idx, total=total, extracted_fit=extracted_fit,
+                stage="解包活动",
+                stage_detail=f"已解包 {idx}/{total}，累计解出 {extracted_fit} 个 .fit",
+            )
+
+        _set_progress(stage="解析与刷新画像",
+                      stage_detail="重新构建跑者画像…",
+                      processed=total, total=total, extracted_fit=extracted_fit)
+        data_tool.invalidate_profile_cache()
+
+        try:
+            profile = data_tool.build_runner_profile()
+            basic = profile.get("基本信息", {})
+            summary = {
+                "最近跑步次数": basic.get("最近跑步次数"),
+                "最近一次跑步": basic.get("最近一次跑步"),
+            }
+        except Exception:
+            summary = {}
+
+        _set_progress(
+            status="success",
+            stage="完成",
+            stage_detail=f"已解出 {extracted_fit} 个 .fit 活动，画像已刷新",
+            processed=total, total=total, extracted_fit=extracted_fit,
+            finished_at=datetime.now().isoformat(),
+            message=f"同步完成：解出 {extracted_fit} 个 .fit 活动，画像已刷新",
+            profile_summary=summary,
+        )
+        # 同步成功也写一份状态，供 /api/data/sync_status 展示“已是最新”
+        try:
+            garmin_sync.record_sync_success(
+                [p for p, _ in packages], source="bookmark")
+        except Exception:
+            pass
+    except Exception as e:
+        logger.exception("后台 ingest 处理异常")
+        _set_progress(
+            status="failed", error=str(e),
+            finished_at=datetime.now().isoformat(),
+            stage="失败", stage_detail=f"同步失败：{e}",
+        )
+
+
+@data_bp.route("/api/data/garmin_sync_progress", methods=["GET", "OPTIONS"])
+def api_garmin_sync_progress():
+    """
+    返回书签一键同步的实时进度，供前端「同步状态」卡片轮询。
+    跨域放行：书签脚本拉起 Agent 页后，页面同源访问本接口（无需 CORS），
+    但保留 CORS 以便书签脚本直接读取进度。
+    """
+    if request.method == "OPTIONS":
+        resp = jsonify({})
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        return resp, 200
+
+    data = _get_progress()
+    resp = jsonify(data)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Cache-Control"] = "no-store"
+    return resp, 200

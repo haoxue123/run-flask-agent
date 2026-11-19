@@ -327,6 +327,8 @@
     </div>
     <script>
     (function () {
+        /* 欢迎弹窗已禁用：直接 return，不展示全屏 overlay */
+        return;
         var KEY = 'rc-welcome-shown';
         if (localStorage.getItem(KEY)) return;
         var overlay = document.getElementById('welcome-overlay');

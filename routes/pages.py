@@ -149,7 +149,7 @@ def index():
             "weekly_distance": weekly_distance,
             "avg_pace": avg_pace,
             "training_load": training_load,
-            "readiness": readiness,
+            "readiness": readiness if readiness is not None else "数据不足",
             "acwr": acwr,
             "acwr_risk": acwr_risk,
             "plan_completion": plan_completion,
@@ -180,13 +180,15 @@ def index():
             insight["items"].append({"icon": "heart-pulse", "text": f"依据：静息心率 {resting_hr}bpm"})
         if acwr is not None:
             insight["items"].append({"icon": "activity", "text": f"依据：ACWR {acwr} ({acwr_risk['level']})"})
-        if readiness < 70:
+        if readiness is not None and readiness < 70:
             insight["items"].append({"icon": "zap", "text": f"依据：就绪度偏低 {readiness}"})
 
         if training_load >= 80:
             insight["badge"] = "建议调整"
-        elif readiness < 70:
+        elif readiness is not None and readiness < 70:
             insight["badge"] = "需关注"
+        elif readiness is None:
+            insight["badge"] = "数据不足"
         else:
             insight["badge"] = "正常"
 

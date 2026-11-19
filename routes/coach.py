@@ -2,13 +2,13 @@
 import os
 import json
 import re
-import tempfile
-import shutil
 import threading
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, Response, stream_with_context, current_app, session
 
 import data_tool
+import safeio
+import visualize
 import llm_agent
 import training_science as ts
 import rag
@@ -16,6 +16,7 @@ import workflow
 import memory
 from llm_agent import load_prompt
 import skills
+import weekly_review
 from openai import APIConnectionError, AuthenticationError
 
 coach_bp = Blueprint("coach", __name__)
@@ -180,7 +181,7 @@ def _infer_plan_duration(message):
     return 7
 
 
-def _stream_generated_plan(message, data_dir, history):
+def _stream_generated_plan(message, data_dir, history, start_epoch=None):
     """当用户给出明确计划指令时，直接调用生成并把结果流式返回。
 
     关键修复：把用户的原始命令作为 user_instructions 传入 generate_training_plan，
@@ -217,6 +218,32 @@ def _stream_generated_plan(message, data_dir, history):
                 profile, plan_duration=plan_duration, user_instructions=effective_instructions
             )
             plan_text = result.get("plan_text", "")
+            structured = result.get("structured", [])
+            science = result.get("science", {})
+
+            # --- 自动写入训练计划系统（与 /generate 路径对齐）---
+            try:
+                target = profile.get("目标", {}) or {}
+                plan_path = os.path.join(data_dir, "plan.json")
+                meta = {
+                    "generated_at": datetime.now().isoformat(),
+                    "plan_duration": plan_duration,
+                    "target_race": target.get("目标比赛", ""),
+                    "target_time": target.get("目标完赛时间", ""),
+                    "source": "coach_chat",
+                }
+                plan_payload = {"plan": structured, "meta": meta, "science": science}
+                safeio.safe_write_json(plan_path, plan_payload)
+                # 生成配速图表
+                chart_dir = current_app.config.get("CHART_DIR", os.path.join(data_dir, "charts"))
+                chart_filename = f"pace_chart_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                os.makedirs(chart_dir, exist_ok=True)
+                chart_path = os.path.join(chart_dir, chart_filename)
+                visualize.plot_pace_chart(structured, output_path=chart_path)
+                chart_url = f"/chart/{chart_filename}"
+            except Exception:
+                chart_url = ""
+
             header = "📋 已根据你的指令生成训练计划：\n\n"
             yield f"data: {json.dumps({'chunk': header})}\n\n"
             full_reply.append(header)
@@ -226,7 +253,10 @@ def _stream_generated_plan(message, data_dir, history):
                 if c:
                     full_reply.append(c)
                     yield f"data: {json.dumps({'chunk': c})}\n\n"
-            note = "\n\n（本计划已根据你给出的指令生成；如需保存，可到「训练计划」页面点击保存。）"
+            # 发送结构化计划数据供前端渲染为卡片（替代纯文本的土格式）
+            if structured:
+                yield f"data: {json.dumps({'plan_data': {'days': structured, 'chart_url': chart_url}})}\n\n"
+            note = "\n\n✅ 训练计划已自动保存至「训练计划」页面，可直接前往查看和调整。"
             full_reply.append(note)
             yield f"data: {json.dumps({'chunk': note})}\n\n"
         except Exception as e:
@@ -242,14 +272,16 @@ def _stream_generated_plan(message, data_dir, history):
             max_entries = MAX_HISTORY_ROUNDS * 2
             if len(history) > max_entries:
                 history[:] = history[-max_entries:]
-            try:
-                _save_chat_history(data_dir, history)
-            except Exception:
-                pass
-            try:
-                memory.update_profile_summary_from_history(history)
-            except Exception:
-                pass
+            # 会话作废检查：点过"新对话"则跳过历史持久化（回复仍返回给用户）
+            if start_epoch is None or _load_epoch(data_dir) == start_epoch:
+                try:
+                    _persist_history(data_dir, history)
+                except Exception:
+                    pass
+                try:
+                    memory.update_profile_summary_from_history(history)
+                except Exception:
+                    pass
             try:
                 memory.update_long_term_memory(message, reply_text)
                 session["memory_profile"] = memory.load_long_term_memory()
@@ -281,18 +313,71 @@ def _load_chat_history(data_dir):
 
 
 def _save_chat_history(data_dir, history):
-    """原子写入对话历史。"""
+    """稳健写入对话历史（去删除化：备份 + 截断式覆盖写 + 校验）。"""
     path = _chat_history_path(data_dir)
     os.makedirs(data_dir, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(suffix=".json", dir=data_dir)
+    safeio.safe_write_json(path, history)
+
+
+def _ensure_message_ids(history):
+    """为历史条目补齐稳定的 id / parent_id（对话地图分支可视化的基础）。
+
+    - 线性链：entry[i].parent_id = entry[i-1].id；首条 parent_id 为 None。
+    - 已带 id / parent_id 的分支条目（fork 产生）保持不变。
+    - 仅修改内存中的列表，不写盘；调用方若需持久化请自行 _save_chat_history。
+    """
+    prev_id = None
+    for entry in history:
+        if not entry.get("id"):
+            # 退化为基于索引的确定性 id（每次加载一致）
+            entry["id"] = "m" + str(history.index(entry))
+        if entry.get("parent_id") is None and prev_id is not None:
+            entry["parent_id"] = prev_id
+        prev_id = entry["id"]
+    return history
+
+
+def _persist_history(data_dir, history):
+    """保存对话历史前确保每条都有稳定 id / parent_id，再落盘。
+
+    对话地图（Tier1/Tier2）依赖 id 与 parent_id 渲染节点与分支边，
+    故在写盘前强制补齐——旧条目沿用既有 id（_ensure_message_ids 幂等），
+    fork 产生的显式 id / parent_id 原样保留。
+    """
+    _ensure_message_ids(history)
+    _save_chat_history(data_dir, history)
+
+
+# ---------------------------------------------------------------------------
+# 会话 epoch：用于"新对话"语义的原子作废标记
+# 单进程单用户场景下，用 data/chat_epoch 文件存一个自增整数。
+# "新对话"时递增 epoch 并清空历史；进行中的对话在收尾保存历史前比对 epoch，
+# 若已变化则丢弃本次保存，彻底消除「清空 vs 流式回复收尾写回」的竞态复活。
+# ---------------------------------------------------------------------------
+def _chat_epoch_path(data_dir):
+    return os.path.join(data_dir, "chat_epoch")
+
+
+def _load_epoch(data_dir):
+    path = _chat_epoch_path(data_dir)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(history, f, ensure_ascii=False, indent=2)
-        os.replace(tmp_path, path)
-    except Exception:
-        if os.path.isfile(tmp_path):
-            os.unlink(tmp_path)
-        raise
+        with open(path, "r", encoding="utf-8") as f:
+            return int((f.read() or "0").strip() or "0")
+    except (OSError, ValueError):
+        return 0
+
+
+def _bump_epoch(data_dir):
+    """递增会话 epoch（线程安全）。返回新的 epoch 值。"""
+    with _cache_lock:
+        ep = _load_epoch(data_dir) + 1
+        try:
+            os.makedirs(data_dir, exist_ok=True)
+            with open(_chat_epoch_path(data_dir), "w", encoding="utf-8") as f:
+                f.write(str(ep))
+        except OSError:
+            pass
+        return ep
 
 
 def _build_history_summary(history, rounds=CONTEXT_ROUNDS):
@@ -374,6 +459,8 @@ def api_coach_chat():
     """AI 教练对话端点（SSE 流式响应 + 对话记忆）。"""
     data = request.get_json()
     message = data.get("message", "").strip()
+    client_msg_id = (data or {}).get("client_msg_id")
+    parent_id = (data or {}).get("parent_id")
     if not message:
         return jsonify({"reply": "请告诉我你的问题。"})
 
@@ -404,6 +491,7 @@ def api_coach_chat():
 
     # 加载对话历史
     history = _load_chat_history(data_dir)
+    _ensure_message_ids(history)
     history_summary = _build_history_summary(history)
 
     # ---- 工作流状态机 ----
@@ -415,10 +503,14 @@ def api_coach_chat():
     next_state = workflow.get_next_state(current_state, intent) if intent else current_state
     session["workflow_state"] = next_state
 
+    # ---- 周复盘闭环入口：用户请求"复盘/周报/调整计划"时，直接返回确定性复盘报告 ----
+    if _is_review_request(message):
+        return _stream_weekly_review(data_dir)
+
     # ---- 计划生成命令拦截：用户给出明确指令时直接生成，而非仅引导去页面 ----
     # 修复"我让他做命令生成计划，但他不听从"：把用户命令作为一等输入传入生成
     if intent == "plan" and _is_plan_generation_command(message):
-        return _stream_generated_plan(message, data_dir, history)
+        return _stream_generated_plan(message, data_dir, history, _load_epoch(data_dir))
 
     # ---- 长期记忆（session 缓存，避免每次对话读磁盘） ----
     user_profile = session.get("memory_profile")
@@ -469,13 +561,22 @@ def api_coach_chat():
     except Exception:
         pass
 
+    # VDOT 配速表：若用户填了近期比赛成绩，注入教练上下文（确定性内核推导）
+    try:
+        from physiology import vdot_block_from_profile
+        vdot_ctx = vdot_block_from_profile(profile)
+        if vdot_ctx:
+            system_prompt = system_prompt + "\n\n【VDOT 配速参考（由近期比赛成绩推导，确定性内核）】\n" + vdot_ctx
+    except Exception:
+        pass
+
     ts_context = ""
     if ts_summary:
         ts_context = f"""
 【训练科学指标】
 - 训练负荷：{ts_summary.get('training_load', '-')}%（基于 TRIMP 模型）
 - ACWR（负荷比）：{ts_summary.get('acwr', '-')}（{ts_summary.get('acwr_risk', {}).get('level', '-')}）
-- 就绪度：{ts_summary.get('readiness', '-')}
+- 就绪度：{ts_summary.get('readiness') if ts_summary.get('readiness_available') else '数据不足'}
 - 周 TRIMP：{ts_summary.get('weekly_trimp', '-')}
 """
 
@@ -597,6 +698,8 @@ def api_coach_chat():
     def generate():
         nonlocal full_reply
         max_tool_rounds = 2
+        # 捕获会话 epoch：本次对话收尾保存前会再次比对，变化则说明期间点过"新对话"
+        _chat_start_epoch = _load_epoch(data_dir)
         current_messages = messages  # 使用外部构建的 messages
 
         for tool_round in range(max_tool_rounds):
@@ -653,29 +756,50 @@ def api_coach_chat():
         now = datetime.now().isoformat()
         reply_text = "".join(full_reply)
         references = _parse_references(reply_text)
-        history.append({"role": "user", "content": message, "time": now})
-        history.append({
-            "role": "assistant",
-            "content": reply_text,
-            "time": now,
-            "references": references,
-        })
-        # 只保留最近 MAX_HISTORY_ROUNDS 轮（每轮 = user + assistant）
-        max_entries = MAX_HISTORY_ROUNDS * 2
-        if len(history) > max_entries:
-            history[:] = history[-max_entries:]
-        try:
-            _save_chat_history(data_dir, history)
-        except Exception:
-            pass  # 保存失败不阻塞响应
 
-        # 增量更新用户画像结构化摘要（随对话演进）
-        try:
-            memory.update_profile_summary_from_history(history)
-        except Exception:
-            pass  # 摘要更新失败不阻塞响应
+        # 会话作废检查：若点过"新对话"，epoch 已变化，跳过历史持久化，
+        # 避免竞态把旧对话写回（否则"新对话"后历史又复活）。
+        if _load_epoch(data_dir) == _chat_start_epoch:
+            # 对话地图分支：fork 时显式指定 id / parent_id，使分支点可被地图渲染；
+            # 线性对话则留 None，由 _ensure_message_ids 派生确定性 id 与链式 parent。
+            if parent_id:
+                _user_msg_id = client_msg_id or ("u" + uuid.uuid4().hex[:12])
+                _asst_msg_id = _user_msg_id + "_a"
+            else:
+                _user_msg_id = None
+                _asst_msg_id = None
 
-        # 更新长期记忆
+            history.append({
+                "role": "user",
+                "content": message,
+                "time": now,
+                "id": _user_msg_id,
+                "parent_id": parent_id,
+            })
+            history.append({
+                "role": "assistant",
+                "content": reply_text,
+                "time": now,
+                "references": references,
+                "id": _asst_msg_id,
+                "parent_id": _user_msg_id,
+            })
+            # 只保留最近 MAX_HISTORY_ROUNDS 轮（每轮 = user + assistant）
+            max_entries = MAX_HISTORY_ROUNDS * 2
+            if len(history) > max_entries:
+                history[:] = history[-max_entries:]
+            try:
+                _persist_history(data_dir, history)
+            except Exception:
+                pass  # 保存失败不阻塞响应
+
+            # 增量更新用户画像结构化摘要（随对话演进）
+            try:
+                memory.update_profile_summary_from_history(history)
+            except Exception:
+                pass  # 摘要更新失败不阻塞响应
+
+        # 更新长期记忆（跨会话用户事实，即便开了新对话也保留）
         try:
             memory.update_long_term_memory(message, reply_text)
             # 刷新 session 中的记忆缓存，下次请求会重新加载
@@ -721,15 +845,17 @@ def api_coach_history():
     """返回已持久化的对话历史，供前端在加载/刷新/切换标签后重水合。"""
     data_dir = current_app.config["DATA_DIR"]
     history = _load_chat_history(data_dir)
+    _ensure_message_ids(history)
     return jsonify({"ok": True, "history": history})
 
 
 @coach_bp.route("/api/coach/history/clear", methods=["POST"])
 def api_coach_history_clear():
-    """清空对话历史（开始新对话）。"""
+    """清空对话历史（开始新对话）。同时递增 epoch，作废进行中的旧对话保存。"""
     data_dir = current_app.config["DATA_DIR"]
     try:
         _save_chat_history(data_dir, [])
+        _bump_epoch(data_dir)
     except Exception:
         return jsonify({"ok": False, "error": "清空失败"}), 500
     return jsonify({"ok": True})
@@ -742,3 +868,71 @@ def api_coach_profile_summary():
     # memory 模块按固定路径读写 data/profile_summary.json
     summary = memory.load_profile_summary()
     return jsonify({"ok": True, "summary": summary})
+
+
+# ============================================================
+# 周复盘闭环：教练对话入口 + API
+# ============================================================
+def _is_review_request(message):
+    """识别周复盘 / 周报 / 调整计划意图（快速关键词，避免每次都调 LLM）。
+
+    仅匹配明确指向"训练计划复盘"的表达；纯知识问题（如"配速要不要调整"）
+    不含"计划/复盘/周报"等词，不会误触发。
+    """
+    if not message:
+        return False
+    kw = ("复盘", "周报", "本周总结", "本周回顾", "训练复盘",
+          "调整计划", "调整我的计划", "调整当前计划",
+          "调整一下当前计划", "调整一下我的计划")
+    return any(k in message for k in kw)
+
+
+def _stream_weekly_review(data_dir):
+    """流式返回周复盘报告（确定性，不依赖 LLM，离线可用）。"""
+    full_reply = []
+
+    def gen():
+        nonlocal full_reply
+        try:
+            report = weekly_review.build_review_report(data_dir)
+            text = report.get("report_text", "")
+            pieces = re.split(r'(?<=[。！？\n])', text)
+            for c in pieces:
+                if c:
+                    full_reply.append(c)
+                    yield f"data: {json.dumps({'chunk': c})}\n\n"
+            yield f"data: {json.dumps({'review_data': report})}\n\n"
+        except Exception as e:
+            err = f"\n⚠️ 复盘失败：{type(e).__name__}: {e}"
+            full_reply.append(err)
+            yield f"data: {json.dumps({'chunk': err})}\n\n"
+        finally:
+            now = datetime.now().isoformat()
+            history = _load_chat_history(data_dir)
+            history.append({"role": "user", "content": "（请求本周训练复盘）", "time": now})
+            history.append({"role": "assistant", "content": "".join(full_reply), "time": now})
+            max_entries = MAX_HISTORY_ROUNDS * 2
+            if len(history) > max_entries:
+                history[:] = history[-max_entries:]
+            try:
+                _persist_history(data_dir, history)
+            except Exception:
+                pass
+            yield "data: [DONE]\n\n"
+
+    return Response(
+        stream_with_context(gen()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@coach_bp.route("/api/coach/weekly-review", methods=["GET"])
+def api_coach_weekly_review():
+    """返回确定性周复盘报告（JSON）。不依赖 LLM，可离线调用。"""
+    data_dir = current_app.config["DATA_DIR"]
+    try:
+        report = weekly_review.build_review_report(data_dir)
+        return jsonify({"ok": True, **report})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})

@@ -235,6 +235,45 @@ def get_recent_runs(client=None, limit=5, data_dir=None, files=None):
     return unique_runs[:limit]
 
 
+def get_all_runs(client=None, data_dir=None, files=None):
+    """返回 data/ 目录下解析出的全部跑步记录（去重、按日期倒序），不限制条数。
+
+    与 get_recent_runs 区别：
+      - 不截断（get_recent_runs 仅取最近 limit 条，会把窗口外的真实执行数据漏掉）；
+      - 不依赖 build_runner_profile 的内存缓存（直接解析文件）。
+    供周复盘等需要"完整实际执行数据"的场景使用。
+    """
+    if data_dir is None:
+        data_dir = DEFAULT_DATA_DIR
+
+    if files is None:
+        files = _scan_activity_files(data_dir)
+
+    runs = []
+    for filepath in files:
+        rec = parse_activity_file(filepath)
+        if rec is None:
+            continue
+        # CSV 文件返回多条记录列表，其他格式返回单条 dict
+        if isinstance(rec, list):
+            runs.extend(r for r in rec if r.get("日期"))
+        elif rec.get("日期"):
+            runs.append(rec)
+
+    # 去重（按 日期+距离+时长 组合键）
+    seen = set()
+    unique_runs = []
+    for r in runs:
+        key = (r.get("日期"), r.get("距离_km"), r.get("时长_分钟"))
+        if key not in seen:
+            seen.add(key)
+            unique_runs.append(r)
+
+    # 按日期倒序
+    unique_runs.sort(key=lambda r: r["日期"], reverse=True)
+    return unique_runs
+
+
 def build_runner_profile(client=None):
     """
     汇总所有数据，构建结构化的"跑者画像"。
@@ -249,7 +288,7 @@ def build_runner_profile(client=None):
         dict，跑者画像，结构与 garmin_tool 完全一致：
         {
             "目标": {"目标完赛时间": "06:00:00"},
-            "基本信息": {"最近跑步次数": 5, "最近一次跑步日期": "..."},
+            "基本信息": {"最近跑步次数（全量，不截断）": "N", "最近一次跑步日期": "..."},
             "近期跑步数据": [...],
             "健康指标": {...},
             "体能指标": {...}
@@ -287,9 +326,9 @@ def build_runner_profile(client=None):
     manual_cfg = _load_manual_config(data_dir)
 
     if activity_files:
-        # 文件模式：解析运动文件获取跑步数据
+        # 文件模式：解析运动文件获取跑步数据（全量，不截断——避免漏掉真实执行数据）
         print(f"  模式：文件导入（找到 {len(activity_files)} 个运动文件）")
-        recent_runs = get_recent_runs(limit=5, data_dir=data_dir, files=activity_files)
+        recent_runs = get_all_runs(data_dir=data_dir, files=activity_files)
 
         # 健康指标/体能指标：运动文件无法获取，尝试用 manual_input.json 补充
         if manual_cfg:
@@ -345,6 +384,8 @@ def build_runner_profile(client=None):
         "近期跑步数据": recent_runs,
         "健康指标": health,
         "体能指标": fitness,
+        # 近期比赛成绩：供 VDOT 推导与计划生成使用；无比赛成绩时为 None
+        "近期比赛成绩": (manual_cfg or {}).get("近期比赛成绩"),
     }
 
     # 缓存数据源信息

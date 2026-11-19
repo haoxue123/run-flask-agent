@@ -142,7 +142,7 @@ def calc_readiness(resting_hr, baseline_resting_hr=None, sleep_hours=None):
         int，0-100 的就绪度分数
     """
     if not resting_hr:
-        return 70  # 无数据时默认中等
+        return None  # 无静息心率数据，无法评估 → 显式返回 None，不再冒充中等就绪度
 
     if baseline_resting_hr is None:
         baseline_resting_hr = 60
@@ -216,7 +216,8 @@ def calc_training_summary(runs, resting_hr=None, max_hr=None, age=None,
             "training_load": int,       # 0-100
             "acwr": float or None,
             "acwr_risk": dict,
-            "readiness": int,           # 0-100
+            "readiness": int or None,           # 0-100；无静息心率时为 None（数据不足）
+            "readiness_available": bool,        # 是否有足够数据计算就绪度
             "avg_trimp_per_run": float,
             "run_count": int,
         }
@@ -230,6 +231,7 @@ def calc_training_summary(runs, resting_hr=None, max_hr=None, age=None,
             "acwr": None,
             "acwr_risk": format_acwr_risk(None),
             "readiness": calc_readiness(resting_hr, baseline_resting_hr, sleep_hours),
+            "readiness_available": bool(resting_hr),
             "avg_trimp_per_run": 0,
             "run_count": 0,
         }
@@ -284,6 +286,7 @@ def calc_training_summary(runs, resting_hr=None, max_hr=None, age=None,
 
     # 就绪度
     readiness = calc_readiness(resting_hr, baseline_resting_hr, sleep_hours)
+    readiness_available = bool(resting_hr)
 
     # 平均每次 TRIMP
     avg_trimp = round(sum(acute_trimps) / len(acute_trimps), 1) if acute_trimps else 0
@@ -294,6 +297,7 @@ def calc_training_summary(runs, resting_hr=None, max_hr=None, age=None,
         "acwr": acwr,
         "acwr_risk": format_acwr_risk(acwr),
         "readiness": readiness,
+        "readiness_available": readiness_available,
         "avg_trimp_per_run": avg_trimp,
         "run_count": run_count,
     }

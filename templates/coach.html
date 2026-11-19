@@ -66,6 +66,7 @@
     .chat-message {
         max-width: 80%;
         animation: coachFadeIn 0.3s ease;
+        overflow: hidden; /* 防止任何子元素（卡片/图片/长文本）视觉溢出造成"俯冲" */
     }
     .chat-message.user {
         margin-left: auto;
@@ -82,6 +83,11 @@
         display: flex;
         align-items: flex-start;
         gap: var(--rc-space-3);
+        min-width: 0; /* flex 子项关键：允许收缩，防止长内容把父容器撑开 */
+    }
+    .chat-row > div {
+        min-width: 0; /* 气泡+引用块容器：允许收缩 */
+        max-width: 100%;
     }
     .chat-user-row {
         display: flex;
@@ -111,6 +117,7 @@
         padding: var(--rc-space-3) var(--rc-space-4);
         font-size: var(--rc-text-sm);
         color: var(--rc-text);
+        overflow-wrap: break-word; word-break: break-word;
     }
     .chat-bubble-user {
         background: var(--rc-primary);
@@ -119,6 +126,7 @@
         border-bottom-right-radius: var(--rc-radius-md);
         padding: var(--rc-space-3) var(--rc-space-4);
         font-size: var(--rc-text-sm);
+        overflow-wrap: break-word; word-break: break-word;
     }
     .chat-time {
         font-size: var(--rc-text-xs);
@@ -132,20 +140,48 @@
         margin-right: var(--rc-space-1);
     }
 
-    /* ---- 打字动画 ---- */
-    .typing-dot {
-        display: inline-block;
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: var(--rc-text-muted);
+    /* ---- 增强型加载状态（渐进式上下文展示） ---- */
+    .typing-bubble {
+        padding: 14px 16px !important;
+    }
+    .typing-status {
+        display: flex; align-items: center; gap: 10px;
+    }
+    .typing-status-text {
+        font-size: var(--rc-text-sm, 13px);
+        color: var(--rc-text-secondary, #A9B4AE);
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+    }
+    .typing-dots {
+        display: inline-flex; gap: 4px; align-items: center;
+        padding-top: 2px;
+    }
+    .typing-dots i {
+        display: inline-block; width: 6px; height: 6px;
+        border-radius: 50%; background: var(--rc-primary, #2BD493);
+        opacity: 0.4;
         animation: coachBlink 1.4s infinite both;
     }
-    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
-    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes coachBlink {
-        0%, 80%, 100% { opacity: 0.2; }
-        40% { opacity: 1; }
+    .typing-dots i:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots i:nth-child(3) { animation-delay: 0.4s; }
+
+    /* 进度条（每 4s 加一段） */
+    .typing-progress {
+        display: flex; gap: 4px; margin-top: 10px;
+    }
+    .prog-seg {
+        width: 28px; height: 3px; border-radius: 2px;
+        background: rgba(255,255,255,0.06); transition: background .3s ease;
+    }
+    .prog-seg.active {
+        background: var(--rc-primary, #2BD493);
+        animation: prog-pulse 1.8s ease-in-out infinite;
+    }
+    @keyframes prog-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
     }
 
     /* ---- 输入区 ---- */
@@ -343,9 +379,10 @@
     }
 
     /* ---- 知识来源引用卡片（可点击复制） ---- */
+    /* 基础样式：聊天消息内联引用 — 轻量融入消息，不浮层化 */
     .ref-block {
-        margin-top: var(--rc-space-3);
-        padding-top: var(--rc-space-3);
+        margin-top: var(--rc-space-2);
+        padding-top: var(--rc-space-2);
         border-top: 1px dashed var(--rc-border);
     }
     .ref-title-lg {
@@ -355,21 +392,164 @@
         margin-bottom: var(--rc-space-2);
     }
     .ref-title-lg i { width: 14px; height: 14px; color: var(--rc-primary); }
-    .ref-card {
+
+    /* 聊天消息内的引用卡片：轻量内联，融入气泡 */
+    .chat-messages .ref-card {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: transparent; border: none; border-radius: 0;
+        padding: 0; margin: 0; cursor: pointer;
+        transition: color .15s ease;
+    }
+    .chat-messages .ref-card:hover { background: transparent; border-color: transparent; color: var(--rc-primary); }
+    .chat-messages .ref-card-icon { width: 13px; height: 13px; color: var(--rc-text-muted); flex-shrink: 0; margin-top: 0; }
+    .chat-messages .ref-card-main { flex: 1; min-width: 0; display: inline-flex; align-items: baseline; gap: 4px; flex-wrap: wrap; }
+    .chat-messages .ref-card-book { font-size: var(--rc-text-xs); font-weight: 600; color: var(--rc-text-secondary); line-height: 1.4; }
+    .chat-messages .ref-card-meta { font-size: var(--rc-text-xs); color: var(--rc-text-muted); margin-top: 0; display: inline; }
+    .chat-messages .ref-card-file { display: none; } /* 内联不显示文件名，底部面板已展示 */
+    .chat-messages .ref-card-copy { display: none; } /* 内联不显示复制按钮 */
+
+    /* 聊天消息内引用区块标题：轻量化 */
+    .chat-messages .ref-title-lg {
+        font-size: 10px; color: var(--rc-text-muted);
+        font-weight: 500; text-transform: none; letter-spacing: 0;
+        margin-bottom: var(--rc-space-1);
+        opacity: 0.7;
+    }
+    .chat-messages .ref-title-lg i { width: 11px; height: 11px; }
+    #rag-panel .ref-card {
         display: flex; align-items: flex-start; gap: 8px;
         background: var(--rc-muted); border: 1px solid var(--rc-border);
         border-radius: var(--rc-radius-md); padding: var(--rc-space-2) var(--rc-space-3);
         margin-bottom: var(--rc-space-2); cursor: pointer;
         transition: border-color .15s ease, background .15s ease;
     }
-    .ref-card:hover { border-color: var(--rc-primary); background: var(--rc-card); }
-    .ref-card-icon { width: 16px; height: 16px; color: var(--rc-primary); flex-shrink: 0; margin-top: 2px; }
-    .ref-card-main { flex: 1; min-width: 0; }
-    .ref-card-book { font-size: var(--rc-text-sm); font-weight: 600; color: var(--rc-text); line-height: 1.4; }
-    .ref-card-meta { font-size: var(--rc-text-xs); color: var(--rc-text-muted); margin-top: 2px; }
-    .ref-card-file { font-size: var(--rc-text-xs); color: var(--rc-text-muted); margin-top: 2px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .ref-card-copy { font-size: var(--rc-text-xs); color: var(--rc-primary); flex-shrink: 0; opacity: 0; transition: opacity .15s ease; align-self: center; }
-    .ref-card:hover .ref-card-copy { opacity: 1; }
+    #rag-panel .ref-card:hover { border-color: var(--rc-primary); background: var(--rc-card); }
+    #rag-panel .ref-card-icon { width: 16px; height: 16px; color: var(--rc-primary); flex-shrink: 0; margin-top: 2px; }
+    #rag-panel .ref-card-main { flex: 1; min-width: 0; }
+    #rag-panel .ref-card-book { font-size: var(--rc-text-sm); font-weight: 600; color: var(--rc-text); line-height: 1.4; }
+    #rag-panel .ref-card-meta { font-size: var(--rc-text-xs); color: var(--rc-text-muted); margin-top: 2px; }
+    #rag-panel .ref-card-file { font-size: var(--rc-text-xs); color: var(--rc-text-muted); margin-top: 2px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    #rag-panel .ref-card-copy { font-size: var(--rc-text-xs); color: var(--rc-primary); flex-shrink: 0; opacity: 0; transition: opacity .15s ease; align-self: center; }
+    #rag-panel .ref-card:hover .ref-card-copy { opacity: 1; }
+
+    /* ---- 训练计划周历卡片（教练对话内嵌） ---- */
+    .plan-card {
+        background: var(--rc-card, rgba(20,32,27,0.6));
+        border: 1px solid var(--rc-border, rgba(255,255,255,0.08));
+        border-radius: var(--rc-radius-lg, 14px);
+        padding: var(--rc-space-4, 16px);
+        margin-top: var(--rc-space-2, 8px);
+        max-width: 100%;
+        overflow: hidden;
+    }
+    .plan-card-header {
+        display: flex; align-items: center; gap: 8px;
+        font-size: var(--rc-text-sm, 14px); font-weight: 700;
+        color: var(--rc-text, #E8EDEA); margin-bottom: var(--rc-space-3, 12px);
+    }
+    .plan-card-icon { font-size: 18px; }
+    /* ---- 配速图：聊天内折叠展示（默认收起，不占空间） ---- */
+    .plan-stats-row {
+        display: flex; flex-wrap: wrap; gap: 6px;
+        margin-bottom: var(--rc-space-3, 12px);
+        align-items: center;
+    }
+    .plan-stat-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        background: rgba(43,212,147,0.08); border: 1px solid rgba(43,212,147,0.15);
+        border-radius: 20px; padding: 3px 10px; font-size: 11px;
+        color: var(--rc-primary, #2BD493); font-weight: 600;
+    }
+    .plan-stat-badge .stat-icon { font-size: 12px; }
+    .plan-stat-badge .stat-val { color: var(--rc-text, #E8EDEA); margin-left: 2px; }
+    .plan-chart-section {
+        border: 1px solid var(--rc-border, rgba(255,255,255,0.06));
+        border-radius: var(--rc-radius-md, 10px); overflow: hidden;
+        margin-bottom: var(--rc-space-3, 12px);
+        background: rgba(255,255,255,0.015);
+    }
+    .plan-chart-toggle {
+        display: flex; align-items: center; justify-content: space-between;
+        width: 100%; padding: 8px 12px; cursor: pointer;
+        background: none; border: none; color: var(--rc-text-secondary, #A9B4AE);
+        font-size: 12px; font-weight: 600; transition: color .15s ease;
+    }
+    .plan-chart-toggle:hover { color: var(--rc-text, #E8EDEA); }
+    .plan-chart-toggle .toggle-icon { transition: transform .2s ease; }
+    .plan-chart-section.expanded .toggle-icon { transform: rotate(180deg); }
+    .plan-chart-body {
+        display: none; padding: 0 10px 10px;
+    }
+    .plan-chart-section.expanded .plan-chart-body { display: block; }
+    .plan-chart-img {
+        width: 100%; border-radius: var(--rc-radius-md, 8px);
+        max-height: 320px; object-fit: contain;
+        background: var(--rc-card, rgba(20,24,27,0.8));
+    }
+    .plan-week { margin-bottom: var(--rc-space-3, 12px); }
+    .plan-week:last-child { margin-bottom: 0; }
+    .plan-week-label {
+        font-size: 11px; font-weight: 600; color: var(--rc-primary, #2BD493);
+        text-transform: uppercase; letter-spacing: 0.08em;
+        margin-bottom: var(--rc-space-2, 8px); padding-left: 2px;
+    }
+    .plan-week-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+        gap: 6px;
+    }
+    .plan-day {
+        background: var(--rc-muted, rgba(255,255,255,0.03));
+        border: 1px solid var(--rc-border, rgba(255,255,255,0.06));
+        border-radius: var(--rc-radius-md, 10px); padding: 8px 6px;
+        text-align: center; transition: border-color .15s ease;
+    }
+    .plan-day:hover { border-color: var(--rc-primary, #2BD493); }
+    .plan-day-active { background: rgba(43,212,147,0.04); }
+    .plan-day-rest { opacity: 0.45; }
+    .plan-day-header {
+        font-size: 11px; font-weight: 700; color: var(--rc-text-secondary, #A9B4AE);
+        margin-bottom: 4px;
+    }
+    .plan-day-header small { font-weight: 400; opacity: 0.6; }
+    .plan-day-type {
+        font-size: 12px; font-weight: 600; color: var(--rc-text, #E8EDEA);
+        line-height: 1.3; margin-bottom: 2px;
+    }
+    .plan-day-rest .plan-day-type { color: var(--rc-text-muted, #6b7c74); }
+    .plan-day-dist {
+        font-size: 11px; color: var(--rc-primary, #2BD493); font-weight: 600;
+    }
+    .plan-day-pace {
+        font-size: 10px; color: var(--rc-text-muted, #6b7c74);
+        margin-top: 2px;
+    }
+    .plan-day-note {
+        font-size: 9px; color: var(--rc-text-muted, #6b7c74);
+        margin-top: 3px; line-height: 1.3; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap;
+    }
+    .plan-card-link {
+        display: inline-block; margin-top: var(--rc-space-3, 12px);
+        font-size: var(--rc-text-xs, 12px); color: var(--rc-primary, #2BD493);
+        text-decoration: none; font-weight: 600; transition: opacity .15s ease;
+    }
+    .plan-card-link:hover { opacity: 0.8; }
+    /* 计划摘要折叠块 */
+    .plan-summary-block {
+        margin-top: var(--rc-space-2, 8px); border-top: 1px dashed var(--rc-border, rgba(255,255,255,0.08));
+        padding-top: var(--rc-space-2, 8px);
+    }
+    .plan-summary-toggle {
+        cursor: pointer; font-size: 11px; color: var(--rc-text-muted, #6b7c74);
+        display: flex; align-items: center; gap: 4px; user-select: none;
+    }
+    .plan-summary-toggle:hover { color: var(--rc-text-secondary, #A9B4AE); }
+    .plan-summary-body {
+        display: none; margin-top: 6px; font-size: 12px; line-height: 1.6;
+        color: var(--rc-text-secondary, #A9B4AE); white-space: pre-wrap;
+    }
+    .plan-summary-block.expanded .plan-summary-body { display: block; }
 </style>
 {% endblock %}
 {% block content %}
@@ -566,6 +746,12 @@
         return text.slice(0, idx).replace(/\s+$/, '');
     }
 
+    // 把知识库文件的技术后缀（.md）去掉，只留人类可读的说明名称
+    function formatSourceFile(file) {
+        if (!file) return file;
+        return String(file).replace(/\.md$/i, '').trim();
+    }
+
     // 单张引用卡片
     function renderRefCards(refs) {
         if (!refs || !refs.length) return '';
@@ -576,7 +762,7 @@
             var metaStr = meta.length ? meta.join('，') : '';
             var book = escapeHtml(r.title || '');
             var metaHtml = metaStr ? '<div class="ref-card-meta">' + escapeHtml(metaStr) + '</div>' : '';
-            var fileHtml = r.file ? '<div class="ref-card-file">' + escapeHtml(r.file) + '</div>' : '';
+            var fileHtml = r.file ? '<div class="ref-card-file">' + escapeHtml(formatSourceFile(r.file)) + '</div>' : '';
             var attr = escapeHtml(JSON.stringify(r));
             return '<div class="ref-card" data-ref="' + attr + '" title="点击复制引用">' +
                 '<i data-lucide="book" class="ref-card-icon"></i>' +
@@ -597,7 +783,7 @@
     function copyCitation(ref) {
         var cite = '《' + (ref.title || '') + '》' +
             ((ref.author || ref.year) ? '（' + [ref.author, ref.year].filter(Boolean).join('，') + '）' : '') +
-            ' · ' + (ref.file || '');
+            ' · ' + (ref.file ? formatSourceFile(ref.file) : '');
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(cite).then(function() {
                 if (window.DS && DS.showToast) DS.showToast('引用已复制', 'success');
@@ -634,7 +820,9 @@
         div.className = 'chat-message ' + role;
 
         if (role === 'coach') {
-            var bodyText = (references && references.length) ? stripRefBlock(content) : content;
+            // 始终剥离「参考来源」原文段：无论后端是否成功解析出结构化卡片，
+            // 气泡里都不应出现含 .md 的原始引用行（解析失败时也不泄漏技术后缀）
+            var bodyText = stripRefBlock(content);
             div.innerHTML =
                 '<div class="chat-row">' +
                 '<div class="coach-orb coach-orb--chat" aria-hidden="true"></div>' +
@@ -692,33 +880,96 @@
             });
     }
     window.newChat = function () {
+        var btn = document.getElementById('newChatBtn');
+        if (btn) { btn.disabled = true; btn.textContent = '清空中…'; }
+        // 1. 立即视觉清空（即时反馈，不等网络）
+        chatMessages.querySelectorAll('.chat-message').forEach(function (n) { n.remove(); });
+        var welcome = document.createElement('div');
+        welcome.className = 'chat-message coach';
+        welcome.innerHTML = '<div class="chat-row"><div class="coach-orb coach-orb--chat" aria-hidden="true"></div>'
+            + '<div><div class="chat-bubble-coach"><p>你好！我是你的 AI 跑步教练。我可以帮你分析训练数据、制定训练计划、提供配速建议和伤病预防指导。</p></div>'
+            + '<div class="chat-time chat-time-left">刚刚</div></div></div>';
+        chatMessages.appendChild(welcome);
+        // 2. 清本地镜像
         try { localStorage.removeItem(LS_KEY); } catch (e) {}
+        // 3. await 清空成功再 reload；失败显式提示，不再静默
         fetch('/api/coach/history/clear', { method: 'POST' })
-            .catch(function () {})
-            .finally(function () { location.reload(); });
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d && d.ok) { location.reload(); }
+                else { throw new Error('clear-failed'); }
+            })
+            .catch(function () {
+                if (window.DS && DS.showToast) DS.showToast('清空失败，请重试', 'error');
+                else alert('清空失败，请稍后重试');
+                if (btn) { btn.disabled = false; btn.textContent = '新对话'; }
+            });
     };
 
-    // 显示 typing 动画
-    function addTyping() {
+    // ---- 意图检测（轻量，与后端 _PLAN_WORDS 保持同步） ----
+    var _PLAN_HINTS = /计划|生成.*计划|制定.*训练|安排.*训练|训练方案|周计划/;
+    function _detectIntent(msg) {
+        if (_PLAN_HINTS.test(msg)) return 'plan';
+        if (/分析|配速|跑量|心率|伤病|恢复|营养/.test(msg)) return 'analyze';
+        return 'chat';
+    }
+
+    // ---- 渐进式加载状态管理 ----
+    var _loadingTimer = null;
+    var _loadingPhase = 0;  // 0=初始 1=处理中 2=深度思考中 3=仍在工作
+
+    // 阶段文案映射（按意图）
+    var _LOADING_TEXT = {
+        plan:   ['正在理解你的训练目标…', '正在调用科学模型生成计划…', '正在计算每日配速与跑量…', '正在生成可视化图表…'],
+        analyze:['正在分析你的数据…', '正在检索相关知识库…', '正在对比科学标准…', '即将给出建议…'],
+        chat:   ['正在思考…', '正在组织回答…']
+    };
+
+    function addTyping(intent) {
+        intent = intent || 'chat';
+        removeTyping();  // 防重复
+        _loadingPhase = 0;
+
         var div = document.createElement('div');
         div.className = 'chat-message coach';
         div.id = 'typing-indicator';
         div.innerHTML =
             '<div class="chat-row">' +
             '<div class="coach-orb coach-orb--chat is-thinking" id="typing-orb"></div>' +
-            '<div class="chat-bubble-coach">' +
-            '<span class="typing-dot"></span>' +
-            '<span class="typing-dot"></span>' +
-            '<span class="typing-dot"></span>' +
+            '<div class="chat-bubble-coach typing-bubble">' +
+            '<div class="typing-status">' +
+                '<span class="typing-status-text" id="typing-text">' + (_LOADING_TEXT[intent][0] || '正在思考…') + '</span>' +
+                '<span class="typing-dots"><i></i><i></i><i></i></span>' +
+            '</div>' +
+            '<div class="typing-progress" id="typing-progress"></div>' +
             '</div>' +
             '</div>';
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;
         lucide.createIcons();
+
+        // 渐进式状态升级：每 4s 升一级，最长覆盖 16s
+        var phases = _LOADING_TEXT[intent] || _LOADING_TEXT.chat;
+        _loadingTimer = setInterval(function() {
+            _loadingPhase++;
+            var textEl = document.getElementById('typing-text');
+            var progEl = document.getElementById('typing-progress');
+            if (!textEl) { clearInterval(_loadingTimer); return; }
+            if (_loadingPhase < phases.length) {
+                textEl.textContent = phases[_loadingPhase];
+                // 进度条加一段
+                if (progEl) {
+                    var seg = document.createElement('div');
+                    seg.className = 'prog-seg active';
+                    progEl.appendChild(seg);
+                }
+            }
+        }, 4000);
     }
 
-    // 移除 typing 动画
+    // 移除 typing 动画（含定时器清理）
     function removeTyping() {
+        if (_loadingTimer) { clearInterval(_loadingTimer); _loadingTimer = null; }
         var el = document.getElementById('typing-indicator');
         if (el) el.remove();
     }
@@ -738,12 +989,13 @@
 
         isSending = true;
         setOrbState('is-thinking');
+        var intent = _detectIntent(msg);
         addMessage('user', msg);
         pushMirror('user', msg);
         chatInput.value = '';
         chatInput.style.height = '';
         sendBtn.disabled = true;
-        addTyping();
+        addTyping(intent);
 
         fetch('/api/coach/chat', {
             method: 'POST',
@@ -804,6 +1056,117 @@
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
 
+            // 收到结构化计划数据：在聊天消息中渲染为周历卡片
+            function applyPlanCard(planData) {
+                finalized = true;
+                if (rafId) { clearTimeout(rafId); rafId = null; }
+                if (!coachDiv) coachDiv = addMessage('coach', '');
+                var inner = coachDiv.querySelector('.chat-row > div');
+                var bubble = coachDiv.querySelector('.chat-bubble-coach');
+                if (bubble) bubble.innerHTML = renderPlanCard(planData);
+                // 把纯文本摘要保留为引用块（折叠状态）
+                var summaryBlock = document.createElement('div');
+                summaryBlock.className = 'plan-summary-block';
+                summaryBlock.innerHTML = '<span class="plan-summary-toggle" onclick="this.parentElement.classList.toggle(\'expanded\')">📊 计划详情 <i data-lucide="chevron-down" style="width:14px;height:14px"></i></span><div class="plan-summary-body">' + escapeHtml(fullText) + '</div>';
+                if (inner) inner.appendChild(summaryBlock);
+                if (window.lucide) lucide.createIcons();
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            // 将结构化计划数据渲染为周历卡片 HTML
+            function renderPlanCard(planData) {
+                var days = planData.days || [];
+                if (!days.length) return '<p>（无法解析计划结构）</p>';
+
+                // ---- 从 days 提取关键指标 ----
+                var totalDays = days.length;
+                var runDays = days.filter(function(d) { return !(d.is_rest || d.type === '休息'); });
+                var restDays = totalDays - runDays.length;
+                var totalDist = 0;
+                var paceVals = [];
+                for (var i = 0; i < runDays.length; i++) {
+                    if (runDays[i].distance_km) totalDist += Number(runDays[i].distance_km);
+                    if (runDays[i].target_pace_sec) paceVals.push(Number(runDays[i].target_pace_sec));
+                }
+                var avgPace = '--';
+                if (paceVals.length > 0) {
+                    var avgSec = Math.round(paceVals.reduce(function(a,b){return a+b;},0) / paceVals.length);
+                    var m = Math.floor(avgSec / 60), s = avgSec % 60;
+                    avgPace = m + '\'' + (s < 10 ? '0' : '') + s + '\"';
+                }
+                // 类型分布统计
+                var typeCount = {};
+                for (var t = 0; t < runDays.length; t++) {
+                    var tp = runDays[t].type || '训练';
+                    typeCount[tp] = (typeCount[tp] || 0) + 1;
+                }
+                var topTypes = Object.keys(typeCount).sort(function(a,b){return typeCount[b]-typeCount[a];}).slice(0,3);
+
+                // ---- 指标 badge 行 ----
+                var statsHtml = '<div class="plan-stats-row">';
+                statsHtml += '<span class="plan-stat-badge"><span class="stat-icon">📅</span>' + totalDays + '天</span>';
+                statsHtml += '<span class="plan-stat-badge"><span class="stat-icon">🏃</span><span class="stat-val">' + runDays.length + '训练</span> / ' + restDays + '休</span>';
+                if (totalDist > 0) {
+                    statsHtml += '<span class="plan-stat-badge"><span class="stat-icon">📏</span><span class="stat-val">' + totalDist.toFixed(1) + 'km</span></span>';
+                }
+                if (avgPace !== '--') {
+                    statsHtml += '<span class="plan-stat-badge"><span class="stat-icon">⏱</span>均配速 <span class="stat-val">' + avgPace + '/km</span></span>';
+                }
+                statsHtml += '</div>';
+
+                // ---- 图表（折叠区） ----
+                var chartSection = '';
+                if (planData.chart_url) {
+                    chartSection = '<div class="plan-chart-section" id="planChartSec">' +
+                        '<button class="plan-chart-toggle" onclick="this.parentElement.classList.toggle(\'expanded\')">' +
+                            '<span>📈 配速概览</span>' +
+                            '<i data-lucide="chevron-down" class="toggle-icon" style="width:16px;height:16px"></i>' +
+                        '</button>' +
+                        '<div class="plan-chart-body">' +
+                            '<img src="' + escapeHtml(planData.chart_url) + '" class="plan-chart-img" alt="配速图" onerror="this.style.display=\'none\'">' +
+                        '</div>' +
+                    '</div>';
+                }
+
+                // 按周分组
+                var weeks = [];
+                var currentWeek = [];
+                for (var i = 0; i < days.length; i++) {
+                    currentWeek.push(days[i]);
+                    if (currentWeek.length === 7 || i === days.length - 1) {
+                        weeks.push(currentWeek.slice());
+                        currentWeek = [];
+                    }
+                }
+                var html = '<div class="plan-card">';
+                html += '<div class="plan-card-header"><span class="plan-card-icon">📋</span>训练计划已生成</div>';
+                html += statsHtml;
+                html += chartSection;
+                for (var w = 0; w < weeks.length; w++) {
+                    html += '<div class="plan-week"><div class="plan-week-label">第 ' + (w + 1) + ' 周</div><div class="plan-week-grid">';
+                    for (var d = 0; d < weeks[w].length; d++) {
+                        var day = weeks[w][d];
+                        var isRest = day.is_rest || day.type === '休息';
+                        var typeClass = isRest ? 'plan-day-rest' : 'plan-day-active';
+                        var typeLabel = day.type || (isRest ? '休息' : '训练');
+                        var dist = day.distance_km != null ? day.distance_km + 'km' : '';
+                        var pace = day.target_pace || '';
+                        var note = day.note || '';
+                        html += '<div class="plan-day ' + typeClass + '">' +
+                            '<div class="plan-day-header">D' + day.day + ' <small>' + (day.weekday || '') + '</small></div>' +
+                            '<div class="plan-day-type">' + escapeHtml(typeLabel) + '</div>' +
+                            (dist ? '<div class="plan-day-dist">' + escapeHtml(dist) + '</div>' : '') +
+                            (pace ? '<div class="plan-day-pace">⏱ ' + escapeHtml(pace) + '</div>' : '') +
+                            (note ? '<div class="plan-day-note">' + escapeHtml(note) + '</div>' : '') +
+                            '</div>';
+                    }
+                    html += '</div></div>';
+                }
+                html += '<a href="/training#step3" class="plan-card-link">前往「训练计划」页调整 →</a>';
+                html += '</div>';
+                return html;
+            }
+
             function readStream() {
                 reader.read().then(function(result) {
                     if (result.done) {
@@ -860,6 +1223,9 @@
                             }
                         } else if (data.references) {
                             applyReferences(data.references);
+                        } else if (data.plan_data) {
+                            // 收到结构化计划数据：渲染为周历卡片（替代纯文本的土格式）
+                            applyPlanCard(data.plan_data);
                         } else if (data.error) {
                             addMessage('coach', '教练暂时无法回复：' + data.error);
                             DS.showToast('发送失败，请重试', 'error');

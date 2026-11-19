@@ -1,39 +1,44 @@
-# 马拉松训练计划 Agent 依赖
-# ==============================
+# Marathon Training Plan Agent dependencies
+# ==========================================
 
-# 运动文件解析（工具使用模式：文件导入）
+# Activity file parsers (file-import mode)
 gpxpy>=1.6.0
 fitparse>=1.2.0
-# TCX 用 Python 标准库 xml.etree.ElementTree 解析，无需额外依赖
+# TCX is parsed with xml.etree.ElementTree (stdlib), no extra dep.
 
-# DeepSeek LLM 调用（兼容 OpenAI SDK）
+# DeepSeek LLM client (OpenAI-compatible SDK)
 openai>=1.30.0
 
-# 环境变量管理
+# Environment variables
 python-dotenv>=1.0.0
 
-# Notebook 环境
+# Notebook environment
 jupyter>=1.0.0
 ipykernel>=6.0.0
 
-# 训练计划可视化
+# Training-plan visualization
 matplotlib>=3.7.0
 
-# Web 应用框架
+# Web framework
 flask>=3.0.0
 
-# RAG 知识库（启用语义检索时需安装；缺失时 rag 模块会静默降级）
+# RAG knowledge base (optional; rag.py silently degrades if missing)
 chromadb>=0.4.22
 sentence-transformers>=2.2.0
 
-# Garmin Connect 同步（garth-ng：OAuth 令牌持久化+中国区支持，根治反复登录 429 / DNS 不通）
+# Garmin Connect sync (garth-ng: OAuth token persistence + China region support)
 garth-ng>=1.1.0
 
-# 后台定时任务（自动同步 Garmin 数据：启动拉一次 + 定时刷新）
+# Garmin browser-automated sync (Playwright): Garmin blocked HTTP-level auth
+# in 2026-03; the only working path is a real browser. Uses system Chrome if
+# present, otherwise downloads Chromium via `playwright install chromium`.
+playwright>=1.40.0
+
+# Background scheduled sync (auto-pull on startup + periodic refresh)
 APScheduler>=3.10.0
 
-# mem0 跨会话长期记忆层（自托管 OSS：DeepSeek 抽取 + 智谱 embedding-3 + Chroma 向量库）
+# mem0 long-term memory layer (self-hosted OSS fallback if keys missing)
 mem0ai>=2.0.0
 
-# 测试（smoke 测试：失败即阻断，区别于评测 harness）
+# Tests (smoke tests block on failure)
 pytest>=8.0.0
