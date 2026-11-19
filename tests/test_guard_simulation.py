@@ -73,6 +73,19 @@ def _mock_llm():
     }
 
 
+@pytest.fixture(autouse=True)
+def _isolate_data_source(monkeypatch, tmp_path):
+    """把 build_runner_profile 的数据源指向临时目录，并清缓存。
+
+    generate() 表单数据写入 app.config["DATA_DIR"]，但 build_runner_profile()
+    读的是 data_tool.DEFAULT_DATA_DIR 全局。两者都指向 tmp_path 才能对齐，
+    避免测试依赖本机 data/ 下的私有数据。
+    """
+    import data_tool
+    monkeypatch.setattr(data_tool, "DEFAULT_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(data_tool, "_profile_cache", None)
+
+
 @pytest.fixture
 def app_client(tmp_path):
     """搭一个最小 Flask 应用，只挂 plan 蓝图，落盘全部指向 tmp_path。"""
@@ -154,7 +167,7 @@ def test_safe_write_json_backup_under_guard(app_client):
     assert json.load(open(p + ".bak", encoding="utf-8"))["v"] == 1, ".bak 应为旧值"
 
 
-def test_full_app_generate_under_guard():
+def test_full_app_generate_under_guard(tmp_path):
     """最高保真：用真实 create_app() 完整应用（含 token 中间件、全部蓝图），
     在沙箱护栏下跑 /generate，确认整条部署链路不崩。"""
     # 必须在 import app 之前注入强 SECRET_KEY，并关闭访问口令
@@ -163,8 +176,12 @@ def test_full_app_generate_under_guard():
 
     import app as appmod
     import llm_agent
+    import data_tool
 
-    tmp = tempfile.mkdtemp()
+    # 与 autouse fixture 的隔离目录对齐：app 写入点和 profile 读取点必须是同一处
+    tmp = str(tmp_path)
+    data_tool.DEFAULT_DATA_DIR = tmp
+    data_tool._profile_cache = None
     appmod.app.config["DATA_DIR"] = tmp
     appmod.app.config["UPLOAD_DIR"] = os.path.join(tmp, "uploads")
     appmod.app.config["CHART_DIR"] = os.path.join(tmp, "charts")

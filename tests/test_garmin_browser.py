@@ -124,6 +124,19 @@ _install_fake_playwright()
 import garmin_browser  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _fake_credentials(monkeypatch):
+    """注入假账号，避免 mock 流程走到真实凭证检查而中断。
+
+    playwright 已被本文件的假模块替换，不会真的联网登录；
+    凭证仅用于通过 _get_credentials() 的守卫。
+    """
+    monkeypatch.setattr(
+        garmin_browser, "_get_credentials",
+        lambda: ("test_user", "test_pass", False),
+    )
+
+
 @pytest.fixture
 def tmp_out(tmp_path):
     # 把 Cookie 路径指向临时目录，避免写脏 data/

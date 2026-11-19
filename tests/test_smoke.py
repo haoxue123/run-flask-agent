@@ -144,7 +144,22 @@ def test_classify_intent_relation():
     assert rl.classify_intent_relation("") is False
 
 
-def test_retrieve_relations_causal_hit():
+def test_retrieve_relations_causal_hit(tmp_path, monkeypatch):
+    """关系检索：自带三元组夹具，不依赖 data/relations.json（非版本化数据）。"""
+    import json as _json
+    relations = {"triples": [{
+        "subject": "跑步膝",
+        "aliases": ["膝盖疼", "膝痛"],
+        "predicate": "成因",
+        "object": "髌股关节压力过大",
+        "note": "跑量增长过快或股四头肌薄弱会增加髌股关节负荷",
+    }]}
+    rp = tmp_path / "relations.json"
+    rp.write_text(_json.dumps(relations, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(rl, "RELATIONS_PATH", str(rp))
+    monkeypatch.setattr(rl, "_triples", None)
+    monkeypatch.setattr(rl, "_index", None)
+
     assert rl.get_triple_count() > 0
     # 因果且含实体别名「膝盖疼」→ 应返回非空结构化推理辅助文本
     ctx = rl.retrieve_relations("为什么跑步会膝盖疼？")

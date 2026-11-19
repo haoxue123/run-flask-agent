@@ -123,10 +123,28 @@ def test_readiness_explicit_when_no_data():
     assert s2["readiness_available"] is True
 
 
-def test_profile_uses_all_runs():
-    """build_runner_profile 应使用全量数据，而非仅最近 5 条。"""
+def test_profile_uses_all_runs(tmp_path, monkeypatch):
+    """build_runner_profile 应使用全量数据，而非仅最近 5 条。
+
+    自包含：原版本读取本机 data/manual_input.json（被 .gitignore），
+    干净 checkout 上没有该文件 -> FileNotFoundError。这里注入临时目录
+    与临时数据（7 条），既验证"不截断到 5 条"又不依赖本机私有数据。
+    """
+    import json as _json
     import data_tool as dt
+
+    runs = [{
+        "日期": f"2026-07-{d:02d}", "距离_km": 5.0, "时长_分钟": 30.0,
+        "平均配速_秒每公里": 360, "平均心率": 150, "活动名称": "测试跑",
+    } for d in range(1, 8)]  # 7 条 > 5，专门验证未截断
+    (tmp_path / "manual_input.json").write_text(
+        _json.dumps({"近期跑步数据": runs, "目标": {"目标完赛时间": "06:00:00"}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dt, "DEFAULT_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(dt, "_profile_cache", None)
+
     prof = dt.build_runner_profile()
-    assert len(prof["近期跑步数据"]) >= 5  # 真实仓库数据 > 5 条，验证未截断
+    assert len(prof["近期跑步数据"]) == 7, "应使用全量 7 条，不得截断到 5 条"
     assert prof["基本信息"].get("最近一次跑步日期") is not None
 
